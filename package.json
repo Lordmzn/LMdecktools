@@ -37,7 +37,8 @@
 		"vite": "^6.0.0"
 	},
 	"dependencies": {
-		"@inlang/paraglide-sveltekit": "^0.15.5"
+		"@inlang/paraglide-sveltekit": "^0.15.5",
+		"yjs": "^13.6.29"
 	},
 	"pnpm": {
 		"onlyBuiltDependencies": [
