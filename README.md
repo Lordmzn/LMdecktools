@@ -38,9 +38,13 @@ LM Deck Tools gives MTG players a single place to manage their decks and physica
 | Storage | IndexedDB (browser-local) |
 | Card Data | Scryfall API |
 | i18n | Paraglide (EN, IT) |
+| Testing | Vitest, Playwright |
 | Build | Vite 6, pnpm |
+| CI | GitHub Actions |
 
 ## Getting Started
+
+Requires **Node 22+** (use `nvm use` to activate the version pinned in `.nvmrc`).
 
 ```bash
 # Install dependencies
@@ -54,6 +58,10 @@ pnpm run build
 
 # Preview production build
 pnpm run preview
+
+# Run tests
+pnpm test             # Unit/component tests
+pnpm test:e2e         # E2E tests (Playwright)
 ```
 
 ## Project Structure
@@ -61,14 +69,19 @@ pnpm run preview
 ```
 src/
   lib/
+    __tests__/      # Unit tests (db, yjs-integration, store)
     components/     # Reusable UI components (Card, SearchBar, Header, etc.)
     store.svelte.ts # Central state management (decks + collection)
     db.ts           # IndexedDB operations
     i18n.ts         # Internationalization
+  tests/
+    setup.ts        # Test setup (fake-indexeddb, jest-dom)
   routes/
     +page.svelte    # Home / deck builder
     collection/     # Collection management page
   app.css           # Global styles
+tests/
+  e2e/              # Playwright E2E tests
 messages/
   en.json           # English translations
   it-it.json        # Italian translations

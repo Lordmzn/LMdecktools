@@ -11,5 +11,11 @@ export default defineConfig({
 			project: './project.inlang',
 			outdir: './src/lib/paraglide'
 		})
-	]
+	],
+	test: {
+		environment: 'jsdom',
+		globals: true,
+		setupFiles: ['./src/tests/setup.ts'],
+		include: ['src/**/*.test.ts']
+	}
 });
