@@ -7,7 +7,9 @@ import {
 	importDecksFromYjs,
 	mergeDecks,
 	mergeCardQuantities,
-	calculateDiff
+	calculateDiff,
+	exportWithMetadata,
+	importWithMetadata
 } from '../yjs-integration';
 
 function makeDeck(overrides: Partial<Deck> = {}): Deck {
@@ -145,6 +147,42 @@ describe('Yjs Integration', () => {
 
 			const result = mergeCardQuantities(local, remote);
 			expect(result).toHaveLength(2);
+		});
+	});
+
+	// [planned] exportWithMetadata should include both collection AND decks.
+	// Currently has an early return before the decks section.
+	describe('exportWithMetadata / importWithMetadata round-trip', () => {
+		it('round-trips decks through exportWithMetadata → importWithMetadata', () => {
+			const decks: Deck[] = [
+				makeDeck({
+					name: 'Red Aggro',
+					deck_cards: [
+						{ id: 'c1', name: 'Lightning Bolt', LM_quantity: 4, mana_cost: '{R}' },
+						{ id: 'c2', name: 'Goblin Guide', LM_quantity: 4 }
+					]
+				})
+			];
+
+			const mockStore = {
+				collection: [
+					{ id: 'c1', name: 'Lightning Bolt', quantity_owned: 4 }
+				]
+			};
+
+			// exportWithMetadata currently takes a StoreInterface; the planned
+			// version should also accept decks. For now we test that decks
+			// survive the round-trip — this will fail because exportWithMetadata
+			// has an early return before encoding decks.
+			const binary = exportWithMetadata(mockStore as any);
+			const result = importWithMetadata(binary);
+
+			expect(result.metadata.app).toBe('LM Deck Tools');
+			expect(result.metadata.version).toBe('1.0');
+			// This assertion fails: decks are never encoded due to early return
+			expect(result.decks).toHaveLength(1);
+			expect(result.decks[0].name).toBe('Red Aggro');
+			expect(result.decks[0].deck_cards).toHaveLength(2);
 		});
 	});
 
