@@ -3,7 +3,7 @@
 
   let currentPath = $derived($page.url.pathname);
   let isHomeActive = $derived(currentPath === '/');
-  let isDecksActive = $derived(currentPath === '/decks');
+  let isCardListsActive = $derived(currentPath === '/card-lists');
   let isCollectionActive = $derived(currentPath === '/collection');
 
 </script>
@@ -44,10 +44,10 @@
     </span>
   </a>
 
-  <a 
-    href="/decks"
-    class="px-6 py-3 font-medium rounded-t-lg transition-all {isDecksActive 
-      ? 'bg-orange-50 text-orange-900 border-t-2 border-x-2 border-orange-400' 
+  <a
+    href="/card-lists"
+    class="px-6 py-3 font-medium rounded-t-lg transition-all {isCardListsActive
+      ? 'bg-orange-50 text-orange-900 border-t-2 border-x-2 border-orange-400'
       : 'text-stone-600 hover:text-orange-900 hover:bg-orange-50/50'}"
   >
     <span class="flex items-center gap-2">
@@ -55,7 +55,7 @@
         <path d="M3 3v18h18"/>
         <path d="m19 9-5 5-4-4-3 3"/>
       </svg>
-      Deck Builder
+      Card Lists
     </span>
   </a>
   

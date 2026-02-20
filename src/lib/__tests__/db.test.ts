@@ -1,16 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
 	openDatabase,
-	createEmptyDeck,
-	saveDeck,
-	loadAllDecks,
-	deleteDeck,
+	createEmptyCardList,
+	saveCardList,
+	loadAllCardLists,
+	deleteCardList,
 	clearDatabase,
 	loadCollection,
 	saveCollectionCard,
 	deleteCollectionCard,
 	getCollectionCard,
-	type Deck,
+	type CardList,
 	type CollectionCard
 } from '../db';
 
@@ -30,73 +30,75 @@ describe('Database Operations', () => {
 		});
 	});
 
-	describe('createEmptyDeck', () => {
-		it('returns a deck with default values', () => {
-			const deck = createEmptyDeck();
+	describe('createEmptyCardList', () => {
+		it('returns a card list with default values', () => {
+			const cardList = createEmptyCardList();
 
-			expect(deck.name).toBe('Nuovo mazzo');
-			expect(deck.deck_cards).toEqual([]);
-			expect(deck.created_at).toBeTypeOf('number');
-			expect(deck.updated_at).toBeTypeOf('number');
-			expect(deck.id).toBeUndefined();
+			expect(cardList.name).toBe('Nuovo mazzo');
+			expect(cardList.cards).toEqual([]);
+			expect(cardList.cardMatching).toBe('generic');
+			expect(cardList.languageMatching).toBe('any');
+			expect(cardList.created_at).toBeTypeOf('number');
+			expect(cardList.updated_at).toBeTypeOf('number');
+			expect(cardList.id).toBeUndefined();
 		});
 	});
 
-	describe('Deck CRUD', () => {
-		it('saves and loads a deck', async () => {
-			const deck = createEmptyDeck();
-			const id = await saveDeck(db, deck);
+	describe('CardList CRUD', () => {
+		it('saves and loads a card list', async () => {
+			const cardList = createEmptyCardList();
+			const id = await saveCardList(db, cardList);
 
 			expect(id).toBeTypeOf('number');
 
-			const decks = await loadAllDecks(db);
-			expect(decks).toHaveLength(1);
-			expect(decks[0].name).toBe('Nuovo mazzo');
-			expect(decks[0].id).toBe(id);
+			const cardLists = await loadAllCardLists(db);
+			expect(cardLists).toHaveLength(1);
+			expect(cardLists[0].name).toBe('Nuovo mazzo');
+			expect(cardLists[0].id).toBe(id);
 		});
 
-		it('updates an existing deck', async () => {
-			const deck = createEmptyDeck();
-			const id = await saveDeck(db, deck);
+		it('updates an existing card list', async () => {
+			const cardList = createEmptyCardList();
+			const id = await saveCardList(db, cardList);
 
-			const updated: Deck = { ...deck, id, name: 'Updated Deck' };
-			await saveDeck(db, updated);
+			const updated: CardList = { ...cardList, id, name: 'Updated List' };
+			await saveCardList(db, updated);
 
-			const decks = await loadAllDecks(db);
-			expect(decks).toHaveLength(1);
-			expect(decks[0].name).toBe('Updated Deck');
+			const cardLists = await loadAllCardLists(db);
+			expect(cardLists).toHaveLength(1);
+			expect(cardLists[0].name).toBe('Updated List');
 		});
 
-		it('deletes a deck', async () => {
-			const deck = createEmptyDeck();
-			const id = await saveDeck(db, deck);
+		it('deletes a card list', async () => {
+			const cardList = createEmptyCardList();
+			const id = await saveCardList(db, cardList);
 
-			await deleteDeck(db, id);
+			await deleteCardList(db, id);
 
-			const decks = await loadAllDecks(db);
-			expect(decks).toHaveLength(0);
+			const cardLists = await loadAllCardLists(db);
+			expect(cardLists).toHaveLength(0);
 		});
 
-		it('saves a deck with cards', async () => {
-			const deck: Deck = {
-				...createEmptyDeck(),
-				deck_cards: [
+		it('saves a card list with cards', async () => {
+			const cardList: CardList = {
+				...createEmptyCardList(),
+				cards: [
 					{ id: 'card-1', name: 'Lightning Bolt', LM_quantity: 4 },
 					{ id: 'card-2', name: 'Counterspell', LM_quantity: 3 }
 				]
 			};
 
-			const id = await saveDeck(db, deck);
-			const decks = await loadAllDecks(db);
+			const id = await saveCardList(db, cardList);
+			const cardLists = await loadAllCardLists(db);
 
-			expect(decks[0].deck_cards).toHaveLength(2);
-			expect(decks[0].deck_cards[0].LM_quantity).toBe(4);
+			expect(cardLists[0].cards).toHaveLength(2);
+			expect(cardLists[0].cards[0].LM_quantity).toBe(4);
 		});
 	});
 
 	describe('clearDatabase', () => {
-		it('removes all decks and collection cards', async () => {
-			await saveDeck(db, createEmptyDeck());
+		it('removes all card lists and collection cards', async () => {
+			await saveCardList(db, createEmptyCardList());
 			await saveCollectionCard(db, {
 				id: 'card-1',
 				name: 'Lightning Bolt',
@@ -105,9 +107,9 @@ describe('Database Operations', () => {
 
 			await clearDatabase(db);
 
-			const decks = await loadAllDecks(db);
+			const cardLists = await loadAllCardLists(db);
 			const collection = await loadCollection(db);
-			expect(decks).toHaveLength(0);
+			expect(cardLists).toHaveLength(0);
 			expect(collection).toHaveLength(0);
 		});
 	});

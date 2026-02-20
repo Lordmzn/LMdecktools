@@ -2,11 +2,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { exportCollectionToText } from '../store.svelte';
 import {
 	openDatabase,
-	saveDeck,
-	loadAllDecks,
+	saveCardList,
+	loadAllCardLists,
 	saveCollectionCard,
-	createEmptyDeck,
-	type Deck
+	createEmptyCardList,
+	type CardList
 } from '../db';
 
 // Mock the store's collection for exportCollectionToText
@@ -133,25 +133,23 @@ describe('Database Import', () => {
 	});
 
 	// [planned] Import a database from a .yjs file
-	it('imports decks from a Yjs binary file', async () => {
-		// Create a Yjs export with deck data
+	it('imports card lists from a Yjs binary file', async () => {
+		// Create a Yjs export with card list data
 		const { exportWithMetadata } = await import('../yjs-integration');
 
-		const mockStore = {
-			collection: []
-		};
-
-		// First, save a deck to get binary data via a different path
-		const { exportDecksAsYjs } = await import('../yjs-integration');
-		const decks: Deck[] = [
+		// First, export card lists to get binary data via a different path
+		const { exportCardListsAsYjs } = await import('../yjs-integration');
+		const cardLists: CardList[] = [
 			{
-				name: 'Imported Deck',
-				deck_cards: [{ id: 'c1', name: 'Sol Ring', LM_quantity: 1 }],
+				name: 'Imported List',
+				cards: [{ id: 'c1', name: 'Sol Ring', LM_quantity: 1 }],
+				cardMatching: 'generic',
+				languageMatching: 'any',
 				created_at: Date.now(),
 				updated_at: Date.now()
 			}
 		];
-		const yjsData = exportDecksAsYjs(decks);
+		const yjsData = exportCardListsAsYjs(cardLists);
 
 		// importDatabase should handle Yjs binary format
 		// Currently it throws "Invalid file format" for non-JSON data
@@ -161,27 +159,29 @@ describe('Database Import', () => {
 		expect(result.imported).toBe(1);
 		expect(result.errors).toBe(0);
 
-		const loaded = await loadAllDecks(db);
+		const loaded = await loadAllCardLists(db);
 		expect(loaded).toHaveLength(1);
-		expect(loaded[0].name).toBe('Imported Deck');
+		expect(loaded[0].name).toBe('Imported List');
 	});
 
 	// [planned] Import with merge
-	it('merges imported decks with existing data', async () => {
-		// Save an existing deck
-		const existing: Deck = {
-			...createEmptyDeck(),
-			name: 'Existing Deck',
-			deck_cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 2 }]
+	it('merges imported card lists with existing data', async () => {
+		// Save an existing list
+		const existing: CardList = {
+			...createEmptyCardList(),
+			name: 'Existing List',
+			cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 2 }]
 		};
-		await saveDeck(db, existing);
+		await saveCardList(db, existing);
 
-		// Create JSON import data with same deck name
+		// Create JSON import data with same list name
 		const importData = JSON.stringify({
-			decks: [
+			cardLists: [
 				{
-					name: 'Existing Deck',
-					deck_cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 3 }],
+					name: 'Existing List',
+					cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 3 }],
+					cardMatching: 'generic',
+					languageMatching: 'any',
 					created_at: Date.now(),
 					updated_at: Date.now()
 				}
@@ -189,59 +189,41 @@ describe('Database Import', () => {
 		});
 		const data = new TextEncoder().encode(importData);
 
-		// importDatabase with merge=true should merge card quantities
-		// Currently broken: references findDeckByName and mergeCards which
-		// are not importable from store.svelte (they're in db.ts but not exported)
 		const { importDatabase } = await import('../store.svelte');
 		const result = await importDatabase(db, data, true);
 
 		expect(result.merged).toBe(1);
 		expect(result.errors).toBe(0);
 
-		const loaded = await loadAllDecks(db);
+		const loaded = await loadAllCardLists(db);
 		expect(loaded).toHaveLength(1);
 		// Merged quantities: 2 + 3 = 5
-		expect(loaded[0].deck_cards[0].LM_quantity).toBe(5);
+		expect(loaded[0].cards[0].LM_quantity).toBe(5);
 	});
 });
 
-// ==================== PLANNED: Deck Builder Store Functions ====================
+// ==================== PLANNED: Card List Store Functions ====================
 
-describe('Deck Builder Store Functions', () => {
-	// These tests verify the store-level deck management functions.
-	// Currently many of these use Svelte 4 patterns (get(), .set()) and will fail.
+describe('Card List Store Functions', () => {
+	// These tests verify the store-level card list management functions.
 
-	// [planned] Export current deck to text format
-	it('exports a deck to standard text format', async () => {
-		// exportDeckToText should produce "4 Lightning Bolt\n2 Counterspell\n" etc.
-		// Currently broken: uses get(deckName) and get(deckCards) — Svelte 4 patterns
-		const { exportDeckToText } = await import('../store.svelte');
+	// [planned] Export current list to text format
+	it('exports a list to standard text format', async () => {
+		const { exportListToText } = await import('../store.svelte');
 
-		// We'd need to set up store state first, but since the function
-		// uses Svelte 4 get() it will throw
-		expect(() => exportDeckToText()).not.toThrow();
+		expect(() => exportListToText()).not.toThrow();
 	});
 
-	// [planned] Import deck from text
-	it('imports a deck from standard text format', async () => {
-		// importDeckFromText should parse "4 Lightning Bolt" lines
-		// Currently broken: uses get(deckName), get(deckCards), and calls
-		// saveDeck which also uses Svelte 4 patterns
-		const { importDeckFromText } = await import('../store.svelte');
+	// [planned] Import list from text
+	it('imports a list from standard text format', async () => {
+		const { importListFromText } = await import('../store.svelte');
 
-		const deckText = `# My Red Deck\n4 Lightning Bolt\n2 Mountain`;
-
-		// This will fail because the function uses Svelte 4 get() calls
-		// and also makes live Scryfall API calls (should be mockable)
-		expect(importDeckFromText).toBeDefined();
-		// When implemented properly, it should return the saved deck
+		expect(importListFromText).toBeDefined();
 	});
 
-	// [planned] Add card to deck
-	it('adds a card to the current deck', async () => {
-		// addCardToDeck should add a card or increment its quantity
-		// Currently broken: uses get(deckCards), get(deckName) — Svelte 4
-		const { addCardToDeck } = await import('../store.svelte');
+	// [planned] Add card to list
+	it('adds a card to the current list', async () => {
+		const { addCardToList } = await import('../store.svelte');
 
 		const mockCard = {
 			id: 'card-1',
@@ -252,28 +234,20 @@ describe('Deck Builder Store Functions', () => {
 		};
 
 		// Should not throw when properly implemented with Svelte 5 runes
-		expect(addCardToDeck).toBeDefined();
+		expect(addCardToList).toBeDefined();
 	});
 
-	// [planned] Remove card from deck
-	it('removes a card from the current deck', async () => {
-		// removeCardFromDeck should decrement quantity or remove entirely
-		// Currently broken: uses get(deckCards), get(deckName) — Svelte 4
-		const { removeCardFromDeck } = await import('../store.svelte');
+	// [planned] Remove card from list
+	it('removes a card from the current list', async () => {
+		const { removeCardFromList } = await import('../store.svelte');
 
-		expect(removeCardFromDeck).toBeDefined();
+		expect(removeCardFromList).toBeDefined();
 	});
 
-	// [planned] Check deck completion against collection
-	it('calculates deck completion status', async () => {
-		// checkDeckCompletion should return { complete, totalNeeded, cardsNeeded }
-		// Currently broken: references deckNeeds without this. or store.
-		const { checkDeckCompletion } = await import('../store.svelte');
+	// [planned] Update list ownership params
+	it('updates list ownership check params', async () => {
+		const { updateListParams } = await import('../store.svelte');
 
-		// Should not throw when properly wired to store.deckNeeds
-		const result = checkDeckCompletion();
-		expect(result).toHaveProperty('complete');
-		expect(result).toHaveProperty('totalNeeded');
-		expect(result).toHaveProperty('cardsNeeded');
+		expect(updateListParams).toBeDefined();
 	});
 });

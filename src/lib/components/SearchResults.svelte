@@ -21,7 +21,7 @@
         <circle cx="11" cy="11" r="8"/>
         <path d="m21 21-4.3-4.3"/>
       </svg>
-      <p class="text-lg">Search for cards to add to your deck</p>
+      <p class="text-lg">Search for cards to add to your list</p>
       <p class="text-sm mt-2">
         <a href="https://scryfall.com/docs/syntax" target="_blank" class="text-orange-600 hover:underline">
           Learn Scryfall syntax

@@ -143,8 +143,8 @@
               {#if localDBexists === true}
                 <div class="space-y-2 text-sm text-stone-600 mb-4">
                   <div class="flex justify-between">
-                    <span class="font-medium">Total decks:</span>
-                    <span class="font-mono">{store.savedDecks.length}</span>
+                    <span class="font-medium">Total lists:</span>
+                    <span class="font-mono">{store.savedCardLists.length}</span>
                   </div>
                   <div class="flex justify-between">
                     <span class="font-medium">Total cards:</span>

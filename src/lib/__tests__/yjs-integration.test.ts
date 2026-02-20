@@ -1,22 +1,24 @@
 import { describe, it, expect } from 'vitest';
-import type { Deck } from '../db';
+import type { CardList } from '../db';
 import {
-	decksToYDoc,
-	yDocToDecks,
-	exportDecksAsYjs,
-	importDecksFromYjs,
-	mergeDecks,
-	mergeCardQuantities,
+	cardListsToYDoc,
+	yDocToCardLists,
+	exportCardListsAsYjs,
+	importCardListsFromYjs,
+	mergeCardLists,
+	mergeListCardQuantities,
 	calculateDiff,
 	exportWithMetadata,
 	importWithMetadata
 } from '../yjs-integration';
 
-function makeDeck(overrides: Partial<Deck> = {}): Deck {
+function makeCardList(overrides: Partial<CardList> = {}): CardList {
 	return {
 		id: 1,
-		name: 'Test Deck',
-		deck_cards: [],
+		name: 'Test List',
+		cards: [],
+		cardMatching: 'generic',
+		languageMatching: 'any',
 		created_at: 1000,
 		updated_at: 2000,
 		...overrides
@@ -24,40 +26,42 @@ function makeDeck(overrides: Partial<Deck> = {}): Deck {
 }
 
 describe('Yjs Integration', () => {
-	describe('round-trip: decksToYDoc -> yDocToDecks', () => {
-		it('converts an empty deck list', () => {
-			const ydoc = decksToYDoc([]);
-			const result = yDocToDecks(ydoc);
+	describe('round-trip: cardListsToYDoc -> yDocToCardLists', () => {
+		it('converts an empty card list array', () => {
+			const ydoc = cardListsToYDoc([]);
+			const result = yDocToCardLists(ydoc);
 			expect(result).toEqual([]);
 		});
 
-		it('preserves deck metadata through round-trip', () => {
-			const decks: Deck[] = [makeDeck({ name: 'My Deck' })];
-			const ydoc = decksToYDoc(decks);
-			const result = yDocToDecks(ydoc);
+		it('preserves card list metadata through round-trip', () => {
+			const cardLists: CardList[] = [makeCardList({ name: 'My List' })];
+			const ydoc = cardListsToYDoc(cardLists);
+			const result = yDocToCardLists(ydoc);
 
 			expect(result).toHaveLength(1);
-			expect(result[0].name).toBe('My Deck');
+			expect(result[0].name).toBe('My List');
 			expect(result[0].created_at).toBe(1000);
 			expect(result[0].updated_at).toBe(2000);
+			expect(result[0].cardMatching).toBe('generic');
+			expect(result[0].languageMatching).toBe('any');
 		});
 
 		it('preserves cards through round-trip', () => {
-			const decks: Deck[] = [
-				makeDeck({
-					deck_cards: [
+			const cardLists: CardList[] = [
+				makeCardList({
+					cards: [
 						{ id: 'card-1', name: 'Lightning Bolt', LM_quantity: 4, mana_cost: '{R}' },
 						{ id: 'card-2', name: 'Counterspell', LM_quantity: 2, mana_cost: '{U}{U}' }
 					]
 				})
 			];
 
-			const ydoc = decksToYDoc(decks);
-			const result = yDocToDecks(ydoc);
+			const ydoc = cardListsToYDoc(cardLists);
+			const result = yDocToCardLists(ydoc);
 
-			expect(result[0].deck_cards).toHaveLength(2);
+			expect(result[0].cards).toHaveLength(2);
 
-			const bolt = result[0].deck_cards.find((c) => c.id === 'card-1');
+			const bolt = result[0].cards.find((c) => c.id === 'card-1');
 			expect(bolt).toBeDefined();
 			expect(bolt!.name).toBe('Lightning Bolt');
 			expect(bolt!.LM_quantity).toBe(4);
@@ -67,97 +71,96 @@ describe('Yjs Integration', () => {
 
 	describe('binary export/import round-trip', () => {
 		it('round-trips through Uint8Array', () => {
-			const decks: Deck[] = [
-				makeDeck({
-					deck_cards: [{ id: 'card-1', name: 'Sol Ring', LM_quantity: 1 }]
+			const cardLists: CardList[] = [
+				makeCardList({
+					cards: [{ id: 'card-1', name: 'Sol Ring', LM_quantity: 1 }]
 				})
 			];
 
-			const binary = exportDecksAsYjs(decks);
+			const binary = exportCardListsAsYjs(cardLists);
 			expect(binary).toBeInstanceOf(Uint8Array);
 			expect(binary.length).toBeGreaterThan(0);
 
-			const result = importDecksFromYjs(binary);
+			const result = importCardListsFromYjs(binary);
 			expect(result).toHaveLength(1);
-			expect(result[0].deck_cards[0].name).toBe('Sol Ring');
+			expect(result[0].cards[0].name).toBe('Sol Ring');
 		});
 	});
 
-	describe('mergeDecks', () => {
-		it('combines two non-overlapping deck sets', () => {
-			const local = [makeDeck({ name: 'Deck A' })];
-			const remote = [makeDeck({ name: 'Deck B' })];
+	describe('mergeCardLists', () => {
+		it('combines two non-overlapping list sets', () => {
+			const local = [makeCardList({ name: 'List A' })];
+			const remote = [makeCardList({ name: 'List B' })];
 
-			const merged = mergeDecks(local, remote);
+			const merged = mergeCardLists(local, remote);
 			const names = merged.map((d) => d.name).sort();
-			expect(names).toEqual(['Deck A', 'Deck B']);
+			expect(names).toEqual(['List A', 'List B']);
 		});
 
-		it('merges overlapping decks by name (last-write-wins for same keys)', () => {
-			const local = [makeDeck({ name: 'Shared Deck', updated_at: 1000 })];
-			const remote = [makeDeck({ name: 'Shared Deck', updated_at: 2000 })];
+		it('merges overlapping lists by name (last-write-wins for same keys)', () => {
+			const local = [makeCardList({ name: 'Shared List', updated_at: 1000 })];
+			const remote = [makeCardList({ name: 'Shared List', updated_at: 2000 })];
 
-			const merged = mergeDecks(local, remote);
+			const merged = mergeCardLists(local, remote);
 			expect(merged).toHaveLength(1);
-			expect(merged[0].name).toBe('Shared Deck');
+			expect(merged[0].name).toBe('Shared List');
 		});
 	});
 
-	describe('mergeCardQuantities', () => {
-		it('adds quantities for same card in same deck', () => {
+	describe('mergeListCardQuantities', () => {
+		it('adds quantities for same card in same list', () => {
 			const local = [
-				makeDeck({
-					name: 'Deck A',
-					deck_cards: [{ id: 'card-1', name: 'Bolt', LM_quantity: 2 }]
+				makeCardList({
+					name: 'List A',
+					cards: [{ id: 'card-1', name: 'Bolt', LM_quantity: 2 }]
 				})
 			];
 			const remote = [
-				makeDeck({
-					name: 'Deck A',
-					deck_cards: [{ id: 'card-1', name: 'Bolt', LM_quantity: 3 }]
+				makeCardList({
+					name: 'List A',
+					cards: [{ id: 'card-1', name: 'Bolt', LM_quantity: 3 }]
 				})
 			];
 
-			const result = mergeCardQuantities(local, remote);
-			const bolt = result[0].deck_cards.find((c) => c.id === 'card-1');
+			const result = mergeListCardQuantities(local, remote);
+			const bolt = result[0].cards.find((c) => c.id === 'card-1');
 			expect(bolt!.LM_quantity).toBe(5);
 		});
 
-		it('adds new cards from remote deck', () => {
+		it('adds new cards from remote list', () => {
 			const local = [
-				makeDeck({
-					name: 'Deck A',
-					deck_cards: [{ id: 'card-1', name: 'Bolt', LM_quantity: 4 }]
+				makeCardList({
+					name: 'List A',
+					cards: [{ id: 'card-1', name: 'Bolt', LM_quantity: 4 }]
 				})
 			];
 			const remote = [
-				makeDeck({
-					name: 'Deck A',
-					deck_cards: [{ id: 'card-2', name: 'Counterspell', LM_quantity: 2 }]
+				makeCardList({
+					name: 'List A',
+					cards: [{ id: 'card-2', name: 'Counterspell', LM_quantity: 2 }]
 				})
 			];
 
-			const result = mergeCardQuantities(local, remote);
-			expect(result[0].deck_cards).toHaveLength(2);
+			const result = mergeListCardQuantities(local, remote);
+			expect(result[0].cards).toHaveLength(2);
 		});
 
-		it('adds entirely new deck from remote', () => {
-			const local = [makeDeck({ name: 'Local Deck' })];
-			const remote = [makeDeck({ name: 'Remote Deck' })];
+		it('adds entirely new list from remote', () => {
+			const local = [makeCardList({ name: 'Local List' })];
+			const remote = [makeCardList({ name: 'Remote List' })];
 
-			const result = mergeCardQuantities(local, remote);
+			const result = mergeListCardQuantities(local, remote);
 			expect(result).toHaveLength(2);
 		});
 	});
 
-	// [planned] exportWithMetadata should include both collection AND decks.
-	// Currently has an early return before the decks section.
+	// [planned] exportWithMetadata should include both collection AND card lists.
 	describe('exportWithMetadata / importWithMetadata round-trip', () => {
-		it('round-trips decks through exportWithMetadata → importWithMetadata', () => {
-			const decks: Deck[] = [
-				makeDeck({
+		it('round-trips card lists through exportWithMetadata → importWithMetadata', () => {
+			const cardLists: CardList[] = [
+				makeCardList({
 					name: 'Red Aggro',
-					deck_cards: [
+					cards: [
 						{ id: 'c1', name: 'Lightning Bolt', LM_quantity: 4, mana_cost: '{R}' },
 						{ id: 'c2', name: 'Goblin Guide', LM_quantity: 4 }
 					]
@@ -165,70 +168,66 @@ describe('Yjs Integration', () => {
 			];
 
 			const mockStore = {
+				savedCardLists: cardLists,
 				collection: [
 					{ id: 'c1', name: 'Lightning Bolt', quantity_owned: 4 }
 				]
 			};
 
-			// exportWithMetadata currently takes a StoreInterface; the planned
-			// version should also accept decks. For now we test that decks
-			// survive the round-trip — this will fail because exportWithMetadata
-			// has an early return before encoding decks.
 			const binary = exportWithMetadata(mockStore as any);
 			const result = importWithMetadata(binary);
 
 			expect(result.metadata.app).toBe('LM Deck Tools');
 			expect(result.metadata.version).toBe('1.0');
-			// This assertion fails: decks are never encoded due to early return
-			expect(result.decks).toHaveLength(1);
-			expect(result.decks[0].name).toBe('Red Aggro');
-			expect(result.decks[0].deck_cards).toHaveLength(2);
+			expect(result.cardLists).toHaveLength(1);
+			expect(result.cardLists[0].name).toBe('Red Aggro');
+			expect(result.cardLists[0].cards).toHaveLength(2);
 		});
 	});
 
 	describe('calculateDiff', () => {
-		it('detects added decks', () => {
-			const local: Deck[] = [];
-			const remote = [makeDeck({ name: 'New Deck' })];
+		it('detects added lists', () => {
+			const local: CardList[] = [];
+			const remote = [makeCardList({ name: 'New List' })];
 
 			const diff = calculateDiff(local, remote);
-			expect(diff.added).toEqual(['New Deck']);
+			expect(diff.added).toEqual(['New List']);
 			expect(diff.removed).toEqual([]);
 		});
 
-		it('detects removed decks', () => {
-			const local = [makeDeck({ name: 'Old Deck' })];
-			const remote: Deck[] = [];
+		it('detects removed lists', () => {
+			const local = [makeCardList({ name: 'Old List' })];
+			const remote: CardList[] = [];
 
 			const diff = calculateDiff(local, remote);
-			expect(diff.removed).toEqual(['Old Deck']);
+			expect(diff.removed).toEqual(['Old List']);
 		});
 
-		it('detects modified decks with card quantity changes', () => {
+		it('detects modified lists with card quantity changes', () => {
 			const local = [
-				makeDeck({
-					name: 'Deck',
-					deck_cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 2 }]
+				makeCardList({
+					name: 'List',
+					cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 2 }]
 				})
 			];
 			const remote = [
-				makeDeck({
-					name: 'Deck',
-					deck_cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]
+				makeCardList({
+					name: 'List',
+					cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]
 				})
 			];
 
 			const diff = calculateDiff(local, remote);
-			expect(diff.modified).toEqual(['Deck']);
-			expect(diff.cardChanges['Deck'].modified).toBe(1);
+			expect(diff.modified).toEqual(['List']);
+			expect(diff.cardChanges['List'].modified).toBe(1);
 		});
 
-		it('reports no changes for identical decks', () => {
-			const deck = makeDeck({
-				deck_cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]
+		it('reports no changes for identical lists', () => {
+			const list = makeCardList({
+				cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]
 			});
 
-			const diff = calculateDiff([deck], [deck]);
+			const diff = calculateDiff([list], [list]);
 			expect(diff.added).toEqual([]);
 			expect(diff.removed).toEqual([]);
 			expect(diff.modified).toEqual([]);

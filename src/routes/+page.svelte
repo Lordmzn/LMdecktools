@@ -7,19 +7,19 @@
         Welcome to LM Deck Tools
       </h1>
       <p class="text-xl text-stone-600 mb-8">
-        Build and manage your Magic: The Gathering decks with ease
+        Manage your Magic: The Gathering card lists and collection
       </p>
-      
+
       <div class="flex justify-center gap-4">
-        <a 
-          href="/decks"
+        <a
+          href="/card-lists"
           class="px-8 py-4 bg-orange-700 text-white rounded-lg hover:bg-orange-800 transition text-lg font-semibold flex items-center gap-2"
         >
           <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M3 3v18h18"/>
             <path d="m19 9-5 5-4-4-3 3"/>
           </svg>
-          Start Building Decks
+          Manage Card Lists
         </a>
         
         <a 
@@ -46,9 +46,9 @@
             <path d="m19 9-5 5-4-4-3 3"/>
           </svg>
         </div>
-        <h3 class="text-xl font-bold text-orange-900 mb-2">Build Decks</h3>
+        <h3 class="text-xl font-bold text-orange-900 mb-2">Card Lists</h3>
         <p class="text-stone-600">
-          Create and manage multiple decks with an intuitive interface. Search cards from Scryfall and organize your strategies.
+          Create and manage named card lists. Search cards from Scryfall and check ownership against your collection.
         </p>
       </div>
 
@@ -62,7 +62,7 @@
         </div>
         <h3 class="text-xl font-bold text-orange-900 mb-2">Track Collection</h3>
         <p class="text-stone-600">
-          Keep track of which cards you own. See at a glance what you need to complete your decks.
+          Keep track of which cards you own. See at a glance what you need to complete your lists.
         </p>
       </div>
 
@@ -77,7 +77,7 @@
         </div>
         <h3 class="text-xl font-bold text-orange-900 mb-2">Import & Export</h3>
         <p class="text-stone-600">
-          Easily import and export your decks and collection. Share with friends or backup your data.
+          Easily import and export your card lists and collection. Share with friends or backup your data.
         </p>
       </div>
 
@@ -105,9 +105,9 @@
             2
           </div>
           <div>
-            <h4 class="font-bold text-stone-800 mb-1">Build Your Decks</h4>
+            <h4 class="font-bold text-stone-800 mb-1">Create Card Lists</h4>
             <p class="text-sm text-stone-600">
-              Create decks by searching for cards. The tool will automatically show if you own the cards you need.
+              Create lists by searching for cards. The tool will automatically show which cards you own.
             </p>
           </div>
         </div>
@@ -117,9 +117,9 @@
             3
           </div>
           <div>
-            <h4 class="font-bold text-stone-800 mb-1">Track Progress</h4>
+            <h4 class="font-bold text-stone-800 mb-1">Track Ownership</h4>
             <p class="text-sm text-stone-600">
-              See at a glance which decks are complete and which cards you still need to acquire.
+              See at a glance which lists are fully owned and which cards you still need to acquire.
             </p>
           </div>
         </div>

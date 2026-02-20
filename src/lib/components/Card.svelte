@@ -52,7 +52,7 @@
           <path d="M8 12h8"/>
           <path d="M12 8v8"/>
         </svg>
-        Add to {target === 'collection' ? "Collection" : "Deck"}
+        Add to {target === 'collection' ? "Collection" : "List"}
       </button>
     </div>
   </div>

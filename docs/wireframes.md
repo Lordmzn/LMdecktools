@@ -5,7 +5,7 @@
 ```
 +------------------------------------------------------------------+
 |  HEADER                                                          |
-|  [swords-pirate] [Home] [Collection] [Deck Builder]  [Choose DB] |
+|  [swords-pirate] [Home] [Collection] [Card Lists]    [Choose DB] |
 +------------------------------------------------------------------+
 |                                                                  |
 |                        PAGE CONTENT                              |
@@ -31,17 +31,17 @@
 |     Build and manage your Magic: The Gathering                   |
 |              decks with ease                                     |
 |                                                                  |
-|       [Start Building Decks]   [Manage Collection]               |
+|       [Manage Card Lists]      [Manage Collection]               |
 |                                                                  |
 +------------------------------------------------------------------+
 |                                                                  |
 |  +------------------+ +------------------+ +------------------+  |
 |  |    (chart icon)   | |   (grid icon)    | |  (download icon) |  |
-|  |   Build Decks     | | Track Collection | | Import & Export  |  |
+|  |   Card Lists      | | Track Collection | | Import & Export  |  |
 |  |                   | |                  | |                  |  |
 |  | Create and manage | | Keep track of    | | Easily import    |  |
-|  | multiple decks... | | which cards you  | | and export your  |  |
-|  |                   | | own...           | | decks...         |  |
+|  | named card lists, | | which cards you  | | and export your  |  |
+|  | check ownership.. | | own...           | | lists...         |  |
 |  +------------------+ +------------------+ +------------------+  |
 |                                                                  |
 +------------------------------------------------------------------+
@@ -49,15 +49,15 @@
 |                    Getting Started                               |
 |                                                                  |
 |  +---------------------------+ +---------------------------+     |
-|  | (1) Add Cards to          | | (2) Build Your Decks      |     |
-|  |     Collection            | |     Create decks by       |     |
-|  |     Start by adding the   | |     searching for cards...|     |
-|  |     cards you own...      | |                           |     |
+|  | (1) Add Cards to          | | (2) Create Card Lists     |     |
+|  |     Collection            | |     Create lists by       |     |
+|  |     Start by adding the   | |     searching for cards,  |     |
+|  |     cards you own...      | |     check ownership...    |     |
 |  +---------------------------+ +---------------------------+     |
 |  +---------------------------+ +---------------------------+     |
-|  | (3) Track Progress        | | (4) Import & Export       |     |
+|  | (3) Track Ownership       | | (4) Import & Export       |     |
 |  |     See at a glance which | |     Use the import/export |     |
-|  |     decks are complete... | |     features to backup... |     |
+|  |     lists are complete... | |     features to backup... |     |
 |  +---------------------------+ +---------------------------+     |
 |                                                                  |
 +------------------------------------------------------------------+
@@ -112,6 +112,55 @@
 
 ---
 
+## Card Lists Page (`/card-lists`)
+
+```
++------------------------------------------------------------------+
+|                                                                  |
+|  +------------------------------------------------------------+  |
+|  | Card Lists                          [+ New List] [Import]  |  |
+|  |                                                 [Export]   |  |
+|  +------------------------------------------------------------+  |
+|                                                                  |
+|  +------------------------------------------------------------+  |
+|  | [List A] [List B] [List C]                                 |  |
+|  | List name: [_______________]                               |  |
+|  +------------------------------------------------------------+  |
+|                                                                  |
+|  +---------------------------+ +---------------------------+     |
+|  |  Search Cards             | |  List Name                |     |
+|  |  [search bar]             | |  N cards (N unique)       |     |
+|  |                           | |                           |     |
+|  |  Card Matching:           | |  Card Matching:           |     |
+|  |  [Generic] / [Specific]   | |  [Generic] / [Specific]  |     |
+|  |  Language:                | |  Language:                |     |
+|  |  [Any]    / [Strict]      | |  [Any]    / [Strict]     |     |
+|  |                           | |                           |     |
+|  |  +------+ +------+        | |  ✓ Owned / ✗ Missing N   |     |
+|  |  | img  | | img  |        | |  cards                   |     |
+|  |  | Own:2| |      |        | |  +-----------------------+|     |
+|  |  | [+   | | [+   |        | |  | 4x Lightning Bolt     ||     |
+|  |  | Add  | | Add  |        | |  |    ✓ Owned            ||     |
+|  |  | to   | | to   |        | |  +-----------------------+|     |
+|  |  | List]| | List]|        | |  | 2x Counterspell       ||     |
+|  |  +------+ +------+        | |  |    ✗ Missing           ||     |
+|  |                           | |  +-----------------------+|     |
+|  +---------------------------+ +---------------------------+     |
+|                                                                  |
++------------------------------------------------------------------+
+```
+
+**Ownership check params:**
+- Card Matching `Generic`: any reprint of that card name in the collection counts
+- Card Matching `Specific`: only the exact printing (same Scryfall ID) counts
+- Language `Any`: card language is ignored when checking ownership
+- Language `Strict`: collection card must have the same language as the list card
+
+**Empty states:**
+- No cards in list: "No cards in list yet. Search and add cards from the left panel."
+
+---
+
 ## DB Selection Modal
 
 ```
@@ -125,11 +174,11 @@
 | | Local database found / not found                     | |
 | |                                                      | |
 | | (if found + not loaded):                             | |
-| |   Total decks: N   Total cards: N                    | |
+| |   Total lists: N   Total cards: N                    | |
 | |   [Use Local DB]                                     | |
 | |                                                      | |
 | | (if found + loaded):                                 | |
-| |   Total decks: N   Total cards: N                    | |
+| |   Total lists: N   Total cards: N                    | |
 | |   [Download local DB]                                | |
 | +------------------------------------------------------+ |
 |                                                          |
@@ -179,7 +228,7 @@
 
 ```
 |             [magnifier icon]                             |
-|        Search for cards to add to your deck              |
+|        Search for cards to add to your list              |
 |          Learn Scryfall syntax (link)                    |
 ```
 

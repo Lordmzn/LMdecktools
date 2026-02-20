@@ -3,10 +3,15 @@
  * Provides transparent IndexedDB operations with import/export capabilities
  */
 
-export interface Deck {
+export type CardMatching = 'generic' | 'specific';
+export type LanguageMatching = 'any' | 'strict';
+
+export interface CardList {
   id?: number;
   name: string;
-  deck_cards: Card[];
+  cards: Card[];
+  cardMatching: CardMatching;
+  languageMatching: LanguageMatching;
   created_at: number;
   updated_at: number;
 }
@@ -33,8 +38,8 @@ export interface CollectionCard {
 }
 
 const DB_NAME = "LMdecktools";
-const DB_VERSION = 2;
-const STORE_NAME = "decks";
+const DB_VERSION = 3;
+const STORE_NAME = "card_lists";
 const COLLECTION_STORE = "collection";
 const METADATA_STORE = "metadata";
 
@@ -72,11 +77,16 @@ export async function openDatabase(): Promise<IDBDatabase> {
     request.onupgradeneeded = (event) => {
       const db = (event.target as IDBOpenDBRequest).result;
 
-      // Create decks store if it doesn't exist
+      // v2 → v3: drop old 'decks' store, create 'card_lists' store
+      if (db.objectStoreNames.contains('decks')) {
+        db.deleteObjectStore('decks');
+      }
+
+      // Create card_lists store if it doesn't exist
       if (!db.objectStoreNames.contains(STORE_NAME)) {
-        const objectStore = db.createObjectStore(STORE_NAME, { 
+        const objectStore = db.createObjectStore(STORE_NAME, {
           keyPath: 'id',
-          autoIncrement: true 
+          autoIncrement: true
         });
         objectStore.createIndex('name', 'name', { unique: false });
         objectStore.createIndex('updated_at', 'updated_at', { unique: false });
@@ -132,9 +142,9 @@ export async function clearDatabase(db: IDBDatabase): Promise<void> {
 }
 
 /**
- * Load all decks from the database
+ * Load all card lists from the database
  */
-export async function loadAllDecks(db: IDBDatabase): Promise<Deck[]> {
+export async function loadAllCardLists(db: IDBDatabase): Promise<CardList[]> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
@@ -145,27 +155,32 @@ export async function loadAllDecks(db: IDBDatabase): Promise<Deck[]> {
     };
 
     request.onerror = () => {
-      reject(new Error(`Failed to load decks: ${request.error?.message}`));
+      reject(new Error(`Failed to load card lists: ${request.error?.message}`));
     };
   });
 }
 
 /**
- * Save a deck to the database
+ * Save a card list to the database
  */
-export async function saveDeck(db: IDBDatabase, deck: Deck): Promise<number> {
+export async function saveCardList(db: IDBDatabase, cardList: CardList): Promise<number> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    
-    const deckToSave = {
-      ...deck,
+
+    const listToSave = {
+      ...cardList,
       updated_at: Date.now()
     };
 
-    const request = deck.id 
-      ? store.put(deckToSave)
-      : store.add(deckToSave);
+    let request: IDBRequest;
+    if (cardList.id) {
+      request = store.put(listToSave);
+    } else {
+      // Remove id so autoIncrement can generate a new key
+      const { id: _id, ...listWithoutId } = listToSave;
+      request = store.add(listWithoutId);
+    }
 
     request.onsuccess = () => {
       updateMetadata(db, 'last_save', Date.now());
@@ -173,19 +188,19 @@ export async function saveDeck(db: IDBDatabase, deck: Deck): Promise<number> {
     };
 
     request.onerror = () => {
-      reject(new Error(`Failed to save deck: ${request.error?.message}`));
+      reject(new Error(`Failed to save card list: ${request.error?.message}`));
     };
   });
 }
 
 /**
- * Delete a deck from the database
+ * Delete a card list from the database
  */
-export async function deleteDeck(db: IDBDatabase, deckId: number): Promise<void> {
+export async function deleteCardList(db: IDBDatabase, listId: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readwrite');
     const store = transaction.objectStore(STORE_NAME);
-    const request = store.delete(deckId);
+    const request = store.delete(listId);
 
     request.onsuccess = () => {
       updateMetadata(db, 'last_save', Date.now());
@@ -193,7 +208,7 @@ export async function deleteDeck(db: IDBDatabase, deckId: number): Promise<void>
     };
 
     request.onerror = () => {
-      reject(new Error(`Failed to delete deck: ${request.error?.message}`));
+      reject(new Error(`Failed to delete card list: ${request.error?.message}`));
     };
   });
 }
@@ -229,9 +244,9 @@ export async function getMetadata(db: IDBDatabase, key: string): Promise<void> {
 }
 
 /**
- * Find a deck by name
+ * Find a card list by name
  */
-async function findDeckByName(db: IDBDatabase, name: string): Promise<Deck | null> {
+export async function findCardListByName(db: IDBDatabase, name: string): Promise<CardList | null> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE_NAME, 'readonly');
     const store = transaction.objectStore(STORE_NAME);
@@ -243,7 +258,7 @@ async function findDeckByName(db: IDBDatabase, name: string): Promise<Deck | nul
     };
 
     request.onerror = () => {
-      reject(new Error(`Failed to find deck: ${request.error?.message}`));
+      reject(new Error(`Failed to find card list: ${request.error?.message}`));
     };
   });
 }
@@ -251,7 +266,7 @@ async function findDeckByName(db: IDBDatabase, name: string): Promise<Deck | nul
 /**
  * Merge two card lists, combining quantities for matching cards
  */
-function mergeCards(existing: Card[], incoming: Card[]): Card[] {
+export function mergeCards(existing: Card[], incoming: Card[]): Card[] {
   const cardMap = new Map<string, Card>();
 
   // Add existing cards
@@ -273,12 +288,14 @@ function mergeCards(existing: Card[], incoming: Card[]): Card[] {
 }
 
 /**
- * Create a new empty deck with default values
+ * Create a new empty card list with default values
  */
-export function createEmptyDeck(): Deck {
+export function createEmptyCardList(): CardList {
   return {
     name: "Nuovo mazzo",
-    deck_cards: [],
+    cards: [],
+    cardMatching: 'generic',
+    languageMatching: 'any',
     created_at: Date.now(),
     updated_at: Date.now()
   };

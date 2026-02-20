@@ -1,18 +1,21 @@
 import {
   openDatabase,
   clearDatabase,
-  loadAllDecks,
-  saveDeck as dbSaveDeck,
-  deleteDeck as dbDeleteDeck,
-  createEmptyDeck,
+  loadAllCardLists,
+  saveCardList as dbSaveCardList,
+  deleteCardList as dbDeleteCardList,
+  createEmptyCardList,
   loadCollection as dbLoadCollection,
   saveCollectionCard,
   deleteCollectionCard,
   getCollectionCard,
+  findCardListByName,
+  mergeCards,
   getMetadata,
-  type Deck,
+  type CardList,
   type CollectionCard,
-  type DBSummary
+  type CardMatching,
+  type LanguageMatching,
 } from './db';
 
 
@@ -24,53 +27,77 @@ let db: IDBDatabase | null = null;
 // ==================== STORE ====================
 export interface StoreInterface {
   dbLoaded: boolean,
-  savedDecks: Deck[],
+  savedCardLists: CardList[],
   collection: CollectionCard[]
+}
+
+export interface OwnershipCheckResult {
+  owned: boolean;
+  cards: {
+    card: import('./db').Card;
+    owned: boolean;
+  }[];
+}
+
+export interface OwnershipCheckParams {
+  cardMatching: CardMatching;
+  languageMatching: LanguageMatching;
 }
 
 class Store implements StoreInterface {
   // DB state
   dbLoaded = $state(false);
-  
-  // Deck state
-  savedDecks= $state([]);
-  currentDeckIndex = $state(NaN);
-  currentDeck: Deck = $derived(
-    this.currentDeckIndex ? 
-    savedDecks[this.currentDeckIndex] 
+
+  // Card list state
+  savedCardLists = $state<CardList[]>([]);
+  currentCardListIndex = $state(NaN);
+  currentCardList = $derived(
+    !isNaN(this.currentCardListIndex) ?
+    this.savedCardLists[this.currentCardListIndex]
     : null
   );
-  deckCards = $derived(this.currentDeck?.deck_cards || []);
-  deckNames = $derived(this.savedDecks.map((deck) => deck.name));
+  listCards = $derived(this.currentCardList?.cards || []);
+  listNames = $derived(this.savedCardLists.map((list) => list.name));
   totalCards = $derived(
-    this.deckCards.reduce((sum, card) => sum + card.quantity, 0)
+    this.listCards.reduce((sum, card) => sum + card.LM_quantity, 0)
   );
-  uniqueCards = $derived(this.deckCards.length);
-  
+  uniqueCards = $derived(this.listCards.length);
+
   // Collection state
-  collection = $state([]);
+  collection = $state<CollectionCard[]>([]);
   totalOwnedCards = $derived(
     this.collection.reduce((sum, card) => sum + card.quantity_owned, 0)
   );
   uniqueOwnedCards = $derived(this.collection.length);
-  isCardOwned(cardId) {
+  isCardOwned(cardId: string) {
     const card = this.collection.find(c => c.id === cardId);
     return card ? card.quantity_owned : 0;
   };
 
-  // Derived deck/collection analysis
-  deckNeeds = $derived.by(() => {
-    return deckCards.map((deckCard) => {
-      const owned = collection.find(c => c.id === deckCard.id);
-      const ownedQty = owned?.quantity_owned || 0;
-      const needed = Math.max(0, deckCard.quantity - ownedQty);
-      return {
-        ...deckCard,
-        owned: ownedQty,
-        needed: needed,
-        hasAll: needed === 0
-      };
+  // Derived ownership check for current list
+  listOwnershipCheck = $derived.by((): OwnershipCheckResult => {
+    const list = this.currentCardList;
+    if (!list) return { owned: true, cards: [] };
+
+    const { cardMatching, languageMatching } = list;
+
+    const cardResults = this.listCards.map((card) => {
+      let candidates = this.collection.filter(c =>
+        cardMatching === 'generic' ? c.name === card.name : c.id === card.id
+      );
+
+      if (languageMatching === 'strict') {
+        candidates = candidates.filter(c => c.lang === card.lang);
+      }
+
+      const totalOwned = candidates.reduce((sum, c) => sum + c.quantity_owned, 0);
+      return { card, owned: totalOwned >= card.LM_quantity };
     });
+
+    return {
+      owned: cardResults.every(r => r.owned),
+      cards: cardResults
+    };
   });
 }
 
@@ -84,12 +111,14 @@ export const store = new Store();
  */
 export async function initDB() {
   db = await openDatabase();
-  await Promise.all([loadDecks(), loadCollection()]);
+  await Promise.all([loadCardLists(), loadCollection()]);
+  store.dbLoaded = true;
   console.log("initDB done");
 }
 
 export async function clearDB() {
-  await clearDatabase();
+  if (!db) throw new Error("Database not initialized");
+  await clearDatabase(db);
   console.log("clearDB done");
 }
 
@@ -101,31 +130,28 @@ export function exportDB() {
 /**
  * Import database from a file (supports both JSON and Yjs formats)
  * Automatically detects format and handles accordingly
- * 
- * Note: For Yjs merge support, import yjs-integration:
- * import { mergeCardQuantities, importWithMetadata } from './yjs-integration';
  */
 export async function importDatabase(
   db: IDBDatabase,
   data: Uint8Array,
   merge: boolean = false
 ): Promise<{ imported: number; merged: number; errors: number }> {
-  let importData: any;
-  let decks: Deck[];
-  
+  let cardLists: CardList[];
+
   // Try to detect format
   try {
     const decoder = new TextDecoder();
     const jsonString = decoder.decode(data);
-    importData = JSON.parse(jsonString);
-    decks = importData.decks;
+    const importData = JSON.parse(jsonString);
+    cardLists = importData.cardLists ?? importData.decks ?? [];
   } catch {
-    // If JSON parsing fails, might be Yjs format
-    // For production, uncomment:
-    // import { importWithMetadata } from './yjs-integration';
-    // const result = importWithMetadata(data);
-    // decks = result.decks;
-    throw new Error('Invalid file format. Please use a valid .lmdb or .json export file.');
+    // If JSON parsing fails, try Yjs format
+    try {
+      const { importCardListsFromYjs } = await import('./yjs-integration');
+      cardLists = importCardListsFromYjs(data);
+    } catch {
+      throw new Error('Invalid file format. Please use a valid .lmdb or .json export file.');
+    }
   }
 
   let imported = 0;
@@ -133,45 +159,44 @@ export async function importDatabase(
   let errors = 0;
 
   if (!merge) {
-    // Clear existing data
     await clearDatabase(db);
   }
 
-  // Import decks
-  for (const deck of decks) {
+  // Import card lists
+  for (const cardList of cardLists) {
     try {
       if (merge) {
-        // Check if deck with same name exists
-        const existing = await findDeckByName(db, deck.name);
+        // Check if list with same name exists
+        const existing = await findCardListByName(db, cardList.name);
         if (existing) {
           // Merge cards
-          const mergedCards = mergeCards(existing.deck_cards, deck.deck_cards);
-          await saveDeck(db, {
+          const mergedCards = mergeCards(existing.cards, cardList.cards);
+          await dbSaveCardList(db, {
             ...existing,
-            deck_cards: mergedCards,
+            cards: mergedCards,
             updated_at: Date.now()
           });
           merged++;
         } else {
-          await saveDeck(db, {
-            ...deck,
+          await dbSaveCardList(db, {
+            ...cardList,
             id: undefined, // Let autoIncrement assign new ID
-            created_at: deck.created_at || Date.now(),
+            created_at: cardList.created_at || Date.now(),
             updated_at: Date.now()
           });
           imported++;
         }
       } else {
-        await saveDeck(db, {
-          ...deck,
+        await dbSaveCardList(db, {
+          ...cardList,
           id: undefined,
-          created_at: deck.created_at || Date.now(),
+          created_at: cardList.created_at || Date.now(),
           updated_at: Date.now()
         });
         imported++;
       }
     } catch (error) {
-      console.error('Error importing deck:', error);
+      console.error('Error importing card list:', error);
       errors++;
     }
   }
@@ -187,7 +212,7 @@ export async function importDatabase(
  */
 export async function loadCollection() {
   if (!db) throw new Error("Database not initialized");
-  
+
   const cards = await dbLoadCollection(db);
   store.collection = cards;
   return cards;
@@ -198,16 +223,16 @@ export async function loadCollection() {
  */
 export async function addToCollection(card: any, quantity: number = 1) {
   if (!db) throw new Error("Database not initialized");
-  
+
   const existingCard = await getCollectionCard(db, card.id);
-  
+
   const cardData: CollectionCard = {
     ...JSON.parse(JSON.stringify(card)),
     quantity_owned: existingCard ? existingCard.quantity_owned + quantity : quantity,
   };
 
   await saveCollectionCard(db, cardData);
-  
+
   if (existingCard) {
     const newCollection = store.collection.map(c =>
       c.id === card.id ? cardData : c
@@ -216,7 +241,7 @@ export async function addToCollection(card: any, quantity: number = 1) {
   } else {
     store.collection = [...store.collection, cardData];
   }
-  
+
   return cardData;
 }
 
@@ -225,13 +250,13 @@ export async function addToCollection(card: any, quantity: number = 1) {
  */
 export async function removeFromCollection(card: any, quantity: number = 1) {
   if (!db) throw new Error("Database not initialized");
-  
+
   const existingCard = store.collection.find(c => c.id === card.id);
-  
+
   if (!existingCard) {
     throw new Error("Card not in collection");
   }
-  
+
   const newQuantity = existingCard.quantity_owned - quantity;
 
   if (newQuantity <= 0) {
@@ -247,8 +272,8 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
       quantity_owned: newQuantity
     };
 
-    const newCard = await saveCollectionCard(db, cardData);
-    
+    await saveCollectionCard(db, cardData);
+
     const newCollection = store.collection.map(c =>
       c.id === card.id ? cardData : c
     );
@@ -262,27 +287,27 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
  */
 export async function updateCollectionQuantity(card: any, quantity: number) {
   if (!db) throw new Error("Database not initialized");
-  
+
   if (quantity <= 0) {
     return removeFromCollection(card, 9999);
   }
-  
+
   const cardData: CollectionCard = {
     ...JSON.parse(JSON.stringify(card)),
     quantity_owned: quantity
   };
-  
+
   await saveCollectionCard(db, cardData);
-  
+
   const existingIndex = store.collection.findIndex(c => c.id === card.id);
   if (existingIndex >= 0) {
     const newCollection = [...store.collection];
     newCollection[existingIndex] = cardData;
     store.collection = newCollection;
   } else {
-    store.collection = [...currentCollection, cardData];
+    store.collection = [...store.collection, cardData];
   }
-  
+
   return cardData;
 }
 
@@ -292,20 +317,6 @@ export async function updateCollectionQuantity(card: any, quantity: number) {
 export function getOwnedQuantity(cardId: string) {
   const card = store.collection.find(c => c.id === cardId);
   return card?.quantity_owned || 0;
-}
-
-/**
- * Check if have enough cards for deck
- */
-export function checkDeckCompletion() {
-  const totalNeeded = deckNeeds.reduce((sum, card) => sum + card.needed, 0);
-  const hasAll = totalNeeded === 0;
-  
-  return {
-    complete: hasAll,
-    totalNeeded: totalNeeded,
-    cardsNeeded: deckNeeds.filter(card => card.needed > 0)
-  };
 }
 
 /**
@@ -347,11 +358,11 @@ export async function importCollectionFromText(text: string) {
 /**
  * Export collection to text
  */
-export function exportCollectionToText(fields) {
+export function exportCollectionToText(fields: string[]) {
   const cards = store.collection;
-  
+
   // 1. Define how checkbox values map to card properties
-  const fieldMap = {
+  const fieldMap: Record<string, (c: any) => any> = {
     'Count': (c) => c.quantity_owned,
     'Name': (c) => c.name,
     'Edition': (c) => c.set?.toUpperCase(),
@@ -366,7 +377,7 @@ export function exportCollectionToText(fields) {
   cards
     .sort((a, b) => a.name.localeCompare(b.name))
     .forEach(card => {
-      
+
       // 2. Loop through the selected fields and get value from map
       const lineParts = fields.map(fieldKey => {
         const getValue = fieldMap[fieldKey];
@@ -379,115 +390,137 @@ export function exportCollectionToText(fields) {
 
       collectionText += `${line}\n`;
     });
-  
+
   return collectionText;
 }
 
-// ==================== DECK FUNCTIONS ====================
+// ==================== CARD LIST FUNCTIONS ====================
 
 /**
- * Load all decks from database
+ * Load all card lists from database
  */
-export async function loadDecks() {
+export async function loadCardLists() {
   if (!db) throw new Error("Database not initialized");
-  
-  store.savedDecks = await loadAllDecks(db);
 
-  // Ensure we have at least one deck
-  if (store.savedDecks.length === 0) {
-    await createNewDeck();
+  store.savedCardLists = await loadAllCardLists(db);
+
+  if (store.savedCardLists.length === 0) {
+    // createNewCardList sets currentCardListIndex
+    await createNewCardList();
+  } else {
+    store.currentCardListIndex = 0;
   }
 }
 
 /**
- * Create new deck
+ * Create new card list
  */
-export async function createNewDeck() {
+export async function createNewCardList() {
   if (!db) throw new Error("Database not initialized");
-  
-  const newDeck = createEmptyDeck();
-  const deckId = await dbSaveDeck(db, newDeck);
-  
-  const deckWithId = { ...newDeck, id: deckId };
-  const decks = store.savedDecks;
-  const newDecks = [...decks, deckWithId];
-  
-  store.savedDecks = newDecks;
-  store.currentDeckIndex = newDecks.length - 1;
-  
-  return deckWithId;
+
+  const newList = createEmptyCardList();
+  const listId = await dbSaveCardList(db, newList);
+
+  const listWithId = { ...newList, id: listId };
+  const newLists = [...store.savedCardLists, listWithId];
+
+  store.savedCardLists = newLists;
+  store.currentCardListIndex = newLists.length - 1;
+
+  return listWithId;
 }
 
-///////// TODO
 /**
- * Save current deck
+ * Save current card list with given name and cards
  */
-export async function saveDeck(name: string, cards: any[]) {
+export async function saveCardList(name: string, cards: any[]) {
   if (!db) throw new Error("Database not initialized");
-  
-  const decks = get(savedDecks);
-  const index = get(currentDeckIndex);
-  const currentDeckData = decks[index];
-  
-  if (!currentDeckData) throw new Error("No deck selected");
-  
-  const updatedDeck: Deck = {
-    ...currentDeckData,
+
+  const index = store.currentCardListIndex;
+  const currentListData = store.savedCardLists[index];
+
+  if (!currentListData) throw new Error("No card list selected");
+
+  const updatedList: CardList = {
+    ...currentListData,
     name,
-    deck_cards: cards,
+    cards,
     updated_at: Date.now()
   };
-  
-  await dbSaveDeck(db, updatedDeck);
-  
-  const newDecks = [...decks];
-  newDecks[index] = updatedDeck;
-  savedDecks.set(newDecks);
-  
-  return updatedDeck;
+
+  await dbSaveCardList(db, updatedList);
+
+  const newLists = [...store.savedCardLists];
+  newLists[index] = updatedList;
+  store.savedCardLists = newLists;
+
+  return updatedList;
 }
 
 /**
- * Delete current deck
+ * Delete current card list
  */
-export async function deleteDeck() {
+export async function deleteCardList() {
   if (!db) throw new Error("Database not initialized");
-  
-  const decks = get(savedDecks);
-  const index = get(currentDeckIndex);
-  
-  if (decks.length <= 1) {
-    throw new Error("Cannot delete the last deck");
+
+  const index = store.currentCardListIndex;
+
+  if (store.savedCardLists.length <= 1) {
+    throw new Error("Cannot delete the last card list");
   }
-  
-  const deckToDelete = decks[index];
-  if (deckToDelete.id) {
-    await dbDeleteDeck(db, deckToDelete.id);
+
+  const listToDelete = store.savedCardLists[index];
+  if (listToDelete.id) {
+    await dbDeleteCardList(db, listToDelete.id);
   }
-  
-  const newDecks = decks.filter((_, i) => i !== index);
-  savedDecks.set(newDecks);
-  currentDeckIndex.set(Math.max(0, index - 1));
+
+  store.savedCardLists = store.savedCardLists.filter((_, i) => i !== index);
+  store.currentCardListIndex = Math.max(0, index - 1);
 }
 
 /**
- * Update deck name
+ * Update list name
  */
-export async function updateDeckName(name: string) {
-  const cards = get(deckCards);
-  return saveDeck(name, cards);
+export async function updateListName(name: string) {
+  return saveCardList(name, store.listCards);
 }
 
 /**
- * Add card to current deck
+ * Update cardMatching and/or languageMatching params for current list
  */
-export async function addCardToDeck(card: any) {
-  const cards = get(deckCards);
-  const name = get(deckName);
-  
+export async function updateListParams(params: Partial<OwnershipCheckParams>) {
+  if (!db) throw new Error("Database not initialized");
+
+  const index = store.currentCardListIndex;
+  const currentListData = store.savedCardLists[index];
+
+  if (!currentListData) throw new Error("No card list selected");
+
+  const updatedList: CardList = {
+    ...currentListData,
+    ...params,
+    updated_at: Date.now()
+  };
+
+  await dbSaveCardList(db, updatedList);
+
+  const newLists = [...store.savedCardLists];
+  newLists[index] = updatedList;
+  store.savedCardLists = newLists;
+
+  return updatedList;
+}
+
+/**
+ * Add card to current list
+ */
+export async function addCardToList(card: any) {
+  const cards = store.listCards;
+  const name = store.currentCardList?.name || 'Nuovo mazzo';
+
   const existingIndex = cards.findIndex((item) => item.id === card.id);
   let newCards;
-  
+
   if (existingIndex !== -1) {
     newCards = [...cards];
     newCards[existingIndex] = {
@@ -495,7 +528,7 @@ export async function addCardToDeck(card: any) {
       LM_quantity: newCards[existingIndex].LM_quantity + 1
     };
   } else {
-    newCards = [...cards, { 
+    newCards = [...cards, {
       id: card.id,
       name: card.name,
       image_uris: card.image_uris,
@@ -505,22 +538,22 @@ export async function addCardToDeck(card: any) {
       LM_quantity: 1
     }];
   }
-  
-  return saveDeck(name, newCards);
+
+  return saveCardList(name, newCards);
 }
 
 /**
- * Remove card from current deck
+ * Remove card from current list
  */
-export async function removeCardFromDeck(card: any) {
-  const cards = get(deckCards);
-  const name = get(deckName);
-  
+export async function removeCardFromList(card: any) {
+  const cards = store.listCards;
+  const name = store.currentCardList?.name || 'Nuovo mazzo';
+
   const existingIndex = cards.findIndex((item) => item.id === card.id);
   if (existingIndex === -1) return;
-  
+
   let newCards;
-  
+
   if (cards[existingIndex].LM_quantity > 1) {
     newCards = [...cards];
     newCards[existingIndex] = {
@@ -530,17 +563,17 @@ export async function removeCardFromDeck(card: any) {
   } else {
     newCards = cards.filter((_, i) => i !== existingIndex);
   }
-  
-  return saveDeck(name, newCards);
+
+  return saveCardList(name, newCards);
 }
 
 /**
- * Import deck from text
+ * Import list from text
  */
-export async function importDeckFromText(text: string) {
+export async function importListFromText(text: string) {
   const lines = text.split('\n').filter(line => line.trim());
-  const newCards = [];
-  let newName = get(deckName);
+  const newCards: any[] = [];
+  let newName = store.currentCardList?.name || 'Nuovo mazzo';
 
   for (const line of lines) {
     if (line.startsWith('#')) {
@@ -559,7 +592,7 @@ export async function importDeckFromText(text: string) {
         );
         if (response.ok) {
           const card = await response.json();
-          newCards.push({ 
+          newCards.push({
             id: card.id,
             name: card.name,
             image_uris: card.image_uris,
@@ -575,20 +608,20 @@ export async function importDeckFromText(text: string) {
     }
   }
 
-  return saveDeck(newName, newCards);
+  return saveCardList(newName, newCards);
 }
 
 /**
- * Export current deck to text
+ * Export current list to text
  */
-export function exportDeckToText() {
-  const name = get(deckName);
-  const cards = get(deckCards);
-  
-  let deckText = `# ${name}\n\n`;
+export function exportListToText() {
+  const name = store.currentCardList?.name || 'List';
+  const cards = store.listCards;
+
+  let listText = `# ${name}\n\n`;
   cards.forEach(card => {
-    deckText += `${card.LM_quantity} ${card.name}\n`;
+    listText += `${card.LM_quantity} ${card.name}\n`;
   });
-  
-  return deckText;
+
+  return listText;
 }

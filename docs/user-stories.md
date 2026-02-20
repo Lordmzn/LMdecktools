@@ -48,19 +48,22 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 
 ## Navigation
 
-- **[done]** As a user, I want to navigate between Home, Collection, and Deck Builder pages via tabs, so that I can move through the app easily.
+- **[done]** As a user, I want to navigate between Home, Collection, and Card Lists pages via tabs, so that I can move through the app easily.
 - **[done]** As a user, I want to see which tab is currently active, so that I know where I am in the app.
 - **[done]** As a user, I want action buttons (Add Cards, Export) to be disabled when no database is loaded, so that I don't trigger errors.
 
 ---
 
-## Deck Builder (Future)
+## Card List Manager
 
-- **[planned]** As a user, I want to create a new deck with a name, so that I can start building a strategy.
-- **[planned]** As a user, I want to add cards to a deck from Scryfall search results, so that I can build my deck list.
-- **[planned]** As a user, I want to remove cards from a deck, so that I can refine my deck composition.
-- **[planned]** As a user, I want to see which deck cards I already own in my collection, so that I know what I still need to buy.
-- **[planned]** As a user, I want to see a "deck needs" summary showing owned vs. needed quantities, so that I can plan purchases.
-- **[planned]** As a user, I want to switch between multiple saved decks, so that I can manage different strategies.
-- **[planned]** As a user, I want to import a deck list from text, so that I can quickly load a decklist from the web.
-- **[planned]** As a user, I want to export a deck list as text, so that I can share it with others.
+- **[done]** As a user, I want to create a new named card list, so that I can start organizing cards.
+- **[done]** As a user, I want to add cards to a list from Scryfall search results, so that I can build my list.
+- **[done]** As a user, I want to remove cards from a list, so that I can refine its composition.
+- **[done]** As a user, I want to switch between multiple saved lists, so that I can manage different card sets.
+- **[done]** As a user, I want to import a card list from text, so that I can quickly load a list from the web.
+- **[done]** As a user, I want to export a card list as text, so that I can share it with others.
+- **[done]** As a user, I want to see a per-card owned/missing indicator, so that I know which cards I still need.
+- **[done]** As a user, I want an overall "✓ Owned / ✗ Missing N" banner, so that I can see list completion at a glance.
+- **[done]** As a user, I want to toggle "Card Matching" between Generic and Specific, so that I can choose whether any reprint counts or only the exact printing.
+- **[done]** As a user, I want to toggle "Language Matching" between Any and Strict, so that I can decide whether language matters when checking ownership.
+- **[planned]** As a user, I want to compare two card lists to see what they have in common and what differs, so that I can identify overlap.

@@ -10,7 +10,7 @@
 	let { data, children }: LayoutProps = $props();
 
 	import {store} from '$lib/store.svelte';
-	$inspect(store.dbLoaded, store.savedDecks, store.collection);
+	$inspect(store.dbLoaded, store.savedCardLists, store.collection);
 
 </script>
 
