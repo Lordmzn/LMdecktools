@@ -11,6 +11,8 @@
     updateCollectionQuantity,
   } from '$lib/store.svelte';
 
+  const READ_ONLY_MSG = 'Select a database to enable editing — click "Preview" in the header';
+
   let search_results = $state([]);
   let isSearching = $state(false);
   let showNotification = $state(false);
@@ -70,7 +72,7 @@
       await addToCollection(card, 1);
       notify(`Added ${card.name} to collection`);
     } catch (error) {
-      notify("Failed to add card", "error");
+      notify(store.isReadOnly ? READ_ONLY_MSG : "Failed to add card", "error");
       console.log(error);
     }
   }
@@ -81,7 +83,7 @@
       await addToCollection(card, 1);
       notify(`Added one ${card.name}`);
     } catch (error) {
-      notify("Failed to add card", "error");
+      notify(store.isReadOnly ? READ_ONLY_MSG : "Failed to add card", "error");
     }
   }
 
@@ -91,7 +93,7 @@
       await removeFromCollection(card, 1);
       notify(`Removed one ${card.name}`);
     } catch (error) {
-      notify("Failed to remove card", "error");
+      notify(store.isReadOnly ? READ_ONLY_MSG : "Failed to remove card", "error");
     }
   }
 
@@ -101,7 +103,7 @@
       await updateCollectionQuantity(card, quantity);
       notify(`Updated ${card.name} quantity`);
     } catch (error) {
-      notify("Failed to update quantity", "error");
+      notify(store.isReadOnly ? READ_ONLY_MSG : "Failed to update quantity", "error");
     }
   }
 
@@ -174,11 +176,11 @@
         </div>
         
         <div class="flex items-center gap-2">
-          <button 
+          <button
             onclick={() => showSearchModal = true}
-            disabled={!store.dbLoaded}
+            disabled={store.dbMode === 'none'}
             class="px-4 py-2 bg-orange-700 text-white rounded-lg hover:bg-orange-800 transition flex items-center gap-2"
-            class:disabled={!store.dbLoaded}
+            class:disabled={store.dbMode === 'none'}
           >
             <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M5 12h14"/>
