@@ -21,51 +21,55 @@
     <button
       onclick={() => showStartupModal = !showStartupModal}
       class="inline-flex items-center gap-2 px-4 py-2 hover:bg-stone-700 text-white rounded-lg shadow-md transition-all duration-200 font-medium"
-      class:bg-orange-800={store.dbLoaded}
-      class:bg-stone-800={!store.dbLoaded}
+      class:bg-orange-800={store.dbMode === 'active'}
+      class:bg-amber-600={store.dbMode === 'peek'}
+      class:bg-stone-800={store.dbMode === 'none'}
       title="Gestione Database"
     >
-      {#if !store.dbLoaded}
-        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 26 26">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+      {#if store.dbMode === 'none'}
+        <!-- Plain DB icon — no database selected yet -->
+        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"/>
         </svg>
-      {:else}
-        <svg 
-          xmlns="http://www.w3.org/2000/svg" 
-          class="w-6 h-6" 
-          viewBox="0 0 24 24" 
-          fill="none"
-        >
-          <path 
-            stroke="currentColor" 
-            stroke-linecap="round" 
-            stroke-linejoin="round" 
-            stroke-width="2" 
+      {:else if store.dbMode === 'peek'}
+        <!-- DB + magnifying glass — read-only preview mode -->
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
             d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
           />
-
+          <!-- Filled white circle = "lens window" that pops off the DB strokes below -->
+          <circle cx="17" cy="5" r="3.8" fill="white"/>
+          <!-- Lens ring -->
+          <circle cx="17" cy="5" r="3" stroke="currentColor" stroke-width="2" fill="none"/>
+          <!-- Handle -->
+          <path d="M19.2 7.2 L21.5 9.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      {:else}
+        <!-- DB + green checkmark — fully active -->
+        <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path
+            stroke="currentColor"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            stroke-width="2"
+            d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+          />
           <g transform="translate(4, 4)">
-            
-            <path 
-              d="M20 6 9 17l-5-5"
-              stroke="white" 
-              stroke-width="5" 
-              stroke-linecap="round" 
-              stroke-linejoin="round"
-            />
-
-            <path 
-              d="M20 6 9 17l-5-5"
-              class="text-green-700" 
-              stroke="currentColor" 
-              stroke-width="3" 
-              stroke-linecap="round" 
-              stroke-linejoin="round"
-            />
+            <path d="M20 6 9 17l-5-5" stroke="white" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M20 6 9 17l-5-5" class="text-green-700" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
           </g>
-          </svg>
+        </svg>
       {/if}
-      <span>{store.dbLoaded ? 'Database' : 'Choose DB'}</span>
+      <span>
+        {#if store.dbMode === 'active'}Database
+        {:else if store.dbMode === 'peek'}Preview
+        {:else}Choose DB
+        {/if}
+      </span>
       {#if showStartupModal}
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"></path>

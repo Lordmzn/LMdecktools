@@ -2,23 +2,26 @@
   import { onMount } from 'svelte';
   let { show = $bindable(false) } = $props();
   import { checkLocalDatabase } from '$lib/db';
-  import { store, initDB, clearDB, exportDB } from '$lib/store.svelte';
+  import { store, initDB, peekDB, clearDB, exportDB } from '$lib/store.svelte';
 
   let fileInput: HTMLInputElement;
   let localDBexists = $state<boolean | null>(null);
   let selectedFile: File | null = $state(null);
 
   onMount(() => {
-    if (store.dbLoaded !== true)
+    if (store.dbMode === 'none') {
       checkLocalDatabase().then(
         (res) => {
-          if (res)
-            // if it exists, we load it so we peek the content
-            initDB();
-            localDBexists = res;
-        }, 
-        () => localDBexists = false
+          if (res) {
+            peekDB();
+            localDBexists = true;
+          } else {
+            localDBexists = false;
+          }
+        },
+        () => { localDBexists = false; }
       );
+    }
   });
 
   function handleFileSelect(event: Event) {
@@ -35,7 +38,6 @@
 
   function handleLoadLocal() {
     initDB();
-    store.dbLoaded = true;
     closeModal();
   }
 
@@ -55,10 +57,12 @@
     URL.revokeObjectURL(url);
   }
 
-  function handleCreateNew() {
-    clearDB();
-    initDB();
-    store.dbLoaded = true;
+  async function handleCreateNew() {
+    if (store.dbMode !== 'none') {
+      await clearDB();
+      store.dbMode = 'none';
+    }
+    await initDB();
     closeModal();
   }
 
@@ -151,7 +155,12 @@
                     <span class="font-mono">{store.totalCards}</span>
                   </div>
                 </div>
-                {#if !store.dbLoaded}
+                {#if store.dbMode === 'peek'}
+                  <div class="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+                    Previewing in read-only mode. Click "Use Local DB" to enable editing.
+                  </div>
+                {/if}
+                {#if store.dbMode !== 'active'}
                   <button
                     onclick={handleLoadLocal}
                     class="w-full bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200 shadow-sm"
