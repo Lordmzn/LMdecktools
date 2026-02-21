@@ -114,6 +114,10 @@ describe('exportCollectionToText', () => {
 	});
 });
 
+// ==================== Write Guards and dbMode Transitions ====================
+// See store-guards.test.ts for write guard and dbMode transition tests.
+// They live in a separate file to avoid vi.mock conflicts with the mock above.
+
 // ==================== PLANNED: Database Import ====================
 
 describe('Database Import', () => {
