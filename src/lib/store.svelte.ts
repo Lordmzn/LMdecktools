@@ -25,10 +25,14 @@ import { exportWithMetadata } from './yjs-integration';
 let db: IDBDatabase | null = null;
 
 // ==================== STORE ====================
+export type DBMode = 'none' | 'peek' | 'active';
+
 export interface StoreInterface {
-  dbLoaded: boolean,
-  savedCardLists: CardList[],
-  collection: CollectionCard[]
+  dbMode: DBMode;
+  dbLoaded: boolean;      // derived: dbMode !== 'none' (backward compat)
+  isReadOnly: boolean;    // derived: dbMode !== 'active'
+  savedCardLists: CardList[];
+  collection: CollectionCard[];
 }
 
 export interface OwnershipCheckResult {
@@ -46,7 +50,16 @@ export interface OwnershipCheckParams {
 
 class Store implements StoreInterface {
   // DB state
-  dbLoaded = $state(false);
+  dbMode = $state<DBMode>('none');
+
+  // These are plain getters so they always recompute from dbMode (no reactive
+  // owner required — works in both templates and test environments).
+  get dbLoaded(): boolean {
+    return this.dbMode !== 'none';
+  }
+  get isReadOnly(): boolean {
+    return this.dbMode !== 'active';
+  }
 
   // Card list state
   savedCardLists = $state<CardList[]>([]);
@@ -104,15 +117,35 @@ class Store implements StoreInterface {
 // Export a single shared instance
 export const store = new Store();
 
+function assertWritable(): void {
+  if (store.dbMode !== 'active') {
+    throw new Error('Database is read-only. Please select a database to enable writing.');
+  }
+}
+
 // ==================== INITIALIZATION ====================
 
 /**
- * Initialize IndexedDB and load data
+ * Open database in read-only peek mode (data visible, writes blocked)
+ */
+export async function peekDB() {
+  db = await openDatabase();
+  store.dbMode = 'peek';
+  await Promise.all([loadCardLists(), loadCollection()]);
+}
+
+/**
+ * Initialize IndexedDB and load data (grants full write access)
  */
 export async function initDB() {
+  if (store.dbMode === 'peek') {
+    // DB already open, just upgrade access level
+    store.dbMode = 'active';
+    return;
+  }
   db = await openDatabase();
+  store.dbMode = 'active';
   await Promise.all([loadCardLists(), loadCollection()]);
-  store.dbLoaded = true;
   console.log("initDB done");
 }
 
@@ -120,6 +153,14 @@ export async function clearDB() {
   if (!db) throw new Error("Database not initialized");
   await clearDatabase(db);
   console.log("clearDB done");
+}
+
+/** Close the IndexedDB connection (used in tests to allow deleteDatabase) */
+export function closeDB() {
+  if (db) {
+    db.close();
+    db = null;
+  }
 }
 
 export function exportDB() {
@@ -222,6 +263,7 @@ export async function loadCollection() {
  * Add card to collection
  */
 export async function addToCollection(card: any, quantity: number = 1) {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   const existingCard = await getCollectionCard(db, card.id);
@@ -249,6 +291,7 @@ export async function addToCollection(card: any, quantity: number = 1) {
  * Remove card from collection
  */
 export async function removeFromCollection(card: any, quantity: number = 1) {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   const existingCard = store.collection.find(c => c.id === card.id);
@@ -286,6 +329,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
  * Update card quantity in collection
  */
 export async function updateCollectionQuantity(card: any, quantity: number) {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   if (quantity <= 0) {
@@ -323,6 +367,7 @@ export function getOwnedQuantity(cardId: string) {
  * Import collection from text
  */
 export async function importCollectionFromText(text: string) {
+  assertWritable();
   const lines = text.split('\n').filter(line => line.trim());
   const results = { success: 0, failed: 0 };
 
@@ -405,8 +450,11 @@ export async function loadCardLists() {
   store.savedCardLists = await loadAllCardLists(db);
 
   if (store.savedCardLists.length === 0) {
-    // createNewCardList sets currentCardListIndex
-    await createNewCardList();
+    if (store.dbMode === 'active') {
+      // createNewCardList sets currentCardListIndex
+      await createNewCardList();
+    }
+    // in peek mode with empty DB: leave savedCardLists empty
   } else {
     store.currentCardListIndex = 0;
   }
@@ -416,6 +464,7 @@ export async function loadCardLists() {
  * Create new card list
  */
 export async function createNewCardList() {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   const newList = createEmptyCardList();
@@ -434,6 +483,7 @@ export async function createNewCardList() {
  * Save current card list with given name and cards
  */
 export async function saveCardList(name: string, cards: any[]) {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   const index = store.currentCardListIndex;
@@ -461,6 +511,7 @@ export async function saveCardList(name: string, cards: any[]) {
  * Delete current card list
  */
 export async function deleteCardList() {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   const index = store.currentCardListIndex;
@@ -482,6 +533,7 @@ export async function deleteCardList() {
  * Update list name
  */
 export async function updateListName(name: string) {
+  assertWritable();
   return saveCardList(name, store.listCards);
 }
 
@@ -489,6 +541,7 @@ export async function updateListName(name: string) {
  * Update cardMatching and/or languageMatching params for current list
  */
 export async function updateListParams(params: Partial<OwnershipCheckParams>) {
+  assertWritable();
   if (!db) throw new Error("Database not initialized");
 
   const index = store.currentCardListIndex;
@@ -515,6 +568,7 @@ export async function updateListParams(params: Partial<OwnershipCheckParams>) {
  * Add card to current list
  */
 export async function addCardToList(card: any) {
+  assertWritable();
   const cards = store.listCards;
   const name = store.currentCardList?.name || 'Nuovo mazzo';
 
@@ -546,6 +600,7 @@ export async function addCardToList(card: any) {
  * Remove card from current list
  */
 export async function removeCardFromList(card: any) {
+  assertWritable();
   const cards = store.listCards;
   const name = store.currentCardList?.name || 'Nuovo mazzo';
 
@@ -571,6 +626,7 @@ export async function removeCardFromList(card: any) {
  * Import list from text
  */
 export async function importListFromText(text: string) {
+  assertWritable();
   const lines = text.split('\n').filter(line => line.trim());
   const newCards: any[] = [];
   let newName = store.currentCardList?.name || 'Nuovo mazzo';
