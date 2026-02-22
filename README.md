@@ -112,6 +112,10 @@ messages/
 
 Developed with substantial assistance from [Claude Code](https://claude.ai/claude-code) by Anthropic — used for architecture design, feature implementation, code review, and documentation.
 
+## Project Board
+
+Active development is tracked on the [GitHub Project board](https://github.com/users/Lordmzn/projects/2).
+
 ## License
 
 Private project.
