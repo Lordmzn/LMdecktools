@@ -6,6 +6,7 @@
   import {
     store,
     createNewCardList,
+    deleteCardList,
     addCardToList,
     removeCardFromList,
     importListFromText,
@@ -22,6 +23,7 @@
   let showImportModal = $state(false);
   let showExportModal = $state(false);
   let showAddCardsModal = $state(false);
+  let showDeleteConfirmModal = $state(false);
   let importText = $state('');
   let exportText = $state('');
   let filterText = $state('');
@@ -73,6 +75,17 @@
       notify('New list created');
     } catch (e) {
       notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to create list', 'error');
+    }
+  }
+
+  async function handleDeleteList() {
+    try {
+      await deleteCardList();
+      showDeleteConfirmModal = false;
+      notify('List deleted');
+    } catch (e) {
+      showDeleteConfirmModal = false;
+      notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to delete list', 'error');
     }
   }
 
@@ -213,6 +226,39 @@
   </div>
 {/if}
 
+<!-- Delete Confirmation Modal -->
+{#if showDeleteConfirmModal}
+  <div
+    class="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+    onclick={() => showDeleteConfirmModal = false}
+    role="dialog"
+    aria-modal="true"
+    aria-label="Confirm delete list"
+  >
+    <div class="bg-white rounded-lg shadow-xl max-w-sm w-full p-6" onclick={(e) => e.stopPropagation()}>
+      <h2 class="text-xl font-bold text-red-700 mb-3">Delete List</h2>
+      <p class="text-stone-700 mb-1">
+        Are you sure you want to delete <strong>{store.currentCardList?.name}</strong>?
+      </p>
+      <p class="text-sm text-stone-500 mb-6">This action cannot be undone.</p>
+      <div class="flex gap-2 justify-end">
+        <button
+          onclick={() => showDeleteConfirmModal = false}
+          class="px-4 py-2 border border-orange-300 rounded-lg text-stone-700 hover:bg-orange-50 transition"
+        >
+          Cancel
+        </button>
+        <button
+          onclick={handleDeleteList}
+          class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
 <!-- Export Modal -->
 {#if showExportModal}
   <div
@@ -268,6 +314,19 @@
               {/each}
             {/if}
           </select>
+          <button
+            onclick={() => showDeleteConfirmModal = true}
+            disabled={store.dbMode === 'none' || !store.currentCardList || store.savedCardLists.length <= 1}
+            class="px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+            title="Delete this list"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M3 6h18"/>
+              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/>
+              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/>
+            </svg>
+            Delete List
+          </button>
         </div>
         <button
           onclick={handleCreateList}

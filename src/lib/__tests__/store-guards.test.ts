@@ -3,7 +3,7 @@
  * Kept separate from store.test.ts to avoid vi.mock conflicts.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { addToCollection, removeFromCollection, createNewCardList, peekDB, initDB, closeDB, store } from '../store.svelte';
+import { addToCollection, removeFromCollection, createNewCardList, deleteCardList, peekDB, initDB, closeDB, store } from '../store.svelte';
 
 // ==================== Write Guards ====================
 
@@ -20,6 +20,10 @@ describe('Write guards', () => {
 
 	it('createNewCardList throws when dbMode is not active', async () => {
 		await expect(createNewCardList()).rejects.toThrow('Database is read-only');
+	});
+
+	it('deleteCardList throws when dbMode is not active', async () => {
+		await expect(deleteCardList()).rejects.toThrow('Database is read-only');
 	});
 });
 
@@ -49,5 +53,33 @@ describe('dbMode transitions', () => {
 		await initDB();
 		expect(store.dbMode).toBe('active');
 		expect(store.isReadOnly).toBe(false);
+	});
+});
+
+// ==================== deleteCardList Operations ====================
+
+describe('deleteCardList operations', () => {
+	afterEach(async () => {
+		closeDB();
+		store.dbMode = 'none';
+		await new Promise<void>((resolve, reject) => {
+			const req = indexedDB.deleteDatabase('LMdecktools');
+			req.onsuccess = () => resolve();
+			req.onerror = () => reject(req.error);
+		});
+	});
+
+	it('throws when trying to delete the only remaining list', async () => {
+		await initDB(); // active mode; seeds 1 default list
+		await expect(deleteCardList()).rejects.toThrow('Cannot delete the last card list');
+	});
+
+	it('deletes a list and adjusts currentCardListIndex', async () => {
+		await initDB();
+		await createNewCardList(); // now 2 lists; index points to new one
+		const countBefore = store.savedCardLists.length;
+		await deleteCardList();
+		expect(store.savedCardLists.length).toBe(countBefore - 1);
+		expect(store.currentCardListIndex).toBeGreaterThanOrEqual(0);
 	});
 });
