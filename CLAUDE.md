@@ -57,6 +57,10 @@ SvelteKit file-based routing. Current routes: `/` (home), `/collection`. The `/d
 
 Paraglide configured with hooks in `hooks.server.ts` (handle) and `hooks.ts` (reroute). Translation files in `messages/`. Currently only a stub `hello_world` key — i18n is wired up but not actively used in UI text.
 
+### Image Cache
+
+The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management (size reporting via `StorageManager.estimate()` or by iterating cache keys, and clearing via `cache.delete()`) is exposed in the DB Selection Modal. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+
 ### Yjs Integration
 
 `src/lib/yjs-integration.ts` has CRDT-based export/import/merge utilities. Currently experimental — export uses Yjs binary format but import only handles JSON (Yjs import path is commented out).
@@ -83,11 +87,11 @@ Paraglide configured with hooks in `hooks.server.ts` (handle) and `hooks.ts` (re
 2. **Component behavior** (UI interactions, prop-driven rendering) → component test in `src/lib/components/__tests__/`
 3. **Full user flow** (multi-page, requires browser) → E2E test in `tests/e2e/`
 
-## Known Issues / WIP
+## Project Tracking
+Task advancement is tracked via **GitHub Issues** on [`Lordmzn/LMdecktools`](https://github.com/Lordmzn/LMdecktools) and on the [**"LM Deck Tools" GitHub Project** board](https://github.com/users/Lordmzn/projects/2). Each task maps to a GitHub issue; keep issue status current.
 
-- Several functions in `store.svelte.ts` still reference old Svelte 4 patterns (`get()`, `.set()`) and need refactoring to Svelte 5 runes
-- `Store.currentDeck` references `savedDecks` without `this.`
-- `updateCollectionQuantity` references undefined `currentCollection` (should be `store.collection`)
-- `handleLoadFile` in `DBSelectionModal.svelte` throws "Not implemented"
-- `exportWithMetadata` has an early return before the decks section
-- Deck Builder features are all planned but not yet implemented (see `docs/user-stories.md`)
+- Before starting a task, check if an issue already exists (`gh issue list`); if not, create one with `gh issue create`
+- Reference the issue number in commit messages (e.g. `fix: resolve silent failure (#12)`)
+- Keep issue status current: open issues are in progress or pending; close an issue when the work is merged
+- The GitHub Project board reflects issue status — update labels/milestones as needed so the board stays accurate
+- Use `gh issue view <number>` to inspect an issue before starting work
