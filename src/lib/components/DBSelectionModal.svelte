@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
 	import { checkLocalDatabase } from '$lib/db';
-	import { store, initDB, peekDB, clearDB, exportDB } from '$lib/store.svelte';
+	import { store, initDB, peekDB, clearDB, exportDB, loadFromFile } from '$lib/store.svelte';
 
 	let fileInput: HTMLInputElement;
 	let localDBexists = $state<boolean | null>(null);
@@ -33,8 +33,14 @@
 		}
 	}
 
-	function handleLoadFile() {
-		throw new Error('Not implemented');
+	async function handleLoadFile() {
+		if (!selectedFile) return;
+		try {
+			await loadFromFile(selectedFile);
+			closeModal();
+		} catch (e) {
+			console.error('Failed to import file:', e);
+		}
 	}
 
 	function handleLoadLocal() {

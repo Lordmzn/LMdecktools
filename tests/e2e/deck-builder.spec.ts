@@ -72,7 +72,9 @@ async function mockScryfallAPI(page: import('@playwright/test').Page) {
 	});
 }
 
-// Helper: create a fresh DB and navigate to deck builder
+// Helper: create a fresh DB. Ends on '/' with store.dbMode === 'active'.
+// All subsequent in-app navigation must use spaGoto (not page.goto) to
+// preserve the store module state across routes.
 async function setupWithDB(page: import('@playwright/test').Page) {
 	await page.goto('/');
 	await page.evaluate(() => {
@@ -93,187 +95,197 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 	await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
 }
 
-// ==================== [planned] Deck Builder Page ====================
+// SPA navigation — clicks the first matching nav link so SvelteKit routes
+// client-side and the store module state (dbMode, savedCardLists, …) is preserved.
+async function spaGoto(page: import('@playwright/test').Page, href: string) {
+	await page.locator(`a[href="${href}"]`).first().click();
+}
 
-test.describe('Deck Builder', () => {
+// Helper: search for a card and add it via evaluate (bypasses the hover-reveal
+// CSS overlay, which has opacity:0 until :hover is active).
+async function addCardViaSearch(
+	page: import('@playwright/test').Page,
+	cardName = 'Lightning Bolt'
+) {
+	const searchInput = page.locator('input[placeholder="Search for cards..."]');
+	await searchInput.fill(cardName);
+	// Click the Search button — more reliable than pressing Enter
+	await page.getByRole('button', { name: 'Search' }).click();
+	await expect(page.getByText(cardName).first()).toBeVisible();
+	// The add button is inside an opacity-0 overlay; use evaluate to call btn.click()
+	// directly in the browser context, bypassing all CSS/coordinate pointer-events issues.
+	await page.locator('[data-testid="card-add-btn"]').first().evaluate((btn) => {
+		(btn as HTMLElement).click();
+	});
+	// Wait for the "Added …" notification toast, confirming the async DB write completed.
+	// Using hasText to avoid a false-positive from the collection page's "Found X cards" toast.
+	await expect(
+		page.locator('.animate-slide-in').filter({ hasText: /added/i })
+	).toBeVisible({ timeout: 3000 });
+}
+
+// Helper: wait for the notification toast to disappear.
+async function waitForToastGone(page: import('@playwright/test').Page) {
+	await expect(page.locator('.animate-slide-in')).not.toBeVisible({ timeout: 5000 });
+}
+
+// ==================== Card Lists Page ====================
+
+test.describe('Card Lists', () => {
 	test.beforeEach(async ({ page }) => {
 		await mockScryfallAPI(page);
 	});
 
-	test('navigating to /decks shows the deck builder page', async ({ page }) => {
+	test('navigating to /card-lists shows the card lists page', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// The deck builder page should exist and show a heading
-		await expect(page.getByRole('heading', { name: /deck/i })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'New List' })).toBeVisible();
+		await expect(page.locator('select').first()).toBeVisible();
 	});
 
-	test('creating a new deck with a custom name', async ({ page }) => {
+	test('creating a new list', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// Should have a way to create a new deck
-		const createButton = page.getByRole('button', { name: /new deck|create deck/i });
-		await expect(createButton).toBeVisible();
-		await createButton.click();
+		// DB auto-creates 1 list ("A list") on init
+		const select = page.locator('select').first();
+		await expect(select.locator('option')).toHaveCount(1);
 
-		// Should be able to name the deck
-		const nameInput = page.locator(
-			'input[placeholder*="deck name" i], input[placeholder*="name" i]'
-		);
-		await nameInput.fill('Red Aggro');
+		await page.getByRole('button', { name: 'New List' }).click();
 
-		// Verify the deck name is displayed
-		await expect(page.getByText('Red Aggro')).toBeVisible();
+		await expect(select.locator('option')).toHaveCount(2);
 	});
 
-	test('adding cards to a deck from search results', async ({ page }) => {
+	test('adding cards to a list from search results', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// Search for a card
-		const searchInput = page.locator('input[placeholder*="search" i]');
-		await expect(searchInput).toBeVisible();
-		await searchInput.fill('Lightning Bolt');
-		await searchInput.press('Enter');
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
 
-		// Search results should appear
-		await expect(page.getByText('Lightning Bolt')).toBeVisible();
-
-		// Add a card to the deck (click add button on the search result)
-		const addButton = page.locator('[title*="add" i], button:has-text("add")').first();
-		await addButton.click();
-
-		// Card should appear in the deck list
 		await expect(
-			page.locator('.deck-cards, [data-testid="deck-cards"]').getByText('Lightning Bolt')
+			page.locator('[data-testid="list-cards"]').getByText('Lightning Bolt')
 		).toBeVisible();
 	});
 
-	test('removing cards from a deck', async ({ page }) => {
+	test('removing cards from a list', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
 		// Add a card first
-		const searchInput = page.locator('input[placeholder*="search" i]');
-		await searchInput.fill('Lightning Bolt');
-		await searchInput.press('Enter');
-		await page.locator('[title*="add" i], button:has-text("add")').first().click();
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
 
-		// Verify card is in deck
-		await expect(page.getByText('Lightning Bolt')).toBeVisible();
+		await expect(
+			page.locator('[data-testid="list-cards"]').getByText('Lightning Bolt')
+		).toBeVisible();
 
-		// Remove the card
-		const removeButton = page.locator('[title*="remove" i], button:has-text("remove")').first();
-		await removeButton.click();
+		// Use force:true to bypass the opacity-0 hover-reveal overlay
+		await page
+			.locator('[data-testid="list-cards"] div.group')
+			.first()
+			.locator('button[title="Remove"]')
+			.click({ force: true });
 
-		// Card should be removed from deck
-		const deckArea = page.locator('.deck-cards, [data-testid="deck-cards"]');
-		await expect(deckArea.getByText('Lightning Bolt')).not.toBeVisible();
+		await expect(page.getByText('No cards in list yet')).toBeVisible();
 	});
 
-	test('deck shows which cards are owned in collection', async ({ page }) => {
+	test('list shows which cards are owned in collection', async ({ page }) => {
 		await setupWithDB(page);
 
-		// First, add a card to the collection
-		await page.goto('/collection');
-		await page.locator('button', { hasText: 'Add Cards' }).click();
-		const collSearchInput = page.locator('input[placeholder*="search" i]');
-		await collSearchInput.fill('Lightning Bolt');
-		await collSearchInput.press('Enter');
-		await expect(page.getByText('Lightning Bolt')).toBeVisible();
-		// Add to collection
-		await page.locator('[title*="add" i], button:has-text("add")').first().click();
+		// Add Lightning Bolt to collection
+		await spaGoto(page, '/collection');
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
 
-		// Now go to deck builder and add same card to a deck
-		await page.goto('/decks');
-		const searchInput = page.locator('input[placeholder*="search" i]');
-		await searchInput.fill('Lightning Bolt');
-		await searchInput.press('Enter');
-		await page.locator('[title*="add" i], button:has-text("add")').first().click();
+		// Add same card to a list
+		await spaGoto(page, '/card-lists');
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
 
-		// The deck view should show ownership info (e.g. "Own: 1")
-		await expect(page.getByText(/own/i)).toBeVisible();
+		// Ownership banner should show fully owned
+		await expect(page.locator('[data-testid="ownership-banner"]')).toContainText(
+			'Owned — you have all cards'
+		);
 	});
 
-	test('deck needs summary shows owned vs needed quantities', async ({ page }) => {
+	test('missing cards summary shows unowned cards', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// Add cards to deck
-		const searchInput = page.locator('input[placeholder*="search" i]');
-		await searchInput.fill('Lightning Bolt');
-		await searchInput.press('Enter');
-		await page.locator('[title*="add" i], button:has-text("add")').first().click();
+		// Add a card to list without adding to collection
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
 
-		// There should be a summary section showing needed cards
-		// (since we don't own any, all should be "needed")
-		await expect(page.getByText(/need|missing/i)).toBeVisible();
+		// The native <dialog> makes outside elements inert while open, so we must
+		// check the banner after closing. Use data-testid for reliable targeting since
+		// getByText(regex) has trouble finding the element with reactive text nodes.
+		await expect(page.locator('[data-testid="ownership-banner"]')).toContainText('Missing');
 	});
 
-	test('switching between multiple saved decks', async ({ page }) => {
+	test('switching between multiple saved lists', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// Should see at least one deck (auto-created on init)
-		// Create a second deck
-		const createButton = page.getByRole('button', { name: /new deck|create deck/i });
-		await createButton.click();
+		// Rename current list via import (# header line only — no API calls)
+		await page.getByRole('button', { name: 'Import' }).click();
+		await page.locator('textarea').fill('# First List');
+		await page.getByRole('button', { name: 'Load List' }).click();
+		// Wait for the Import modal to close, then for the toast to clear
+		await expect(page.locator('[aria-label="Import List"]')).not.toBeVisible({ timeout: 5000 });
+		await waitForToastGone(page);
 
-		// Should have a way to switch between decks (tabs, dropdown, sidebar)
-		const deckSelector = page.locator('select, [role="tablist"], [data-testid="deck-selector"]');
-		await expect(deckSelector).toBeVisible();
+		// Create a second list
+		await page.getByRole('button', { name: 'New List' }).click();
 
-		// Should show at least 2 decks
-		const deckOptions = page.locator('select option, [role="tab"], [data-testid="deck-tab"]');
-		const count = await deckOptions.count();
-		expect(count).toBeGreaterThanOrEqual(2);
+		// Select should now have 2 options
+		const select = page.locator('select').first();
+		await expect(select.locator('option')).toHaveCount(2);
+
+		// Switch back to the first list and verify the heading updates
+		await select.selectOption({ index: 0 });
+		await expect(page.getByRole('heading', { name: 'First List' })).toBeVisible();
 	});
 
-	test('importing a deck from text', async ({ page }) => {
+	test('importing a list from text', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// Should have an import button/option
-		const importButton = page.getByRole('button', { name: /import/i });
-		await expect(importButton).toBeVisible();
-		await importButton.click();
+		await page.getByRole('button', { name: 'Import' }).click();
 
-		// Should show a text area for pasting deck lists
 		const textarea = page.locator('textarea');
-		await expect(textarea).toBeVisible();
+		await textarea.fill('# My Red List\n4 Lightning Bolt');
 
-		await textarea.fill('# My Red Deck\n4 Lightning Bolt');
+		await page.getByRole('button', { name: 'Load List' }).click();
 
-		// Submit the import
-		const submitButton = page.getByRole('button', { name: /import|load|submit/i });
-		await submitButton.click();
-
-		// Deck should be loaded with the imported cards
-		await expect(page.getByText('Lightning Bolt')).toBeVisible();
-		await expect(page.getByText('My Red Deck')).toBeVisible();
+		// Import calls the mocked named API for "Lightning Bolt"
+		await expect(page.getByRole('heading', { name: 'My Red List' })).toBeVisible();
+		await expect(
+			page.locator('[data-testid="list-cards"]').getByText('Lightning Bolt')
+		).toBeVisible();
 	});
 
-	test('exporting a deck as text', async ({ page }) => {
+	test('exporting a list as text', async ({ page }) => {
 		await setupWithDB(page);
-		await page.goto('/decks');
+		await spaGoto(page, '/card-lists');
 
-		// Add a card to the deck first
-		const searchInput = page.locator('input[placeholder*="search" i]');
-		await searchInput.fill('Lightning Bolt');
-		await searchInput.press('Enter');
-		await page.locator('[title*="add" i], button:has-text("add")').first().click();
+		// Add a card
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
 
-		// Click export
-		const exportButton = page.getByRole('button', { name: /export/i });
-		await expect(exportButton).toBeVisible();
-		await exportButton.click();
+		// Click Export
+		await page.getByRole('button', { name: 'Export' }).click();
 
-		// Should show export text in standard format
-		const exportText = page.locator('textarea, pre, [data-testid="export-text"]');
-		await expect(exportText).toBeVisible();
-
-		const text = await exportText.textContent();
+		const exportPre = page.locator('[data-testid="export-text"]');
+		await expect(exportPre).toBeVisible();
+		const text = await exportPre.textContent();
 		expect(text).toContain('Lightning Bolt');
 	});
 });

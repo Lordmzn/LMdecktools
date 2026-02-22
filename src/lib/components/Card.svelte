@@ -39,6 +39,7 @@
 			class="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
 		>
 			<button
+				data-testid="card-add-btn"
 				onclick={handleAdd}
 				class="flex translate-y-4 transform items-center gap-2 rounded-lg bg-white px-4 py-2 font-semibold text-stone-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-stone-100 {isAdding
 					? 'scale-110'

@@ -505,11 +505,17 @@
 			{#if store.listCards.length > 0}
 				<div class="mt-6">
 					{#if ownershipCheck.owned}
-						<div class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+						<div
+							data-testid="ownership-banner"
+							class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800"
+						>
 							✓ Owned — you have all cards in this list
 						</div>
 					{:else}
-						<div class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+						<div
+							data-testid="ownership-banner"
+							class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+						>
 							✗ Missing {missingCount}
 							{missingCount === 1 ? 'card' : 'cards'}
 						</div>

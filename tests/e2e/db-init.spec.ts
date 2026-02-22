@@ -52,7 +52,7 @@ test.describe('Database Initialization', () => {
 		await page.goto('/');
 
 		await expect(page.getByRole('heading', { name: /Welcome to LM Deck Tools/i })).toBeVisible();
-		await expect(page.getByText('Start Building Decks')).toBeVisible();
+		await expect(page.getByText('Manage Card Lists')).toBeVisible();
 		await expect(page.getByText('Manage Collection')).toBeVisible();
 	});
 });
