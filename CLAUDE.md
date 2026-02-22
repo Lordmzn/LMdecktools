@@ -38,38 +38,47 @@ Requires Node 22+ (see `.nvmrc`). Use `nvm use` to switch.
 ## Architecture
 
 ### State Management
+
 A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-based runes. Exported as `export const store = new Store()`. Components import `store` directly — no context API or Svelte 4 writable stores. Async functions (`initDB`, `addToCollection`, `createNewDeck`, etc.) are exported alongside and mutate `store.*` after DB operations.
 
 ### Storage Layer
+
 Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Database `LMdecktools` v2 with three object stores: `decks` (autoIncrement), `collection` (keyed by Scryfall card ID), `metadata` (timestamps).
 
 ### Card Data
+
 Live Scryfall API calls (`api.scryfall.com/cards/search` and `/cards/named`). No local card database.
 
 ### Routing
+
 SvelteKit file-based routing. Current routes: `/` (home), `/collection`. The `/decks` route is linked in nav but not yet created.
 
 ### i18n
+
 Paraglide configured with hooks in `hooks.server.ts` (handle) and `hooks.ts` (reroute). Translation files in `messages/`. Currently only a stub `hello_world` key — i18n is wired up but not actively used in UI text.
 
 ### Yjs Integration
+
 `src/lib/yjs-integration.ts` has CRDT-based export/import/merge utilities. Currently experimental — export uses Yjs binary format but import only handles JSON (Yjs import path is commented out).
 
 ## Testing
 
 ### Structure
+
 - `src/lib/__tests__/` — unit tests for lib modules (`db.test.ts`, `yjs-integration.test.ts`, `store.test.ts`)
 - `src/lib/components/__tests__/` — component tests (placeholder, expand as needed)
 - `tests/e2e/` — Playwright E2E tests (`db-init.spec.ts`)
 - `src/tests/setup.ts` — test setup (imports `fake-indexeddb/auto` and `@testing-library/jest-dom/vitest`)
 
 ### Gotchas
+
 - **Svelte 5 runes in tests:** `$state`/`$derived` require a reactive owner. The `Store` class cannot be instantiated directly in a plain `.test.ts` — use `@testing-library/svelte` to mount a wrapper component, or mock the module (see `store.test.ts`)
 - **fake-indexeddb:** Imported in setup file. Tests that use IndexedDB must close/delete the DB in `afterEach` to avoid state leaking between tests
 - **Paraglide imports:** Vitest uses the paraglide Vite plugin (already in `vite.config.ts`) to resolve `$paraglide/runtime` imports
 - **E2E DB button:** The DB modal button requires `evaluate((btn) => btn.click())` rather than Playwright's `.click()` due to layout; see `openDBModal` helper in E2E tests
 
 ### Adding tests for new user stories
+
 1. **Pure logic** (data transforms, calculations) → unit test in `src/lib/__tests__/`
 2. **Component behavior** (UI interactions, prop-driven rendering) → component test in `src/lib/components/__tests__/`
 3. **Full user flow** (multi-page, requires browser) → E2E test in `tests/e2e/`

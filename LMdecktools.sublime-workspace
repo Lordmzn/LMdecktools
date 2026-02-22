@@ -1,262 +1,77 @@
 {
-	"auto_complete":
-	{
-		"selected_items":
-		[
-			[
-				"coll",
-				"coll_last_save"
-			],
-			[
-				"co",
-				"collection"
-			],
-			[
-				"qu",
-				"querystring"
-			],
-			[
-				"sho",
-				"showAllPrints"
-			],
-			[
-				"deck",
-				"deckNeeds"
-			],
-			[
-				"dec",
-				"deckStore"
-			],
-			[
-				"Dec",
-				"DeckStore"
-			],
-			[
-				"currentD",
-				"currentDeckIndex"
-			],
-			[
-				"lo",
-				"localDBexists"
-			],
-			[
-				"inde",
-				"indexedDB"
-			],
-			[
-				"db",
-				"dbLoaded"
-			],
-			[
-				"sh",
-				"showStartupModal"
-			],
-			[
-				"ca",
-				"addCardToDeck"
-			],
-			[
-				"LM",
-				"LMdecktools"
-			],
-			[
-				"flex-",
-				"flex-col"
-			],
-			[
-				"flw",
-				"flex-row"
-			],
-			[
-				"err",
-				"error_type"
-			],
-			[
-				"o",
-				"object_type"
-			],
-			[
-				"obj",
-				"object_type"
-			],
-			[
-				"em",
-				"ems_id_device"
-			],
-			[
-				"date",
-				"date_bin"
-			],
-			[
-				"cod",
-				"codice_tipo_evento"
-			],
-			[
-				"bin",
-				"binary_content"
-			],
-			[
-				"the",
-				"the_string"
-			],
-			[
-				"ts_",
-				"ts_message"
-			],
-			[
-				"arr",
-				"array_decoder"
-			],
-			[
-				"da",
-				"day_of_month"
-			],
-			[
-				"mo",
-				"month_bin"
-			],
-			[
-				"ta",
-				"target_eng"
-			],
-			[
-				"cur",
-				"current_eng"
-			],
-			[
-				"pars",
-				"parsed_mqtt_payload"
-			],
-			[
-				"par",
-				"parsed_mqtt_payload"
-			],
-			[
-				"e",
-				"ems_payload"
-			],
-			[
-				"te",
-				"template_id"
-			],
-			[
-				"mq",
-				"mqtt_payload"
-			],
-			[
-				"cf_",
-				"cf_content_2"
-			],
-			[
-				"decode_cf1_2",
-				"decode_cf1_2_3_4_common"
-			],
-			[
-				"deco",
-				"decode_cf_specific"
-			],
-			[
-				"decode_cf1_",
-				"decode_cf1_2_3_4_specific"
-			],
-			[
-				"decode_cf_",
-				"decode_cf1_2_3_4_specific"
-			],
-			[
-				"part",
-				"partial_map_cf1"
-			],
-			[
-				"decode_c",
-				"decode_cf_specific"
-			],
-			[
-				"pa",
-				"partial_map_cf1"
-			],
-			[
-				"tem",
-				"template_id"
-			],
-			[
-				"get",
-				"get_route_elements"
-			],
-			[
-				"know",
-				"known_event_cf"
-			],
-			[
-				"kn",
-				"known_periodic_cf"
-			],
-			[
-				"decode",
-				"decode_mychain2_payload"
-			],
-			[
-				"get_",
-				"get_route_data_pipeline"
-			],
-			[
-				"for",
-				"format_unit_topology"
-			],
-			[
-				"get_r",
-				"get_timeseries_from_multiple_arkes"
-			],
-			[
-				"para",
-				"parameters_configuration"
-			],
-			[
-				"norm",
-				"normalize_src_func"
-			],
-			[
-				"create",
-				"create_connection"
-			],
-			[
-				"upd",
-				"update_connection_types"
-			],
-			[
-				"create_",
-				"create_parameter_value"
-			],
-			[
-				"crea",
-				"create_timeseries"
-			],
-			[
-				"parame",
-				"parameters_per_unit"
-			],
-			[
-				"Ar",
-				"ArkeUnit"
-			],
-			[
-				"_sa",
-				"_safe_post"
-			]
+	"auto_complete": {
+		"selected_items": [
+			["coll", "coll_last_save"],
+			["co", "collection"],
+			["qu", "querystring"],
+			["sho", "showAllPrints"],
+			["deck", "deckNeeds"],
+			["dec", "deckStore"],
+			["Dec", "DeckStore"],
+			["currentD", "currentDeckIndex"],
+			["lo", "localDBexists"],
+			["inde", "indexedDB"],
+			["db", "dbLoaded"],
+			["sh", "showStartupModal"],
+			["ca", "addCardToDeck"],
+			["LM", "LMdecktools"],
+			["flex-", "flex-col"],
+			["flw", "flex-row"],
+			["err", "error_type"],
+			["o", "object_type"],
+			["obj", "object_type"],
+			["em", "ems_id_device"],
+			["date", "date_bin"],
+			["cod", "codice_tipo_evento"],
+			["bin", "binary_content"],
+			["the", "the_string"],
+			["ts_", "ts_message"],
+			["arr", "array_decoder"],
+			["da", "day_of_month"],
+			["mo", "month_bin"],
+			["ta", "target_eng"],
+			["cur", "current_eng"],
+			["pars", "parsed_mqtt_payload"],
+			["par", "parsed_mqtt_payload"],
+			["e", "ems_payload"],
+			["te", "template_id"],
+			["mq", "mqtt_payload"],
+			["cf_", "cf_content_2"],
+			["decode_cf1_2", "decode_cf1_2_3_4_common"],
+			["deco", "decode_cf_specific"],
+			["decode_cf1_", "decode_cf1_2_3_4_specific"],
+			["decode_cf_", "decode_cf1_2_3_4_specific"],
+			["part", "partial_map_cf1"],
+			["decode_c", "decode_cf_specific"],
+			["pa", "partial_map_cf1"],
+			["tem", "template_id"],
+			["get", "get_route_elements"],
+			["know", "known_event_cf"],
+			["kn", "known_periodic_cf"],
+			["decode", "decode_mychain2_payload"],
+			["get_", "get_route_data_pipeline"],
+			["for", "format_unit_topology"],
+			["get_r", "get_timeseries_from_multiple_arkes"],
+			["para", "parameters_configuration"],
+			["norm", "normalize_src_func"],
+			["create", "create_connection"],
+			["upd", "update_connection_types"],
+			["create_", "create_parameter_value"],
+			["crea", "create_timeseries"],
+			["parame", "parameters_per_unit"],
+			["Ar", "ArkeUnit"],
+			["_sa", "_safe_post"]
 		]
 	},
-	"buffers":
-	[
+	"buffers": [
 		{
 			"file": "src/routes/collection/+page.svelte",
-			"settings":
-			{
+			"settings": {
 				"buffer_size": 9572,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			},
-			"undo_stack":
-			[
+			"undo_stack": [
 				[
 					5,
 					2,
@@ -1619,14 +1434,12 @@
 		},
 		{
 			"file": "src/lib/components/DBSelectionModal.svelte",
-			"settings":
-			{
+			"settings": {
 				"buffer_size": 9032,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			},
-			"undo_stack":
-			[
+			"undo_stack": [
 				[
 					239,
 					1,
@@ -6315,14 +6128,12 @@
 		},
 		{
 			"file": "src/lib/components/Header.svelte",
-			"settings":
-			{
+			"settings": {
 				"buffer_size": 2787,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			},
-			"undo_stack":
-			[
+			"undo_stack": [
 				[
 					100,
 					1,
@@ -10287,8 +10098,7 @@
 		},
 		{
 			"file": "_old/src/lib/components/DataManagementPanel.svelte",
-			"settings":
-			{
+			"settings": {
 				"buffer_size": 8931,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
@@ -10296,14 +10106,12 @@
 		},
 		{
 			"file": "src/lib/store.svelte.ts",
-			"settings":
-			{
+			"settings": {
 				"buffer_size": 11771,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			},
-			"undo_stack":
-			[
+			"undo_stack": [
 				[
 					1806,
 					1,
@@ -15006,14 +14814,12 @@
 		},
 		{
 			"file": "src/lib/db.ts",
-			"settings":
-			{
+			"settings": {
 				"buffer_size": 12973,
 				"encoding": "UTF-8",
 				"line_ending": "Unix"
 			},
-			"undo_stack":
-			[
+			"undo_stack": [
 				[
 					21,
 					1,
@@ -17080,36 +16886,22 @@
 		}
 	],
 	"build_system": "",
-	"build_system_choices":
-	[
-	],
+	"build_system_choices": [],
 	"build_varint": "",
-	"command_palette":
-	{
+	"command_palette": {
 		"height": 0.0,
 		"last_filter": "",
-		"selected_items":
-		[
-			[
-				"install",
-				"Package Control: Install Package"
-			],
-			[
-				"isntall",
-				"Package Control: Install Package"
-			]
+		"selected_items": [
+			["install", "Package Control: Install Package"],
+			["isntall", "Package Control: Install Package"]
 		],
 		"width": 0.0
 	},
-	"console":
-	{
+	"console": {
 		"height": 148.0,
-		"history":
-		[
-		]
+		"history": []
 	},
-	"distraction_free":
-	{
+	"distraction_free": {
 		"menu_visible": true,
 		"show_minimap": false,
 		"show_open_files": false,
@@ -17117,8 +16909,7 @@
 		"side_bar_visible": false,
 		"status_bar_visible": false
 	},
-	"expanded_folders":
-	[
+	"expanded_folders": [
 		"/Users/emanuelemason/ProgettiLM/LMdecktools",
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/_old",
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/_old/src",
@@ -17131,8 +16922,7 @@
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/src/routes",
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/src/routes/collection"
 	],
-	"file_history":
-	[
+	"file_history": [
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/.prettierrc",
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/package.json",
 		"/Users/emanuelemason/ProgettiLM/LMdecktools/_old/src/lib/components/DataManagementPanel.svelte",
@@ -17262,23 +17052,16 @@
 		"/Users/emanuelemason/Progetti/mammuttone/mqtt-to-ems/lib/mqtt/application.ex",
 		"/Users/emanuelemason/Progetti/cartagine/crons.py"
 	],
-	"find":
-	{
+	"find": {
 		"height": 51.0
 	},
-	"find_in_files":
-	{
+	"find_in_files": {
 		"height": 110.0,
-		"where_history":
-		[
-			""
-		]
+		"where_history": [""]
 	},
-	"find_state":
-	{
+	"find_state": {
 		"case_sensitive": false,
-		"find_history":
-		[
+		"find_history": [
 			")\n",
 			"METADATA_STORE",
 			"updateMetadata",
@@ -17291,9 +17074,7 @@
 		"in_selection": false,
 		"preserve_case": false,
 		"regex": true,
-		"replace_history":
-		[
-		],
+		"replace_history": [],
 		"reverse": false,
 		"scrollbar_highlights": true,
 		"show_context": true,
@@ -17302,32 +17083,19 @@
 		"whole_word": false,
 		"wrap": true
 	},
-	"groups":
-	[
+	"groups": [
 		{
-			"sheets":
-			[
+			"sheets": [
 				{
 					"buffer": 0,
 					"file": "src/routes/collection/+page.svelte",
 					"semi_transient": false,
-					"settings":
-					{
+					"settings": {
 						"buffer_size": 9572,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								500,
-								500
-							]
-						],
-						"settings":
-						{
-							"auto_complete_triggers":
-							[
+						"regions": {},
+						"selection": [[500, 500]],
+						"settings": {
+							"auto_complete_triggers": [
 								{
 									"characters": "<",
 									"selector": "text.html, text.xml"
@@ -17361,23 +17129,12 @@
 					"buffer": 1,
 					"file": "src/lib/components/DBSelectionModal.svelte",
 					"semi_transient": false,
-					"settings":
-					{
+					"settings": {
 						"buffer_size": 9032,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								1462,
-								1462
-							]
-						],
-						"settings":
-						{
-							"auto_complete_triggers":
-							[
+						"regions": {},
+						"selection": [[1462, 1462]],
+						"settings": {
+							"auto_complete_triggers": [
 								{
 									"characters": "<",
 									"selector": "text.html, text.xml"
@@ -17412,23 +17169,12 @@
 					"file": "src/lib/components/Header.svelte",
 					"selected": true,
 					"semi_transient": false,
-					"settings":
-					{
+					"settings": {
 						"buffer_size": 2787,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								1740,
-								1740
-							]
-						],
-						"settings":
-						{
-							"auto_complete_triggers":
-							[
+						"regions": {},
+						"selection": [[1740, 1740]],
+						"settings": {
+							"auto_complete_triggers": [
 								{
 									"characters": "<",
 									"selector": "text.html, text.xml"
@@ -17462,21 +17208,11 @@
 					"buffer": 3,
 					"file": "_old/src/lib/components/DataManagementPanel.svelte",
 					"semi_transient": false,
-					"settings":
-					{
+					"settings": {
 						"buffer_size": 8931,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								8072,
-								8072
-							]
-						],
-						"settings":
-						{
+						"regions": {},
+						"selection": [[8072, 8072]],
+						"settings": {
 							"lsp_uri": "file:///Users/emanuelemason/ProgettiLM/LMdecktools/_old/src/lib/components/DataManagementPanel.svelte",
 							"syntax": "Packages/Svelte/Svelte.sublime-syntax",
 							"tab_size": 2,
@@ -17493,30 +17229,18 @@
 			]
 		},
 		{
-			"sheets":
-			[
+			"sheets": [
 				{
 					"buffer": 4,
 					"file": "src/lib/store.svelte.ts",
 					"selected": true,
 					"semi_transient": false,
-					"settings":
-					{
+					"settings": {
 						"buffer_size": 11771,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								2054,
-								2054
-							]
-						],
-						"settings":
-						{
-							"auto_complete_triggers":
-							[
+						"regions": {},
+						"selection": [[2054, 2054]],
+						"settings": {
+							"auto_complete_triggers": [
 								{
 									"characters": "<",
 									"selector": "text.html, text.xml"
@@ -17543,23 +17267,12 @@
 					"buffer": 5,
 					"file": "src/lib/db.ts",
 					"semi_transient": false,
-					"settings":
-					{
+					"settings": {
 						"buffer_size": 12973,
-						"regions":
-						{
-						},
-						"selection":
-						[
-							[
-								2659,
-								2672
-							]
-						],
-						"settings":
-						{
-							"auto_complete_triggers":
-							[
+						"regions": {},
+						"selection": [[2659, 2672]],
+						"settings": {
+							"auto_complete_triggers": [
 								{
 									"characters": "<",
 									"selector": "text.html, text.xml"
@@ -17585,109 +17298,63 @@
 			]
 		}
 	],
-	"incremental_find":
-	{
+	"incremental_find": {
 		"height": 51.0
 	},
-	"input":
-	{
+	"input": {
 		"height": 42.0
 	},
-	"layout":
-	{
-		"cells":
-		[
-			[
-				0,
-				0,
-				1,
-				1
-			],
-			[
-				1,
-				0,
-				2,
-				1
-			]
+	"layout": {
+		"cells": [
+			[0, 0, 1, 1],
+			[1, 0, 2, 1]
 		],
-		"cols":
-		[
-			0.0,
-			0.5,
-			1.0
-		],
-		"rows":
-		[
-			0.0,
-			1.0
-		]
+		"cols": [0.0, 0.5, 1.0],
+		"rows": [0.0, 1.0]
 	},
 	"menu_visible": true,
-	"output.LSP Log Panel":
-	{
+	"output.LSP Log Panel": {
 		"height": 0.0,
-		"history":
-		[
-		]
+		"history": []
 	},
-	"output.diagnostics":
-	{
+	"output.diagnostics": {
 		"height": 0.0,
-		"history":
-		[
-		]
+		"history": []
 	},
-	"output.find_results":
-	{
+	"output.find_results": {
 		"height": 0.0,
-		"history":
-		[
-		]
+		"history": []
 	},
-	"output.mdpopups":
-	{
+	"output.mdpopups": {
 		"height": 0.0,
-		"history":
-		[
-		]
+		"history": []
 	},
 	"pinned_build_system": "",
 	"project": "LMdecktools.sublime-project",
-	"replace":
-	{
+	"replace": {
 		"height": 98.0
 	},
 	"save_all_on_build": true,
-	"select_file":
-	{
+	"select_file": {
 		"height": 0.0,
 		"last_filter": "",
-		"selected_items":
-		[
-		],
+		"selected_items": [],
 		"width": 0.0
 	},
-	"select_project":
-	{
+	"select_project": {
 		"height": 0.0,
 		"last_filter": "",
-		"selected_items":
-		[
-		],
+		"selected_items": [],
 		"width": 0.0
 	},
-	"select_symbol":
-	{
+	"select_symbol": {
 		"height": 305.0,
 		"last_filter": "",
-		"selected_items":
-		[
-		],
+		"selected_items": [],
 		"width": 592.0
 	},
 	"selected_group": 0,
-	"settings":
-	{
+	"settings": {
 		"lsp_show_inlay_hints": false
 	},
 	"show_minimap": true,
@@ -17696,7 +17363,5 @@
 	"side_bar_visible": true,
 	"side_bar_width": 295.0,
 	"status_bar_visible": true,
-	"template_settings":
-	{
-	}
+	"template_settings": {}
 }

@@ -17,6 +17,7 @@
 ```
 
 **Header states for DB button:**
+
 - No DB loaded: dark button `[Choose DB v]`
 - DB loaded: orange button `[Database v]` with green checkmark on icon
 
@@ -106,6 +107,7 @@
 ```
 
 **Empty states:**
+
 - No DB: "No database selected. Click 'Choose DB' to get started."
 - DB loaded, no cards: "No cards in collection yet. Click 'Add Cards' to get started."
 - Filter has no matches: "No cards match your filter."
@@ -142,12 +144,14 @@
 ```
 
 **Ownership check params:**
+
 - Card Matching `Generic`: any reprint of that card name in the collection counts
 - Card Matching `Specific`: only the exact printing (same Scryfall ID) counts
 - Language `Any`: card language is ignored when checking ownership
 - Language `Strict`: collection card must have the same language as the list card
 
 **Empty states:**
+
 - No cards in list: "No cards in list yet. Search and add cards from the left panel."
 
 ---
