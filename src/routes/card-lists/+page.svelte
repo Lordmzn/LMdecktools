@@ -55,7 +55,8 @@
 		try {
 			await addCardToList(card);
 			notify(`Added ${card.name} to list`);
-		} catch {
+		} catch (error) {
+			console.error('Failed to add card:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
 		}
 	}

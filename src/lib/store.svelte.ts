@@ -131,8 +131,12 @@ export async function peekDB() {
  */
 export async function initDB() {
 	if (store.dbMode === 'peek') {
-		// DB already open, just upgrade access level
 		store.dbMode = 'active';
+		// If loadCardLists() ran in peek mode with an empty DB, it skipped
+		// createNewCardList(). Re-run now that we have write access.
+		if (store.savedCardLists.length === 0) {
+			await createNewCardList();
+		}
 		return;
 	}
 	db = await openDatabase();
@@ -158,6 +162,23 @@ export function closeDB() {
 export function exportDB() {
 	if (!db) throw new Error('Database not initialized');
 	return exportWithMetadata(store);
+}
+
+/**
+ * Load database from a file (JSON or Yjs format).
+ * Clears existing data, imports from the file, then reloads the store.
+ */
+export async function loadFromFile(file: File): Promise<void> {
+	if (!db) {
+		db = await openDatabase();
+	}
+	store.dbMode = 'active';
+
+	const buffer = await file.arrayBuffer();
+	const data = new Uint8Array(buffer);
+
+	await importDatabase(db, data, false);
+	await Promise.all([loadCardLists(), loadCollection()]);
 }
 
 /**
