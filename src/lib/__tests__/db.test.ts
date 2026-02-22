@@ -34,7 +34,7 @@ describe('Database Operations', () => {
 		it('returns a card list with default values', () => {
 			const cardList = createEmptyCardList();
 
-			expect(cardList.name).toBe('Nuovo mazzo');
+			expect(cardList.name).toBe('A list');
 			expect(cardList.cards).toEqual([]);
 			expect(cardList.cardMatching).toBe('generic');
 			expect(cardList.languageMatching).toBe('any');
@@ -53,7 +53,7 @@ describe('Database Operations', () => {
 
 			const cardLists = await loadAllCardLists(db);
 			expect(cardLists).toHaveLength(1);
-			expect(cardLists[0].name).toBe('Nuovo mazzo');
+			expect(cardLists[0].name).toBe('A list');
 			expect(cardLists[0].id).toBe(id);
 		});
 
@@ -88,7 +88,7 @@ describe('Database Operations', () => {
 				]
 			};
 
-			const id = await saveCardList(db, cardList);
+			const _id = await saveCardList(db, cardList);
 			const cardLists = await loadAllCardLists(db);
 
 			expect(cardLists[0].cards).toHaveLength(2);

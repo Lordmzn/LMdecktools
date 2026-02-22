@@ -3,7 +3,16 @@
  * Kept separate from store.test.ts to avoid vi.mock conflicts.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { addToCollection, removeFromCollection, createNewCardList, deleteCardList, peekDB, initDB, closeDB, store } from '../store.svelte';
+import {
+	addToCollection,
+	removeFromCollection,
+	createNewCardList,
+	deleteCardList,
+	peekDB,
+	initDB,
+	closeDB,
+	store
+} from '../store.svelte';
 
 // ==================== Write Guards ====================
 

@@ -169,9 +169,7 @@ describe('Yjs Integration', () => {
 
 			const mockStore = {
 				savedCardLists: cardLists,
-				collection: [
-					{ id: 'c1', name: 'Lightning Bolt', quantity_owned: 4 }
-				]
+				collection: [{ id: 'c1', name: 'Lightning Bolt', quantity_owned: 4 }]
 			};
 
 			const binary = exportWithMetadata(mockStore as any);

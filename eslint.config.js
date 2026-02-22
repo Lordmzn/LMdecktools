@@ -35,5 +35,20 @@ export default ts.config(
 				svelteConfig
 			}
 		}
+	},
+	{
+		rules: {
+			// Paraglide i18n routing is wired up but not actively used — plain hrefs are fine
+			'svelte/no-navigation-without-resolve': 'off',
+			// Pervasive in WIP code interacting with IndexedDB and Scryfall API
+			'@typescript-eslint/no-explicit-any': 'off',
+			// Allow _-prefixed variables as intentional no-ops (unused destructuring, unused params)
+			'@typescript-eslint/no-unused-vars': [
+				'error',
+				{ varsIgnorePattern: '^_', argsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' }
+			],
+			// Disabled in favour of @typescript-eslint/no-unused-vars (avoids false positives on TS type annotations)
+			'no-unused-vars': 'off'
+		}
 	}
 );

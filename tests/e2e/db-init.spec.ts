@@ -17,7 +17,7 @@ async function openDBModal(page: import('@playwright/test').Page) {
 	await page.waitForLoadState('networkidle');
 	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
 	await expect(dbButton).toBeVisible();
-	await dbButton.evaluate((btn) => btn.click());
+	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	// Wait for modal content to appear
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 }
@@ -51,9 +51,7 @@ test.describe('Database Initialization', () => {
 	test('home page renders correctly', async ({ page }) => {
 		await page.goto('/');
 
-		await expect(
-			page.getByRole('heading', { name: /Welcome to LM Deck Tools/i })
-		).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Welcome to LM Deck Tools/i })).toBeVisible();
 		await expect(page.getByText('Start Building Decks')).toBeVisible();
 		await expect(page.getByText('Manage Collection')).toBeVisible();
 	});

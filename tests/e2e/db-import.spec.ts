@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Helper: create a fresh DB
-async function setupWithDB(page: import('@playwright/test').Page) {
+async function _setupWithDB(page: import('@playwright/test').Page) {
 	await page.goto('/');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
@@ -14,7 +14,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 	await page.waitForLoadState('networkidle');
 
 	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
-	await dbButton.evaluate((btn) => btn.click());
+	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
 	await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
@@ -25,7 +25,7 @@ async function openDBModal(page: import('@playwright/test').Page) {
 	await page.waitForLoadState('networkidle');
 	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
 	await expect(dbButton).toBeVisible();
-	await dbButton.evaluate((btn) => btn.click());
+	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Import from File')).toBeVisible({ timeout: 5000 });
 }
 
@@ -51,9 +51,7 @@ test.describe('Database Import', () => {
 			decks: [
 				{
 					name: 'Imported Red Deck',
-					deck_cards: [
-						{ id: 'c1', name: 'Lightning Bolt', LM_quantity: 4 }
-					],
+					deck_cards: [{ id: 'c1', name: 'Lightning Bolt', LM_quantity: 4 }],
 					created_at: Date.now(),
 					updated_at: Date.now()
 				}

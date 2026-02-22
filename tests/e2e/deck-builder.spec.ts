@@ -87,7 +87,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 
 	// Create a new DB via the modal
 	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
-	await dbButton.evaluate((btn) => btn.click());
+	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
 	await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
@@ -118,7 +118,9 @@ test.describe('Deck Builder', () => {
 		await createButton.click();
 
 		// Should be able to name the deck
-		const nameInput = page.locator('input[placeholder*="deck name" i], input[placeholder*="name" i]');
+		const nameInput = page.locator(
+			'input[placeholder*="deck name" i], input[placeholder*="name" i]'
+		);
 		await nameInput.fill('Red Aggro');
 
 		// Verify the deck name is displayed
@@ -143,7 +145,9 @@ test.describe('Deck Builder', () => {
 		await addButton.click();
 
 		// Card should appear in the deck list
-		await expect(page.locator('.deck-cards, [data-testid="deck-cards"]').getByText('Lightning Bolt')).toBeVisible();
+		await expect(
+			page.locator('.deck-cards, [data-testid="deck-cards"]').getByText('Lightning Bolt')
+		).toBeVisible();
 	});
 
 	test('removing cards from a deck', async ({ page }) => {
@@ -217,15 +221,11 @@ test.describe('Deck Builder', () => {
 		await createButton.click();
 
 		// Should have a way to switch between decks (tabs, dropdown, sidebar)
-		const deckSelector = page.locator(
-			'select, [role="tablist"], [data-testid="deck-selector"]'
-		);
+		const deckSelector = page.locator('select, [role="tablist"], [data-testid="deck-selector"]');
 		await expect(deckSelector).toBeVisible();
 
 		// Should show at least 2 decks
-		const deckOptions = page.locator(
-			'select option, [role="tab"], [data-testid="deck-tab"]'
-		);
+		const deckOptions = page.locator('select option, [role="tab"], [data-testid="deck-tab"]');
 		const count = await deckOptions.count();
 		expect(count).toBeGreaterThanOrEqual(2);
 	});

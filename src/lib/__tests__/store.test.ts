@@ -4,7 +4,6 @@ import {
 	openDatabase,
 	saveCardList,
 	loadAllCardLists,
-	saveCollectionCard,
 	createEmptyCardList,
 	type CardList
 } from '../db';
@@ -138,9 +137,6 @@ describe('Database Import', () => {
 
 	// [planned] Import a database from a .yjs file
 	it('imports card lists from a Yjs binary file', async () => {
-		// Create a Yjs export with card list data
-		const { exportWithMetadata } = await import('../yjs-integration');
-
 		// First, export card lists to get binary data via a different path
 		const { exportCardListsAsYjs } = await import('../yjs-integration');
 		const cardLists: CardList[] = [
@@ -229,7 +225,7 @@ describe('Card List Store Functions', () => {
 	it('adds a card to the current list', async () => {
 		const { addCardToList } = await import('../store.svelte');
 
-		const mockCard = {
+		const _mockCard = {
 			id: 'card-1',
 			name: 'Lightning Bolt',
 			image_uris: { normal: 'http://example.com/bolt.jpg' },
