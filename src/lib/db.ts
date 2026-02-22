@@ -292,7 +292,7 @@ export function mergeCards(existing: Card[], incoming: Card[]): Card[] {
  */
 export function createEmptyCardList(): CardList {
   return {
-    name: "Nuovo mazzo",
+    name: "A list",
     cards: [],
     cardMatching: 'generic',
     languageMatching: 'any',
