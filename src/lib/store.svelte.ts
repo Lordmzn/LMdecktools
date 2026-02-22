@@ -115,6 +115,11 @@ function assertWritable(): void {
 	}
 }
 
+/** Strip Svelte reactive Proxy wrappers so objects can be stored in IndexedDB. */
+function toPlainCard(card: any): any {
+	return JSON.parse(JSON.stringify(card));
+}
+
 // ==================== INITIALIZATION ====================
 
 /**
@@ -281,7 +286,7 @@ export async function addToCollection(card: any, quantity: number = 1) {
 	const existingCard = await getCollectionCard(db, card.id);
 
 	const cardData: CollectionCard = {
-		...JSON.parse(JSON.stringify(card)),
+		...toPlainCard(card),
 		quantity_owned: existingCard ? existingCard.quantity_owned + quantity : quantity
 	};
 
@@ -321,7 +326,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
 	} else {
 		// Update quantity
 		const cardData: CollectionCard = {
-			...JSON.parse(JSON.stringify(existingCard)),
+			...toPlainCard(existingCard),
 			quantity_owned: newQuantity
 		};
 
@@ -345,7 +350,7 @@ export async function updateCollectionQuantity(card: any, quantity: number) {
 	}
 
 	const cardData: CollectionCard = {
-		...JSON.parse(JSON.stringify(card)),
+		...toPlainCard(card),
 		quantity_owned: quantity
 	};
 
@@ -589,18 +594,7 @@ export async function addCardToList(card: any) {
 			LM_quantity: newCards[existingIndex].LM_quantity + 1
 		};
 	} else {
-		newCards = [
-			...cards,
-			{
-				id: card.id,
-				name: card.name,
-				image_uris: card.image_uris,
-				card_faces: card.card_faces,
-				mana_cost: card.mana_cost,
-				type_line: card.type_line,
-				LM_quantity: 1
-			}
-		];
+		newCards = [...cards, { ...toPlainCard(card), LM_quantity: 1 }];
 	}
 
 	return saveCardList(name, newCards);
