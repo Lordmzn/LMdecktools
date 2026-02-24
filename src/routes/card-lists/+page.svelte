@@ -65,7 +65,8 @@
 		try {
 			await removeCardFromList(card);
 			notify(`Removed ${card.name} from list`);
-		} catch {
+		} catch (error) {
+			console.error('Failed to remove card:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to remove card', 'error');
 		}
 	}
@@ -74,7 +75,8 @@
 		try {
 			await createNewCardList();
 			notify('New list created');
-		} catch {
+		} catch (error) {
+			console.error('Failed to create list:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to create list', 'error');
 		}
 	}
@@ -84,7 +86,8 @@
 			await deleteCardList();
 			showDeleteConfirmModal = false;
 			notify('List deleted');
-		} catch {
+		} catch (error) {
+			console.error('Failed to delete list:', error);
 			showDeleteConfirmModal = false;
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to delete list', 'error');
 		}
@@ -100,7 +103,8 @@
 			showImportModal = false;
 			importText = '';
 			notify('List imported');
-		} catch {
+		} catch (error) {
+			console.error('Import failed:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Import failed', 'error');
 		}
 	}

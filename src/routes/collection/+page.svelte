@@ -73,8 +73,8 @@
 			await addToCollection(card, 1);
 			notify(`Added ${card.name} to collection`);
 		} catch (error) {
+			console.error('Failed to add card:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
-			console.log(error);
 		}
 	}
 
@@ -83,7 +83,8 @@
 		try {
 			await addToCollection(card, 1);
 			notify(`Added one ${card.name}`);
-		} catch {
+		} catch (error) {
+			console.error('Failed to add card:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
 		}
 	}
@@ -93,7 +94,8 @@
 		try {
 			await removeFromCollection(card, 1);
 			notify(`Removed one ${card.name}`);
-		} catch {
+		} catch (error) {
+			console.error('Failed to remove card:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to remove card', 'error');
 		}
 	}
@@ -103,7 +105,8 @@
 		try {
 			await updateCollectionQuantity(card, quantity);
 			notify(`Updated ${card.name} quantity`);
-		} catch {
+		} catch (error) {
+			console.error('Failed to update quantity:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
 		}
 	}

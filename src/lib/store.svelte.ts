@@ -616,11 +616,11 @@ export async function removeCardFromList(card: any) {
 	if (cards[existingIndex].LM_quantity > 1) {
 		newCards = [...cards];
 		newCards[existingIndex] = {
-			...newCards[existingIndex],
+			...toPlainCard(newCards[existingIndex]),
 			LM_quantity: newCards[existingIndex].LM_quantity - 1
 		};
 	} else {
-		newCards = cards.filter((_, i) => i !== existingIndex);
+		newCards = cards.filter((_, i) => i !== existingIndex).map(toPlainCard);
 	}
 
 	return saveCardList(name, newCards);
