@@ -20,6 +20,7 @@
 
 - No DB loaded: dark button `[Choose DB v]`
 - DB loaded: orange button `[Database v]` with green checkmark on icon
+- DB loaded + linked file active: orange button `[Database v]` with green checkmark + small link icon
 
 ---
 
@@ -190,6 +191,53 @@
 | | Start from scratch                                   | |
 | | Create a new empty database.                         | |
 | | [Create New Database]                                | |
+| +------------------------------------------------------+ |
+|                                                          |
+| +------------------------------------------------------+ |
+| | [image icon]                                         | |
+| | Image Cache                                          | |
+| | Card images are cached locally for faster loading.   | |
+| |                                                      | |
+| | Cache size: 42 MB  (317 images cached)               | |
+| | [Clear Image Cache]                                  | |
+| +------------------------------------------------------+ |
+|                                                          |
+| +------------------------------------------------------+ |
+| | [link icon]                                          | |
+| | Linked File                                          | |
+| |                                                      | |
+| | STATE 1 — No file linked (default):                  | |
+| |   Automatically save every change to a file          | |
+| |   on your computer. Place it in a cloud-synced       | |
+| |   folder for cross-device access with no backend.   | |
+| |   [Link a File...]                                   | |
+| |   Requires Chrome 86+, Edge 86+, or Safari 15.2+.   | |
+| |   Not supported in Firefox.                          | |
+| |                                                      | |
+| | STATE 2 — Active (handle in IDB, permission granted):| |
+| |   [green link icon] my-collection.yjs                | |
+| |   ~/Dropbox/MTG/my-collection.yjs                    | |
+| |   Last saved: 2 min ago                              | |
+| |   [Save Now]  [Change File...]  [Unlink]             | |
+| |                                                      | |
+| | STATE 3 — Reconnect needed                           | |
+| |   (handle in IDB, permission = 'prompt'):            | |
+| |   [amber link icon] my-collection.yjs                | |
+| |   Browser permission needed once per session.        | |
+| |   [Reconnect to File]  [Unlink]                      | |
+| |                                                      | |
+| | STATE 4 — File not found                             | |
+| |   (handle in IDB, file deleted or moved):            | |
+| |   [red alert icon] File not found                    | |
+| |   my-collection.yjs could not be located.            | |
+| |   Your data is safe in the browser.                  | |
+| |   [Unlink]                                           | |
+| |                                                      | |
+| | STATE 5 — Write failed (error during session write): | |
+| |   [red alert icon] Last save failed: disk full       | |
+| |   my-collection.yjs — ~/Dropbox/MTG/                 | |
+| |   Your data is safe in the browser.                  | |
+| |   [Save Now]  [Unlink]                               | |
 | +------------------------------------------------------+ |
 |                                                          |
 | Note: You can always export or import your data later.   |

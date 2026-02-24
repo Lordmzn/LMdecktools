@@ -46,6 +46,13 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 
 ---
 
+## Image Caching
+
+- **[planned]** As a user, I want card images to be cached in my browser after their first load, so that they display instantly on repeat visits without fetching from Scryfall again.
+- **[planned]** As a user, I want to see how much storage my image cache uses and be able to clear it, so that I can reclaim browser storage when needed.
+
+---
+
 ## Navigation
 
 - **[done]** As a user, I want to navigate between Home, Collection, and Card Lists pages via tabs, so that I can move through the app easily.
@@ -68,6 +75,29 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 - **[done]** As a user, I want to toggle "Language Matching" between Any and Strict, so that I can decide whether language matters when checking ownership.
 - **[done]** As a user, I want to delete a card list with a confirmation step, so that I can remove lists I no longer need without accidentally losing data.
 - **[planned]** As a user, I want to compare two card lists to see what they have in common and what differs, so that I can identify overlap.
+
+---
+
+## File-Based Sync
+
+- **[planned]** As a user, I want to link a file on my local filesystem via the OS file picker (`showSaveFilePicker`), so that the app has a designated location to persist my data automatically.
+- **[planned]** As a user, I want every change I make (adding a card, editing a quantity, updating a list) to be saved silently to the linked file, so that my data is always up to date without any manual action.
+- **[planned]** As a user, I want the app to request write permission for the linked file once per browser session (not on every change), so that I am not interrupted by repeated permission dialogs.
+- **[planned]** As a user, I want to see the linked file's name, path, and the time of the last successful save displayed in the DB modal, so that I always know the current sync status.
+- **[planned]** As a user, I want a "Save Now" button in the DB modal, so that I can trigger a manual save whenever I want without waiting for the next automatic write.
+- **[planned]** As a user, I want to unlink the current file, so that auto-save stops and I return to browser-only storage without deleting any of my data.
+- **[planned]** As a user, I want to change the linked file (re-link to a different location), so that I can move my data file without losing the auto-save connection.
+- **[planned]** As a user, I want the app to detect when the linked file has been changed externally (e.g., synced from another device) and show a toast notification with "Reload" and "Ignore" options, so that I can pull in changes made elsewhere without risk of data loss.
+- **[planned]** As a user, I want to see a clear error state in the DB modal when the linked file can no longer be found (e.g., it was moved or deleted), so that I understand what happened and can unlink or re-link.
+- **[planned]** As a user, I want to see a clear error state when a write to the linked file fails mid-session (e.g., disk full, permissions revoked), so that I know my last change may not have been persisted and can act accordingly.
+- **[planned]** As a user, I want to see a note in the DB modal that file linking requires a compatible browser (Chrome 86+, Edge 86+, Safari 15.2+) and is not available in Firefox, so that I understand why the feature may be absent in my browser.
+
+---
+
+## Cross-Device Sync
+
+- **[planned]** As a user, I want to scan a QR code shown by another device running LM Deck Tools, so that the two devices can sync my collection and lists directly over a local network or WebRTC, without any data passing through a server I do not control. _(Experimental — implementation requires a lightweight signaling step and is subject to browser P2P support.)_
+- **[planned]** As a user, I want CRDT-based merge semantics during a P2P sync, so that concurrent edits from both devices are reconciled without data loss and without requiring a central server to arbitrate. _(Experimental — depends on the Yjs WebRTC provider; merge behaviour for deletions and quantity changes must be validated before this story is considered done.)_
 
 ---
 

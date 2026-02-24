@@ -88,6 +88,7 @@ The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall ima
 3. **Full user flow** (multi-page, requires browser) → E2E test in `tests/e2e/`
 
 ## Project Tracking
+
 Task advancement is tracked via **GitHub Issues** on [`Lordmzn/LMdecktools`](https://github.com/Lordmzn/LMdecktools) and on the [**"LM Deck Tools" GitHub Project** board](https://github.com/users/Lordmzn/projects/2). Each task maps to a GitHub issue; keep issue status current.
 
 - Before starting a task, check if an issue already exists (`gh issue list`); if not, create one with `gh issue create`

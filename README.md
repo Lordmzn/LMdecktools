@@ -39,22 +39,25 @@ Features that conflict with these principles (cloud sync, social feeds, price tr
 ### Data Management
 
 - All data stored locally in IndexedDB — no server, no account
+- Card images cached via the browser Cache API — instant repeat loads, no Scryfall round-trip
+- Link a file on your local filesystem (Chrome/Edge/Safari 15.2+): every change writes silently to your chosen location — place it in a cloud-synced folder for "Bring Your Own Cloud" multi-device access, with no backend and no data leaving your machine
 - Export/import decks and collections as text or JSON
 - Merge imports with existing data or replace entirely
 
 ## Tech Stack
 
-| Layer     | Technology                |
-| --------- | ------------------------- |
-| Framework | SvelteKit 2 / Svelte 5    |
-| Styling   | Tailwind CSS 4            |
-| Language  | TypeScript 5              |
-| Storage   | IndexedDB (browser-local) |
-| Card Data | Scryfall API              |
-| i18n      | Paraglide (EN, IT)        |
-| Testing   | Vitest, Playwright        |
-| Build     | Vite 6, pnpm              |
-| CI        | GitHub Actions            |
+| Layer       | Technology                |
+| ----------- | ------------------------- |
+| Framework   | SvelteKit 2 / Svelte 5    |
+| Styling     | Tailwind CSS 4            |
+| Language    | TypeScript 5              |
+| Storage     | IndexedDB (browser-local) |
+| Card Data   | Scryfall API              |
+| Image Cache | Browser Cache API         |
+| i18n        | Paraglide (EN, IT)        |
+| Testing     | Vitest, Playwright        |
+| Build       | Vite 6, pnpm              |
+| CI          | GitHub Actions            |
 
 ## Getting Started
 

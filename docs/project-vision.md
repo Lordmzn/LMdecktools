@@ -41,10 +41,33 @@ The current, working version of LM Deck Tools is a direct result of executing on
 
 ## 4. Future Roadmap
 
-The planned features continue to align with the core principles:
+The planned and experimental features below continue to align with the core principles.
+
+### 4.1 Near-term
 
 - **[planned] Import from `.yjs` or `.json` file:** This is the other half of the data ownership story, allowing users to restore backups or import data from other sources without needing a cloud sync.
 - **[planned] Compare two card lists:** This is a valuable feature that can be built entirely on the client-side, adding utility without compromising the core principles.
+- **[planned] Cache card images with the browser Cache API:** After their first load, Scryfall card images are stored in the browser's native Cache storage (`caches.open()`) and served locally on every subsequent visit. This reduces Scryfall API traffic, speeds up the UI, and keeps images available across sessions — all without a service worker, a server, or any extra dependency. Cache size is reported in the DB modal and the user can clear it on demand. Fully aligned with Zero Cost, Zero Backend, and Absolute Privacy.
+
+### 4.2 File-Based Sync ("Bring Your Own Cloud")
+
+The [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) (`showSaveFilePicker` / `createWritable`) enables a browser app to hold a persistent, writable handle to a file the user has explicitly chosen via the OS file picker. LM Deck Tools will use this to implement silent auto-save: every state change writes the current `.yjs` snapshot to the linked file without user intervention.
+
+This approach aligns squarely with all three core principles:
+
+- **Zero Backend:** The write goes directly from the browser to the local filesystem — no server is involved at any point.
+- **Absolute Privacy:** The file never leaves the user's machine unless they choose to copy or sync it manually.
+- **User-Controlled Data:** The user picks the file location. Placing that file inside a cloud-synced folder (Dropbox, iCloud Drive, OneDrive, Google Drive for Desktop) gives them cross-device access using infrastructure they already own and control — hence "Bring Your Own Cloud."
+
+The one UX constraint this feature imposes: browsers require a user gesture to grant write access, and the permission is not stored across sessions. The app will request permission once per session (on the first post-load write attempt, or when the user explicitly clicks "Reconnect to File"), and will display a clear status panel in the DB modal showing the link state, the filename and path, the time of last successful save, and any error conditions.
+
+Browser support caveat: the File System Access API is available in Chrome 86+, Edge 86+, and Safari 15.2+. Firefox does not support it as of mid-2025. The feature will degrade gracefully — users on unsupported browsers will not see the linking controls.
+
+### 4.3 P2P QR Sync (experimental)
+
+As a longer-term experiment, LM Deck Tools may support direct device-to-device sync via a QR code pairing flow built on `y-webrtc` (the Yjs WebRTC provider). One device generates a QR code encoding a room ID; the second device scans it, and a WebRTC data channel carries the Yjs CRDT updates between the two without routing data through any application server.
+
+This feature remains strictly experimental for two reasons: (a) WebRTC still requires a short-lived signaling exchange (typically via a public STUN/TURN service) to establish the peer connection, which introduces a transient dependency on an external server; (b) merge semantics for concurrent edits — particularly quantity decrements and list deletions — need careful validation before the feature can be considered reliable. Development will not begin until the File-Based Sync feature is stable and the signaling dependency question is resolved in a way that does not compromise the Absolute Privacy principle.
 
 By deliberately choosing a focused, backend-less architecture, LM Deck Tools carves out a unique identity in a crowded market. It is not just another deck builder; it is a statement on privacy, data ownership, and sustainable solo development.
 

@@ -114,14 +114,17 @@ async function addCardViaSearch(
 	await expect(page.getByText(cardName).first()).toBeVisible();
 	// The add button is inside an opacity-0 overlay; use evaluate to call btn.click()
 	// directly in the browser context, bypassing all CSS/coordinate pointer-events issues.
-	await page.locator('[data-testid="card-add-btn"]').first().evaluate((btn) => {
-		(btn as HTMLElement).click();
-	});
+	await page
+		.locator('[data-testid="card-add-btn"]')
+		.first()
+		.evaluate((btn) => {
+			(btn as HTMLElement).click();
+		});
 	// Wait for the "Added …" notification toast, confirming the async DB write completed.
 	// Using hasText to avoid a false-positive from the collection page's "Found X cards" toast.
-	await expect(
-		page.locator('.animate-slide-in').filter({ hasText: /added/i })
-	).toBeVisible({ timeout: 3000 });
+	await expect(page.locator('.animate-slide-in').filter({ hasText: /added/i })).toBeVisible({
+		timeout: 3000
+	});
 }
 
 // Helper: wait for the notification toast to disappear.
