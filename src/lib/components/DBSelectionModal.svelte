@@ -7,6 +7,7 @@
 	let fileInput: HTMLInputElement;
 	let localDBexists = $state<boolean | null>(null);
 	let selectedFile: File | null = $state(null);
+	let isLoadingFile = $state(false);
 
 	onMount(() => {
 		if (store.dbMode === 'none') {
@@ -35,11 +36,14 @@
 
 	async function handleLoadFile() {
 		if (!selectedFile) return;
+		isLoadingFile = true;
 		try {
 			await loadFromFile(selectedFile);
 			closeModal();
 		} catch (e) {
 			console.error('Failed to import file:', e);
+		} finally {
+			isLoadingFile = false;
 		}
 	}
 
@@ -242,10 +246,30 @@
 							{/if}
 							<button
 								onclick={handleLoadFile}
-								disabled={!selectedFile}
-								class="w-full rounded-lg bg-orange-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+								disabled={!selectedFile || isLoadingFile}
+								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-stone-300"
 							>
-								Import File
+								{#if isLoadingFile}
+									<svg
+										class="h-4 w-4 animate-spin"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										/>
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+									</svg>
+									Importing…
+								{:else}
+									Import File
+								{/if}
 							</button>
 						</div>
 					</div>

@@ -629,11 +629,17 @@ export async function removeCardFromList(card: any) {
 /**
  * Import list from text
  */
-export async function importListFromText(text: string) {
+export async function importListFromText(
+	text: string,
+	onProgress?: (current: number, total: number) => void
+) {
 	assertWritable();
 	const lines = text.split('\n').filter((line) => line.trim());
 	const newCards: any[] = [];
 	let newName = store.currentCardList?.name || 'Nuovo mazzo';
+
+	const total = lines.filter((l) => !l.startsWith('#') && /^\d+\s+/.test(l)).length;
+	let current = 0;
 
 	for (const line of lines) {
 		if (line.startsWith('#')) {
@@ -665,6 +671,8 @@ export async function importListFromText(text: string) {
 			} catch {
 				console.error(`Failed to import ${cardName}`);
 			}
+			current++;
+			onProgress?.(current, total);
 		}
 	}
 

@@ -21,6 +21,9 @@
 	let showNotification = $state(false);
 	let notificationMessage = $state('');
 	let showImportModal = $state(false);
+	let isImporting = $state(false);
+	let importCurrent = $state(0);
+	let importTotal = $state(0);
 	let showExportModal = $state(false);
 	let showAddCardsModal = $state(false);
 	let showDeleteConfirmModal = $state(false);
@@ -98,14 +101,22 @@
 	}
 
 	async function handleImport() {
+		isImporting = true;
+		importCurrent = 0;
+		importTotal = 0;
 		try {
-			await importListFromText(importText);
+			await importListFromText(importText, (current, total) => {
+				importCurrent = current;
+				importTotal = total;
+			});
 			showImportModal = false;
 			importText = '';
 			notify('List imported');
 		} catch (error) {
 			console.error('Import failed:', error);
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Import failed', 'error');
+		} finally {
+			isImporting = false;
 		}
 	}
 
@@ -232,21 +243,44 @@
 			<p class="mb-3 text-sm text-stone-500">Paste a card list in standard format:</p>
 			<textarea
 				bind:value={importText}
+				disabled={isImporting}
 				placeholder="# List Name&#10;4 Lightning Bolt&#10;2 Mountain"
-				class="h-48 w-full rounded-lg border border-orange-300 p-3 font-mono text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+				class="h-48 w-full rounded-lg border border-orange-300 p-3 font-mono text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
 			></textarea>
 			<div class="mt-4 flex justify-end gap-2">
 				<button
 					onclick={() => (showImportModal = false)}
-					class="rounded-lg border border-orange-300 px-4 py-2 text-stone-700 transition hover:bg-orange-50"
+					disabled={isImporting}
+					class="rounded-lg border border-orange-300 px-4 py-2 text-stone-700 transition hover:bg-orange-50 disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					Cancel
 				</button>
 				<button
 					onclick={handleImport}
-					class="rounded-lg bg-orange-700 px-4 py-2 text-white transition hover:bg-orange-800"
+					disabled={isImporting}
+					class="flex items-center gap-2 rounded-lg bg-orange-700 px-4 py-2 text-white transition hover:bg-orange-800 disabled:cursor-not-allowed disabled:opacity-75"
 				>
-					Load List
+					{#if isImporting}
+						<svg
+							class="h-4 w-4 animate-spin"
+							xmlns="http://www.w3.org/2000/svg"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<circle
+								class="opacity-25"
+								cx="12"
+								cy="12"
+								r="10"
+								stroke="currentColor"
+								stroke-width="4"
+							/>
+							<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+						</svg>
+						{importTotal > 0 ? `Importing… (${importCurrent}/${importTotal})` : 'Importing…'}
+					{:else}
+						Load List
+					{/if}
 				</button>
 			</div>
 		</div>
