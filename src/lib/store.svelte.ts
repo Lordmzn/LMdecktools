@@ -542,6 +542,27 @@ export async function deleteCardList() {
 }
 
 /**
+ * Add all cards in the current list to the collection, respecting LM_quantity.
+ * Returns counts of added and failed cards.
+ */
+export async function addAllToCollection(): Promise<{ added: number; failed: number }> {
+	assertWritable();
+	const cards = $state.snapshot(store.listCards) as any[];
+	let added = 0;
+	let failed = 0;
+	for (const card of cards) {
+		try {
+			await addToCollection(card, card.LM_quantity);
+			added++;
+		} catch (e) {
+			console.error(`Failed to add ${card.name} to collection:`, e);
+			failed++;
+		}
+	}
+	return { added, failed };
+}
+
+/**
  * Update list name
  */
 export async function updateListName(name: string) {

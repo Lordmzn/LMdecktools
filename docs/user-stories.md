@@ -74,6 +74,8 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 - **[done]** As a user, I want to toggle "Card Matching" between Generic and Specific, so that I can choose whether any reprint counts or only the exact printing.
 - **[done]** As a user, I want to toggle "Language Matching" between Any and Strict, so that I can decide whether language matters when checking ownership.
 - **[done]** As a user, I want to delete a card list with a confirmation step, so that I can remove lists I no longer need without accidentally losing data.
+- **[done]** As a user, I want to rename a card list by clicking its title and typing in place, so that I can correct or update the name without opening a separate dialog.
+- **[done]** As a user, I want an "Add all to collection" button on the card list view, so that I can bulk-add every card in the list to my collection in one action, incrementing existing quantities.
 - **[planned]** As a user, I want to compare two card lists to see what they have in common and what differs, so that I can identify overlap.
 
 ---

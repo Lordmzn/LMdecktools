@@ -119,7 +119,7 @@
 |  +------------------------------------------------------------+  |
 |  | List Title (editable)                                      |  |
 |  | N cards (N unique)                                         |  |
-|  | [Filter cards...] [Sort by: Name v] [+ Add] [Import] [Export] |  |
+|  | [Filter...] [Sort v] [Add all to collection] [+ Add] [Import] [Export] |  |
 |  | Card matching: [Generic]/[Specific]  Language: [Any]/[Strict]  ✓ Owned / ✗ Missing N |  |
 |  |--------- --------------------------------------------------|  |
 |  |                                                            |  |
