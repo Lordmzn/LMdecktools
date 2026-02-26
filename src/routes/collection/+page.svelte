@@ -172,9 +172,9 @@
 
 <div class="min-h-screen bg-orange-50">
 	<div class="mx-auto max-w-7xl p-4">
-		<!-- Header -->
-		<div class="mb-6 rounded-lg border border-orange-100 bg-white p-6 shadow-lg">
-			<div class="flex flex-wrap items-center justify-between gap-4">
+		<!-- Header + Collection Grid -->
+		<div class="rounded-lg border border-orange-100 bg-white p-6 shadow-lg">
+			<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
 				<div>
 					<h1 class="text-3xl font-bold text-orange-900">My Collection</h1>
 					{#if store.dbLoaded}
@@ -184,7 +184,27 @@
 					{/if}
 				</div>
 
-				<div class="flex items-center gap-2">
+				<div class="flex flex-wrap items-center gap-2">
+					<!-- Filter -->
+					<input
+						type="text"
+						disabled={!store.dbLoaded}
+						bind:value={filterText}
+						placeholder="Filter cards..."
+						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+					/>
+
+					<!-- Sort -->
+					<select
+						bind:value={sortBy}
+						disabled={!store.dbLoaded}
+						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+					>
+						<option value="name">Sort by Name</option>
+						<option value="quantity">Sort by Quantity</option>
+						<option value="set">Sort by Set</option>
+					</select>
+
 					<button
 						onclick={() => (showSearchModal = true)}
 						disabled={store.dbMode === 'none'}
@@ -239,34 +259,6 @@
 						</svg>
 						Export
 					</button>
-				</div>
-			</div>
-		</div>
-
-		<!-- Collection Grid -->
-		<div class="rounded-lg border border-orange-100 bg-white p-6 shadow-lg">
-			<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-				<h2 class="text-xl font-bold text-orange-900">Your Cards</h2>
-				<div class="flex items-center gap-3">
-					<!-- Filter -->
-					<input
-						type="text"
-						disabled={!store.dbLoaded}
-						bind:value={filterText}
-						placeholder="Filter cards..."
-						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
-					/>
-
-					<!-- Sort -->
-					<select
-						bind:value={sortBy}
-						disabled={!store.dbLoaded}
-						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
-					>
-						<option value="name">Sort by Name</option>
-						<option value="quantity">Sort by Quantity</option>
-						<option value="set">Sort by Set</option>
-					</select>
 				</div>
 			</div>
 

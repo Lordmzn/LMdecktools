@@ -60,13 +60,4 @@
 		{owned ? '✓ Owned' : '✗ Missing'}
 	</div>
 
-	<!-- Card Name -->
-	<div class="mt-1 w-full px-2 text-sm font-medium text-orange-900">
-		{card.name}
-	</div>
-
-	<!-- Set Name -->
-	<div class="w-full px-2 text-xs text-stone-500">
-		{card.set_name || ''}
-	</div>
 </div>

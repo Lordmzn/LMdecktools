@@ -427,16 +427,41 @@
 				</button>
 			</div>
 
-			<!-- Row 2: Card count + Add Cards / Import / Export -->
-			<div class="flex flex-wrap items-center justify-between gap-4">
-				<p class="text-sm text-stone-500">
-					{#if store.dbLoaded}
-						{store.totalCards} cards ({store.uniqueCards} unique)
-					{:else}
-						No database selected
-					{/if}
-				</p>
-				<div class="flex gap-2">
+			</div>
+
+		<!-- Card Panel -->
+		<div class="rounded-lg border border-orange-100 bg-white p-6 shadow-lg">
+			<!-- List name + card count | Filter + Sort + Action buttons -->
+			<div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+				<div>
+					<h2 class="text-xl font-bold text-orange-900">
+						{store.currentCardList?.name || 'No list selected'}
+					</h2>
+					<p class="mt-1 text-sm text-stone-500">
+						{#if store.dbLoaded}
+							{store.totalCards} cards ({store.uniqueCards} unique)
+						{:else}
+							No database selected
+						{/if}
+					</p>
+				</div>
+				<div class="flex flex-wrap items-center gap-2">
+					<input
+						type="text"
+						disabled={!store.dbLoaded}
+						bind:value={filterText}
+						placeholder="Filter cards..."
+						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+					/>
+					<select
+						bind:value={sortBy}
+						disabled={!store.dbLoaded}
+						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
+					>
+						<option value="name">Sort by Name</option>
+						<option value="quantity">Sort by Quantity</option>
+						<option value="set">Sort by Set</option>
+					</select>
 					<button
 						onclick={() => (showAddCardsModal = true)}
 						disabled={store.dbMode === 'none' || !store.currentCardList}
@@ -472,99 +497,10 @@
 					</button>
 				</div>
 			</div>
-		</div>
 
-		<!-- Card Panel -->
-		<div class="rounded-lg border border-orange-100 bg-white p-6 shadow-lg">
-			<!-- Filter + Sort -->
-			<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-				<h2 class="text-xl font-bold text-orange-900">
-					{store.currentCardList?.name || 'No list selected'}
-				</h2>
-				<div class="flex items-center gap-3">
-					<input
-						type="text"
-						disabled={!store.dbLoaded}
-						bind:value={filterText}
-						placeholder="Filter cards..."
-						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-					/>
-					<select
-						bind:value={sortBy}
-						disabled={!store.dbLoaded}
-						class="rounded-lg border border-orange-300 px-3 py-2 text-sm focus:border-orange-500 focus:ring-2 focus:ring-orange-500 disabled:opacity-50"
-					>
-						<option value="name">Sort by Name</option>
-						<option value="quantity">Sort by Quantity</option>
-						<option value="set">Sort by Set</option>
-					</select>
-				</div>
-			</div>
-
-			<!-- Card Grid -->
-			<div class="list-cards" data-testid="list-cards">
-				{#if store.listCards.length === 0}
-					<div class="py-12 text-center text-stone-500">
-						<svg
-							xmlns="http://www.w3.org/2000/svg"
-							width="48"
-							height="48"
-							viewBox="0 0 24 24"
-							fill="none"
-							stroke="currentColor"
-							stroke-width="2"
-							class="mx-auto mb-4 opacity-50"
-						>
-							<rect width="18" height="18" x="3" y="3" rx="2" />
-							<path d="M3 9h18" />
-						</svg>
-						<p>No cards in list yet</p>
-						<p class="mt-2 text-sm">Click "Add Cards" to get started</p>
-					</div>
-				{:else if filteredListCards.length === 0}
-					<div class="py-12 text-center text-stone-500">
-						<p>No cards match your filter</p>
-					</div>
-				{:else}
-					<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-						{#each filteredListCards as { card, owned } (card.id)}
-							<CardListCard
-								{card}
-								{owned}
-								onRemove={handleRemoveCard}
-								disabled={store.dbMode === 'none'}
-							/>
-						{/each}
-					</div>
-				{/if}
-			</div>
-
-			<!-- Ownership banner -->
-			{#if store.listCards.length > 0}
-				<div class="mt-6">
-					{#if ownershipCheck.owned}
-						<div
-							data-testid="ownership-banner"
-							class="rounded-lg border border-green-200 bg-green-50 p-3 text-sm text-green-800"
-						>
-							✓ Owned — you have all cards in this list
-						</div>
-					{:else}
-						<div
-							data-testid="ownership-banner"
-							class="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
-						>
-							✗ Missing {missingCount}
-							{missingCount === 1 ? 'card' : 'cards'}
-						</div>
-					{/if}
-				</div>
-			{/if}
-
-			<!-- Card matching / language controls -->
+			<!-- Card matching / language controls + ownership banner (above grid) -->
 			{#if store.currentCardList}
-				<hr class="my-6 border-orange-100" />
-				<div class="flex flex-wrap gap-4 text-sm">
+				<div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
 					<div class="flex items-center gap-2">
 						<span class="font-medium text-stone-600">Card Matching:</span>
 						<button
@@ -611,8 +547,64 @@
 							Strict
 						</button>
 					</div>
+					{#if store.listCards.length > 0}
+						{#if ownershipCheck.owned}
+							<div
+								data-testid="ownership-banner"
+								class="rounded-lg border border-green-200 bg-green-50 px-3 py-1 text-sm text-green-800"
+							>
+								✓ Owned — you have all cards in this list
+							</div>
+						{:else}
+							<div
+								data-testid="ownership-banner"
+								class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-1 text-sm text-amber-800"
+							>
+								✗ Missing {missingCount}
+								{missingCount === 1 ? 'card' : 'cards'}
+							</div>
+						{/if}
+					{/if}
 				</div>
 			{/if}
+
+			<!-- Card Grid -->
+			<div class="list-cards" data-testid="list-cards">
+				{#if store.listCards.length === 0}
+					<div class="py-12 text-center text-stone-500">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="48"
+							height="48"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+							class="mx-auto mb-4 opacity-50"
+						>
+							<rect width="18" height="18" x="3" y="3" rx="2" />
+							<path d="M3 9h18" />
+						</svg>
+						<p>No cards in list yet</p>
+						<p class="mt-2 text-sm">Click "Add Cards" to get started</p>
+					</div>
+				{:else if filteredListCards.length === 0}
+					<div class="py-12 text-center text-stone-500">
+						<p>No cards match your filter</p>
+					</div>
+				{:else}
+					<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+						{#each filteredListCards as { card, owned } (card.id)}
+							<CardListCard
+								{card}
+								{owned}
+								onRemove={handleRemoveCard}
+								disabled={store.dbMode === 'none'}
+							/>
+						{/each}
+					</div>
+				{/if}
+			</div>
 		</div>
 	</div>
 </div>
