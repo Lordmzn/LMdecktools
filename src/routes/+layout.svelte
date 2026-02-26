@@ -10,7 +10,7 @@
 </script>
 
 <ParaglideJS {i18n}>
-	<div class="flex min-h-screen flex-col">
+	<div class="flex min-h-screen flex-col text-neutral-100">
 		<Header />
 
 		<main class="flex-1">

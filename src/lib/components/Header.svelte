@@ -8,23 +8,27 @@
 </script>
 
 <DBSelectionModal bind:show={showStartupModal} />
-<header class="border-b border-orange-200 bg-white">
-	<div class="mx-auto flex max-w-screen-xl justify-between px-4 pt-3">
-		<!-- Tab Navigation -->
+<header class="px-4 pt-4">
+	<div
+		class="mx-auto flex max-w-screen-xl items-center justify-between rounded-2xl border border-neutral-500/30 bg-neutral-800/40 px-4 py-2 backdrop-blur-md"
+	>
+		<!-- Logo + Tab Navigation -->
 		<HeaderNav />
 
-		<!-- Toggle Button -->
+		<!-- DB Status Button -->
 		<button
 			onclick={() => (showStartupModal = !showStartupModal)}
-			class="inline-flex items-center gap-2 rounded-lg px-4 py-2 font-medium text-white shadow-md transition-all duration-200 hover:bg-stone-700"
-			class:bg-orange-800={store.dbMode === 'active'}
-			class:bg-amber-600={store.dbMode === 'peek'}
-			class:bg-stone-800={store.dbMode === 'none'}
+			class="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-white transition-all duration-200 {store.dbMode ===
+			'active'
+				? 'bg-orange-500 hover:bg-orange-600'
+				: store.dbMode === 'peek'
+					? 'bg-amber-600 hover:bg-amber-700'
+					: 'bg-neutral-700 hover:bg-neutral-600'}"
 			title="Gestione Database"
 		>
 			{#if store.dbMode === 'none'}
 				<!-- Plain DB icon — no database selected yet -->
-				<svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 					<path
 						stroke-linecap="round"
 						stroke-linejoin="round"
@@ -34,7 +38,7 @@
 				</svg>
 			{:else if store.dbMode === 'peek'}
 				<!-- DB + magnifying glass — read-only preview mode -->
-				<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 					<path
 						stroke="currentColor"
 						stroke-linecap="round"
@@ -42,7 +46,7 @@
 						stroke-width="2"
 						d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
 					/>
-					<!-- Filled white circle = "lens window" that pops off the DB strokes below -->
+					<!-- Filled circle = "lens window" -->
 					<circle cx="17" cy="5" r="3.8" fill="white" />
 					<!-- Lens ring -->
 					<circle cx="17" cy="5" r="3" stroke="currentColor" stroke-width="2" fill="none" />
@@ -56,7 +60,7 @@
 				</svg>
 			{:else}
 				<!-- DB + green checkmark — fully active -->
-				<svg class="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
 					<path
 						stroke="currentColor"
 						stroke-linecap="round"
@@ -74,7 +78,7 @@
 						/>
 						<path
 							d="M20 6 9 17l-5-5"
-							class="text-green-700"
+							class="text-green-400"
 							stroke="currentColor"
 							stroke-width="3"
 							stroke-linecap="round"
@@ -103,18 +107,3 @@
 		</button>
 	</div>
 </header>
-
-<style>
-	@keyframes spin {
-		from {
-			transform: rotate(0deg);
-		}
-		to {
-			transform: rotate(360deg);
-		}
-	}
-
-	.animate-spin {
-		animation: spin 1s linear infinite;
-	}
-</style>

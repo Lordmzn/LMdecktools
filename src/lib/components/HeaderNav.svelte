@@ -7,15 +7,46 @@
 	let isCollectionActive = $derived(currentPath === '/collection');
 </script>
 
-<!-- Tab Navigation -->
-<nav class="-mb-px flex gap-1">
-	<h1 class="px-6 py-3 text-xl font-bold text-orange-900">⚔️ 🏴‍☠️</h1>
+<!-- Logo + Tab Navigation -->
+<nav class="flex items-center gap-1">
+	<!-- Card-deck logo + brand name -->
+	<a href="/" class="mr-3 flex items-center gap-2">
+		<svg
+			class="h-7 w-7 text-orange-400"
+			viewBox="0 0 24 24"
+			fill="none"
+			xmlns="http://www.w3.org/2000/svg"
+		>
+			<rect x="1" y="5" width="12" height="16" rx="2" stroke="currentColor" stroke-width="2" />
+			<rect
+				x="5"
+				y="3"
+				width="12"
+				height="16"
+				rx="2"
+				stroke="currentColor"
+				stroke-width="2"
+				fill="rgba(0,0,0,0.4)"
+			/>
+			<rect
+				x="9"
+				y="1"
+				width="12"
+				height="16"
+				rx="2"
+				stroke="currentColor"
+				stroke-width="2"
+				fill="rgba(0,0,0,0.4)"
+			/>
+		</svg>
+		<span class="font-bold text-white">LM Deck Tools</span>
+	</a>
 
 	<a
 		href="/"
-		class="rounded-t-lg px-6 py-3 font-medium transition-all {isHomeActive
-			? 'border-x-2 border-t-2 border-orange-400 bg-orange-50 text-orange-900'
-			: 'text-stone-600 hover:bg-orange-50/50 hover:text-orange-900'}"
+		class="rounded-xl px-4 py-2 font-medium transition-all {isHomeActive
+			? 'bg-neutral-800 text-orange-400'
+			: 'text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-100'}"
 	>
 		<span class="flex items-center gap-2">
 			<svg
@@ -36,9 +67,9 @@
 
 	<a
 		href="/collection"
-		class="rounded-t-lg px-6 py-3 font-medium transition-all {isCollectionActive
-			? 'border-x-2 border-t-2 border-orange-400 bg-orange-50 text-orange-900'
-			: 'text-stone-600 hover:bg-orange-50/50 hover:text-orange-900'}"
+		class="rounded-xl px-4 py-2 font-medium transition-all {isCollectionActive
+			? 'bg-neutral-800 text-orange-400'
+			: 'text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-100'}"
 	>
 		<span class="flex items-center gap-2">
 			<svg
@@ -59,9 +90,9 @@
 
 	<a
 		href="/card-lists"
-		class="rounded-t-lg px-6 py-3 font-medium transition-all {isCardListsActive
-			? 'border-x-2 border-t-2 border-orange-400 bg-orange-50 text-orange-900'
-			: 'text-stone-600 hover:bg-orange-50/50 hover:text-orange-900'}"
+		class="rounded-xl px-4 py-2 font-medium transition-all {isCardListsActive
+			? 'bg-neutral-800 text-orange-400'
+			: 'text-neutral-400 hover:bg-neutral-800/50 hover:text-neutral-100'}"
 	>
 		<span class="flex items-center gap-2">
 			<svg

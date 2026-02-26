@@ -1,3 +1,71 @@
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
+
+/* ── Glossy panel — semi-transparent dark surface with orange gradient border ── */
+.panel {
+	position: relative;
+	isolation: isolate;
+	background: rgba(23, 23, 23, 0.55);
+	backdrop-filter: blur(12px);
+	-webkit-backdrop-filter: blur(12px);
+	box-shadow:
+		inset 80px 0 140px -60px rgba(249, 115, 22, 0.09),
+		inset -80px 0 140px -60px rgba(249, 115, 22, 0.09);
+}
+
+/* Gradient border ring — bright orange on sides, dimmer through centre.
+   Uses mask-composite so the 1 px ring is at inset:0 and won't be
+   clipped by overflow:hidden on the parent. */
+.panel::before {
+	content: '';
+	position: absolute;
+	inset: 0;
+	border-radius: inherit;
+	padding: 1px;
+	background: linear-gradient(
+		to right,
+		rgba(249, 115, 22, 0.8) 0%,
+		rgba(249, 115, 22, 0.25) 38%,
+		rgba(249, 115, 22, 0.18) 50%,
+		rgba(249, 115, 22, 0.25) 62%,
+		rgba(249, 115, 22, 0.8) 100%
+	);
+	-webkit-mask:
+		linear-gradient(#fff 0 0) content-box,
+		linear-gradient(#fff 0 0);
+	mask:
+		linear-gradient(#fff 0 0) content-box,
+		linear-gradient(#fff 0 0);
+	-webkit-mask-composite: xor;
+	mask-composite: exclude;
+	pointer-events: none;
+}
+
+html {
+	background-color: #0a0a0a; /* neutral-950 */
+	background-image:
+		/* teal — top-right */
+		radial-gradient(
+			ellipse 700px 700px at calc(100% + 80px) -80px,
+			rgba(20, 184, 166, 0.18) 0%,
+			rgba(20, 184, 166, 0.06) 45%,
+			transparent 70%
+		),
+		/* purple — bottom-left */
+			radial-gradient(
+				ellipse 600px 600px at -80px calc(100% + 80px),
+				rgba(124, 58, 237, 0.16) 0%,
+				rgba(124, 58, 237, 0.05) 45%,
+				transparent 70%
+			),
+		/* orange — center-right */
+			radial-gradient(
+				ellipse 500px 500px at 78% 42%,
+				rgba(249, 115, 22, 0.12) 0%,
+				rgba(249, 115, 22, 0.04) 45%,
+				transparent 70%
+			);
+	background-attachment: fixed;
+	color: #f5f5f5; /* neutral-100 */
+}

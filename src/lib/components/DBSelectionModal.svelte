@@ -90,42 +90,40 @@
 		tabindex="0"
 		onclick={(e) => e.target === e.currentTarget && closeModal()}
 		onkeydown={(e) => {
-			// 1. Check for specific keys (Enter or Space)
 			if (e.key === 'Enter' || e.key === ' ') {
-				// 2. IMPORTANT: Prevent closing if the user is typing in an input INSIDE the modal
 				if (e.target === e.currentTarget) {
-					e.preventDefault(); // Stop 'Space' from scrolling the page
+					e.preventDefault();
 					closeModal();
 				}
 			}
 		}}
 	>
 		<div
-			class="mx-4 w-full max-w-2xl transform overflow-hidden rounded-2xl bg-white shadow-2xl transition-all duration-300"
+			class="panel mx-4 w-full max-w-2xl transform overflow-hidden rounded-2xl shadow-2xl transition-all duration-300"
 			class:scale-100={show}
 			class:scale-95={!show}
 		>
 			<!-- Header -->
-			<div class="bg-gradient-to-r from-orange-900 to-orange-400 px-6 py-4">
+			<div class="bg-gradient-to-r from-orange-900 to-orange-500 px-6 py-4">
 				<h2 class="flex items-center gap-2 text-2xl font-bold text-white">
 					⚔️ Welcome to LM Deck Tools 🏴‍☠️
 				</h2>
-				<p class="mt-1 text-sm text-stone-200">Choose how to start your MTG collection</p>
+				<p class="mt-1 text-sm text-orange-100">Choose how to start your MTG collection</p>
 			</div>
 
 			<!-- Content -->
 			<div class="space-y-6 p-6">
 				<!-- Local Database Option -->
 				<div
-					class="rounded-xl border-2 border-stone-200 p-5 transition-colors hover:border-stone-400"
+					class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
 				>
 					<div class="flex items-start gap-4">
 						{#if localDBexists === true}
 							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-100"
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
 							>
 								<svg
-									class="h-6 w-6 text-green-600"
+									class="h-6 w-6 text-green-400"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
@@ -140,10 +138,10 @@
 							</div>
 						{:else}
 							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-orange-100"
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
 							>
 								<svg
-									class="h-6 w-6 text-orange-600"
+									class="h-6 w-6 text-orange-400"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
@@ -158,7 +156,7 @@
 							</div>
 						{/if}
 						<div class="flex-1">
-							<h3 class="mb-2 text-lg font-semibold text-stone-900">
+							<h3 class="mb-2 text-lg font-semibold text-neutral-100">
 								{#if localDBexists === null}
 									Searching for local database
 								{:else if localDBexists === true}
@@ -168,7 +166,7 @@
 								{/if}
 							</h3>
 							{#if localDBexists === true}
-								<div class="mb-4 space-y-2 text-sm text-stone-600">
+								<div class="mb-4 space-y-2 text-sm text-neutral-400">
 									<div class="flex justify-between">
 										<span class="font-medium">Total lists:</span>
 										<span class="font-mono">{store.savedCardLists.length}</span>
@@ -180,7 +178,7 @@
 								</div>
 								{#if store.dbMode === 'peek'}
 									<div
-										class="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800"
+										class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
 									>
 										Previewing in read-only mode. Click "Use Local DB" to enable editing.
 									</div>
@@ -207,14 +205,14 @@
 
 				<!-- Import from File Option -->
 				<div
-					class="rounded-xl border-2 border-stone-200 p-5 transition-colors hover:border-stone-400"
+					class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
 				>
 					<div class="flex items-start gap-4">
 						<div
-							class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-orange-100"
+							class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
 						>
 							<svg
-								class="h-6 w-6 text-orange-600"
+								class="h-6 w-6 text-orange-400"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -228,8 +226,8 @@
 							</svg>
 						</div>
 						<div class="flex-1">
-							<h3 class="mb-2 text-lg font-semibold text-stone-900">Import from File</h3>
-							<p class="mb-4 text-sm text-stone-600">
+							<h3 class="mb-2 text-lg font-semibold text-neutral-100">Import from File</h3>
+							<p class="mb-4 text-sm text-neutral-400">
 								Import a backup file. Merging with local data is supported.
 							</p>
 							<input
@@ -237,17 +235,17 @@
 								accept=".yjs,.json"
 								bind:this={fileInput}
 								onchange={handleFileSelect}
-								class="mb-3 block w-full text-sm text-stone-500 file:mr-4 file:rounded-lg file:border-0 file:bg-orange-50 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-700 hover:file:bg-orange-100"
+								class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600"
 							/>
 							{#if selectedFile}
-								<p class="mb-3 text-xs text-stone-500">
+								<p class="mb-3 text-xs text-neutral-400">
 									Selected file: {selectedFile.name}
 								</p>
 							{/if}
 							<button
 								onclick={handleLoadFile}
 								disabled={!selectedFile || isLoadingFile}
-								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-stone-300"
+								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 							>
 								{#if isLoadingFile}
 									<svg
@@ -277,14 +275,14 @@
 
 				<!-- Create New Option -->
 				<div
-					class="rounded-xl border-2 border-stone-200 p-5 transition-colors hover:border-stone-400"
+					class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
 				>
 					<div class="flex items-start gap-4">
 						<div
-							class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-purple-100"
+							class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-purple-900"
 						>
 							<svg
-								class="h-6 w-6 text-purple-600"
+								class="h-6 w-6 text-purple-400"
 								fill="none"
 								stroke="currentColor"
 								viewBox="0 0 24 24"
@@ -298,8 +296,8 @@
 							</svg>
 						</div>
 						<div class="flex-1">
-							<h3 class="mb-2 text-lg font-semibold text-stone-900">Start from scratch</h3>
-							<p class="mb-4 text-sm text-stone-600">
+							<h3 class="mb-2 text-lg font-semibold text-neutral-100">Start from scratch</h3>
+							<p class="mb-4 text-sm text-neutral-400">
 								Create a new empty database. {#if localDBexists}The local database will be kept but
 									not used.{/if}
 							</p>
@@ -314,8 +312,8 @@
 				</div>
 
 				<!-- Info Note -->
-				<div class="rounded-lg border border-stone-200 bg-stone-50 p-4">
-					<p class="text-xs text-stone-600">
+				<div class="rounded-lg border border-neutral-800 bg-neutral-800/50 p-4">
+					<p class="text-xs text-neutral-400">
 						<strong>Note:</strong> You can always export or import your data later using the application
 						controls.
 					</p>

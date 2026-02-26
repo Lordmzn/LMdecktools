@@ -7,7 +7,7 @@
 <div>
 	{#if isSearching}
 		<div class="flex items-center justify-center py-12">
-			<div class="h-12 w-12 animate-spin rounded-full border-b-2 border-orange-700"></div>
+			<div class="h-12 w-12 animate-spin rounded-full border-b-2 border-orange-500"></div>
 		</div>
 	{:else if results.length > 0}
 		<div class="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
@@ -16,7 +16,7 @@
 			{/each}
 		</div>
 	{:else}
-		<div class="py-12 text-center text-stone-500">
+		<div class="py-12 text-center text-neutral-400">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="48"

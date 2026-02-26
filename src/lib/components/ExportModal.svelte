@@ -45,34 +45,32 @@
 			if (e.target === e.currentTarget) show = false;
 		}}
 		onkeydown={(e) => {
-			// 1. Check for specific keys (Enter or Space)
 			if (e.key === 'Enter' || e.key === ' ') {
-				// 2. IMPORTANT: Prevent closing if the user is typing in an input INSIDE the modal
 				if (e.target === e.currentTarget) {
-					e.preventDefault(); // Stop 'Space' from scrolling the page
+					e.preventDefault();
 					show = false;
 				}
 			}
 		}}
 	>
-		<div class="w-full max-w-2xl rounded-lg bg-white p-6 shadow-xl">
-			<h3 class="mb-4 text-2xl font-bold">🚛 Export</h3>
-			<p>
+		<div class="panel w-full max-w-2xl rounded-xl p-6 shadow-xl">
+			<h3 class="mb-4 text-2xl font-bold text-neutral-100">🚛 Export</h3>
+			<p class="text-neutral-400">
 				Use this tool to share your collection outside this app. If you need to backup your
 				collection, use the DB management.
 			</p>
 
-			<div class="mb-4">
-				<label class="mb-2 block text-sm font-semibold text-stone-700">Include Fields:</label>
+			<div class="mt-4 mb-4">
+				<label class="mb-2 block text-sm font-semibold text-neutral-300">Include Fields:</label>
 
-				<div class="grid grid-cols-2 gap-2 text-sm text-stone-700 sm:grid-cols-4">
+				<div class="grid grid-cols-2 gap-2 text-sm text-neutral-300 sm:grid-cols-4">
 					{#each fieldOptions as option (option.value)}
 						<label class="flex cursor-pointer items-center gap-2">
 							<input
 								type="checkbox"
 								bind:group={selectedFields}
 								value={option.value}
-								class="h-4 w-4 accent-orange-600"
+								class="h-4 w-4 accent-orange-500"
 							/>
 							<span>{option.label}</span>
 						</label>
@@ -83,26 +81,26 @@
 			<textarea
 				bind:value={text}
 				id="export-preview"
-				class="h-64 w-full rounded-lg border border-stone-300 p-3 font-mono text-sm"
+				class="h-64 w-full rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm text-neutral-300"
 				placeholder="Select fields to generate preview..."
 			></textarea>
 
 			<div class="mt-4 flex gap-3">
 				<button
 					onclick={handleDownload}
-					class="flex-1 rounded-lg bg-orange-700 px-4 py-2 font-medium text-white transition hover:bg-orange-800 sm:flex-none"
+					class="flex-1 rounded-lg bg-orange-500 px-4 py-2 font-medium text-white transition hover:bg-orange-600 sm:flex-none"
 				>
 					Download File
 				</button>
 				<button
 					onclick={handleCopy}
-					class="rounded-lg bg-orange-600 px-4 py-2 text-white transition hover:bg-orange-700"
+					class="rounded-lg bg-neutral-800 px-4 py-2 text-neutral-200 transition hover:bg-neutral-700"
 				>
 					Copy to Clipboard
 				</button>
 				<button
 					onclick={() => (show = false)}
-					class="rounded-lg bg-orange-200 px-4 py-2 text-orange-900 transition hover:bg-orange-300"
+					class="rounded-lg bg-neutral-800 px-4 py-2 text-neutral-200 transition hover:bg-neutral-700"
 				>
 					Close
 				</button>

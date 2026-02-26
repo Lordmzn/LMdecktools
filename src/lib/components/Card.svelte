@@ -28,7 +28,7 @@
 		<!-- Owned Badge -->
 		{#if showOwned && ownedQuantity > 0}
 			<div
-				class="absolute top-2 right-2 rounded-full bg-orange-600 px-2 py-1 text-xs font-bold text-white shadow-lg"
+				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-white shadow-lg"
 			>
 				Own: {ownedQuantity}
 			</div>
@@ -41,7 +41,7 @@
 			<button
 				data-testid="card-add-btn"
 				onclick={handleAdd}
-				class="flex translate-y-4 transform items-center gap-2 rounded-lg bg-white px-4 py-2 font-semibold text-stone-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-stone-100 {isAdding
+				class="flex translate-y-4 transform items-center gap-2 rounded-lg bg-neutral-100 px-4 py-2 font-semibold text-neutral-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-white {isAdding
 					? 'scale-110'
 					: ''}"
 			>
@@ -67,7 +67,7 @@
 	</div>
 
 	<!-- Card Name Below -->
-	<div class="mt-2 w-full px-2 text-sm font-medium text-stone-700">
+	<div class="mt-2 w-full px-2 text-sm font-medium text-neutral-300">
 		{card.name}
 	</div>
 </div>

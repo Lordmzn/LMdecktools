@@ -13,8 +13,8 @@
 	<!-- Card Image -->
 	<div
 		class="relative w-full overflow-hidden rounded-lg shadow-lg {owned
-			? 'ring-2 ring-green-400'
-			: 'ring-2 ring-amber-400'}"
+			? 'ring-2 ring-green-500'
+			: 'ring-2 ring-amber-500'}"
 	>
 		<img
 			src={card.image_uris?.normal ?? card.card_faces?.[0]?.image_uris?.normal}
@@ -24,7 +24,7 @@
 
 		<!-- Quantity Badge -->
 		<div
-			class="absolute top-10 right-4 rounded-full bg-orange-600 px-2 py-1 text-sm font-bold text-white shadow-lg"
+			class="absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 text-sm font-bold text-white shadow-lg"
 		>
 			{card.LM_quantity}×
 		</div>
@@ -56,8 +56,7 @@
 	</div>
 
 	<!-- Owned / Missing indicator -->
-	<div class="mt-1 text-xs font-medium {owned ? 'text-green-600' : 'text-amber-600'}">
+	<div class="mt-1 text-xs font-medium {owned ? 'text-green-400' : 'text-amber-400'}">
 		{owned ? '✓ Owned' : '✗ Missing'}
 	</div>
-
 </div>

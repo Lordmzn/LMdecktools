@@ -43,7 +43,7 @@
 
 		<!-- Quantity Badge -->
 		<div
-			class="absolute top-10 right-4 rounded-full bg-orange-600 px-2 py-1 text-sm font-bold text-white shadow-lg"
+			class="absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 text-sm font-bold text-white shadow-lg"
 		>
 			{card.quantity_owned}×
 		</div>
@@ -73,7 +73,7 @@
 
 				<button
 					onclick={startEdit}
-					class="rounded-lg bg-orange-100 p-2 font-semibold text-orange-900 shadow-lg transition hover:bg-orange-200"
+					class="rounded-lg bg-neutral-700 p-2 font-semibold text-neutral-100 shadow-lg transition hover:bg-neutral-600"
 					title="Edit quantity"
 				>
 					<svg
@@ -110,7 +110,6 @@
 			</div>
 		</div>
 	</div>
-
 </div>
 
 <!-- Edit Quantity Modal -->
@@ -120,32 +119,32 @@
 		onclick={cancelEdit}
 	>
 		<div
-			class="w-full max-w-sm rounded-lg bg-white p-6 shadow-xl"
+			class="panel w-full max-w-sm rounded-xl p-6 shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h3 class="mb-4 text-lg font-bold">Edit Quantity</h3>
-			<p class="mb-4 text-sm text-stone-600">{card.name}</p>
+			<h3 class="mb-4 text-lg font-bold text-neutral-100">Edit Quantity</h3>
+			<p class="mb-4 text-sm text-neutral-400">{card.name}</p>
 
 			<div class="mb-6 flex items-center gap-3">
-				<label class="text-sm font-medium">Quantity:</label>
+				<label class="text-sm font-medium text-neutral-300">Quantity:</label>
 				<input
 					type="number"
 					bind:value={editQuantity}
 					min="0"
-					class="flex-1 rounded-lg border border-stone-300 px-3 py-2 focus:border-orange-500 focus:ring-2 focus:ring-orange-500"
+					class="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-neutral-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
 				/>
 			</div>
 
 			<div class="flex gap-3">
 				<button
 					onclick={saveEdit}
-					class="flex-1 rounded-lg bg-orange-700 px-4 py-2 text-white transition hover:bg-orange-800"
+					class="flex-1 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600"
 				>
 					Save
 				</button>
 				<button
 					onclick={cancelEdit}
-					class="flex-1 rounded-lg bg-stone-200 px-4 py-2 text-stone-800 transition hover:bg-stone-300"
+					class="flex-1 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-200 transition hover:bg-neutral-700"
 				>
 					Cancel
 				</button>
