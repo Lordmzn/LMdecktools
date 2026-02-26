@@ -546,7 +546,7 @@ export async function deleteCardList() {
  */
 export async function updateListName(name: string) {
 	assertWritable();
-	return saveCardList(name, store.listCards);
+	return saveCardList(name, $state.snapshot(store.listCards) as any[]);
 }
 
 /**

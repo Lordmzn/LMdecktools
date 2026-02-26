@@ -11,7 +11,8 @@
 		removeCardFromList,
 		importListFromText,
 		exportListToText,
-		updateListParams
+		updateListParams,
+		updateListName
 	} from '$lib/store.svelte';
 
 	const READ_ONLY_MSG = 'Select a database to enable editing — click "Preview" in the header';
@@ -434,7 +435,30 @@
 			<!-- List name + card count | Filter + Sort + Action buttons -->
 			<div class="mb-4 flex flex-wrap items-center justify-between gap-4">
 				<div>
-					<h2 class="text-xl font-bold text-orange-900">
+					<h2
+						class="text-xl font-bold text-orange-900 outline-none {store.currentCardList && !store.isReadOnly ? 'cursor-text' : ''}"
+						contenteditable={store.currentCardList && !store.isReadOnly ? 'plaintext-only' : 'false'}
+						onblur={(e) => {
+							const trimmed = (e.currentTarget as HTMLElement).innerText.trim();
+							if (!trimmed) {
+								(e.currentTarget as HTMLElement).innerText = store.currentCardList?.name ?? '';
+								return;
+							}
+							if (trimmed !== store.currentCardList?.name) {
+								updateListName(trimmed).catch((err) => {
+									console.error('Failed to rename list:', err);
+									notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to rename list', 'error');
+								});
+							}
+						}}
+						onkeydown={(e) => {
+							if (e.key === 'Enter') e.preventDefault();
+							if (e.key === 'Escape') {
+								(e.currentTarget as HTMLElement).innerText = store.currentCardList?.name ?? '';
+								(e.currentTarget as HTMLElement).blur();
+							}
+						}}
+					>
 						{store.currentCardList?.name || 'No list selected'}
 					</h2>
 					<p class="mt-1 text-sm text-stone-500">
