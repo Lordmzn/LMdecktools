@@ -1,9 +1,11 @@
 <script lang="ts">
-	let { card, owned, onRemove, onAddToCollection, disabled } = $props<{
+	let { card, owned, onRemove, onAddToCollection, onIncrement, onDecrement, disabled } = $props<{
 		card: any;
 		owned: boolean;
 		onRemove: (card: any) => void;
 		onAddToCollection: (card: any) => void;
+		onIncrement: (card: any) => void;
+		onDecrement: (card: any) => void;
 		disabled: boolean;
 	}>();
 </script>
@@ -23,11 +25,29 @@
 			class="h-auto w-full"
 		/>
 
-		<!-- Quantity Badge -->
+		<!-- Quantity Stepper -->
 		<div
-			class="absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 text-sm font-bold text-white shadow-lg"
+			class="absolute top-8 right-2 flex items-center gap-0.5 rounded-full bg-orange-500 shadow-lg"
 		>
-			{card.LM_quantity}×
+			<button
+				onclick={() => onDecrement(card)}
+				{disabled}
+				class="rounded-l-full py-0.5 pr-0.5 pl-2 text-sm font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+				title={card.LM_quantity <= 1 ? 'Remove from list' : 'Decrease quantity'}
+			>
+				−
+			</button>
+			<span class="min-w-[1.5rem] py-0.5 text-center text-sm font-bold text-white">
+				{card.LM_quantity}×
+			</span>
+			<button
+				onclick={() => onIncrement(card)}
+				{disabled}
+				class="rounded-r-full py-0.5 pr-2 pl-0.5 text-sm font-bold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+				title="Increase quantity"
+			>
+				+
+			</button>
 		</div>
 
 		<!-- Action Overlay -->

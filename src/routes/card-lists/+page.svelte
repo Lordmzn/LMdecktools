@@ -77,6 +77,22 @@
 		}
 	}
 
+	async function handleIncrementQuantity(card: any) {
+		try {
+			await addCardToList(card);
+		} catch (error) {
+			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
+		}
+	}
+
+	async function handleDecrementQuantity(card: any) {
+		try {
+			await removeCardFromList(card);
+		} catch (error) {
+			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
+		}
+	}
+
 	async function handleCreateList() {
 		try {
 			await createNewCardList();
@@ -666,6 +682,8 @@
 							{owned}
 							onRemove={handleRemoveCard}
 							onAddToCollection={handleAddSingleToCollection}
+							onIncrement={handleIncrementQuantity}
+							onDecrement={handleDecrementQuantity}
 							disabled={store.dbMode === 'none'}
 						/>
 					{/each}
