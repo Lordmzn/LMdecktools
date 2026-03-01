@@ -3,7 +3,7 @@
 
 	let currentPath = $derived($page.url.pathname);
 	let isHomeActive = $derived(currentPath === '/');
-	let isCardListsActive = $derived(currentPath === '/card-lists');
+	let isCardListsActive = $derived(currentPath.startsWith('/card-lists'));
 	let isCollectionActive = $derived(currentPath === '/collection');
 </script>
 

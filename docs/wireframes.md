@@ -147,6 +147,36 @@
 
 ---
 
+## Compare Card Lists Page (`/card-lists/compare`)
+
+```
++------------------------------------------------------------------+
+|                                                                  |
+|  +------------------------------------------------------------+  |
+|  | [<] Compare Lists                                          |  |
+|  | List A: [Deck name  v]   List B: [Deck name  v]            |  |
+|  | Card matching: [Generic]/[Specific]  Language: [Any]/[Strict] [Export] |
+|  | [N only in A]  [N in both]  [N only in B]                  |  |
+|  +------------------------------------------------------------+  |
+|                                                                  |
+|  Desktop (lg+): three-column grid                                |
+|  +------------------+ +------------------+ +------------------+  |
+|  | ONLY IN A (amber)| | IN BOTH (green)  | | ONLY IN B (blue) |  |
+|  | [img] Card  4x   | | [img] Card 2/3   | | [img] Card  1x   |  |
+|  | [img] Card  1x   | | [img] Card 1/1   | | [img] Card  2x   |  |
+|  +------------------+ +------------------+ +------------------+  |
+|                                                                  |
+|  Mobile: tab bar [Only A | Both | Only B] + single column        |
+|                                                                  |
++------------------------------------------------------------------+
+```
+
+**"In Both" quantity format:** `quantityA / quantityB cardName`
+
+**Guard state:** If fewer than 2 lists exist, show message with link back to `/card-lists`.
+
+---
+
 ## DB Selection Modal
 
 ```

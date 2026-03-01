@@ -443,25 +443,48 @@
 					Delete List
 				</button>
 			</div>
-			<button
-				onclick={handleCreateList}
-				disabled={store.dbMode === 'none'}
-				class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-			>
-				<svg
-					xmlns="http://www.w3.org/2000/svg"
-					width="18"
-					height="18"
-					viewBox="0 0 24 24"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
+			<div class="flex items-center gap-2">
+				<a
+					href="/card-lists/compare"
+					class="flex items-center gap-2 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 {store.savedCardLists.length < 2 ? 'pointer-events-none opacity-50' : ''}"
+					aria-disabled={store.savedCardLists.length < 2}
 				>
-					<path d="M5 12h14" />
-					<path d="M12 5v14" />
-				</svg>
-				New List
-			</button>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M16 3h5v5" />
+						<path d="M8 3H3v5" />
+						<path d="M12 22v-8.3a4 4 0 0 0-1.172-2.872L3 3" />
+						<path d="m15 9 6-6" />
+					</svg>
+					Compare Lists
+				</a>
+				<button
+					onclick={handleCreateList}
+					disabled={store.dbMode === 'none'}
+					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+				>
+					<svg
+						xmlns="http://www.w3.org/2000/svg"
+						width="18"
+						height="18"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M5 12h14" />
+						<path d="M12 5v14" />
+					</svg>
+					New List
+				</button>
+			</div>
 		</div>
 	</div>
 
