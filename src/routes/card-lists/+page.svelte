@@ -13,7 +13,8 @@
 		exportListToText,
 		updateListParams,
 		updateListName,
-		addAllToCollection
+		addAllToCollection,
+		addToCollection
 	} from '$lib/store.svelte';
 
 	const READ_ONLY_MSG = 'Select a database to enable editing — click "Preview" in the header';
@@ -137,6 +138,15 @@
 			}
 		} catch (e) {
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add cards to collection', 'error');
+		}
+	}
+
+	async function handleAddSingleToCollection(card: any) {
+		try {
+			await addToCollection(card, card.LM_quantity);
+			notify(`Added ${card.name} to collection`);
+		} catch (e) {
+			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card to collection', 'error');
 		}
 	}
 
@@ -655,6 +665,7 @@
 							{card}
 							{owned}
 							onRemove={handleRemoveCard}
+							onAddToCollection={handleAddSingleToCollection}
 							disabled={store.dbMode === 'none'}
 						/>
 					{/each}

@@ -1,8 +1,9 @@
 <script lang="ts">
-	let { card, owned, onRemove, disabled } = $props<{
+	let { card, owned, onRemove, onAddToCollection, disabled } = $props<{
 		card: any;
 		owned: boolean;
 		onRemove: (card: any) => void;
+		onAddToCollection: (card: any) => void;
 		disabled: boolean;
 	}>();
 </script>
@@ -29,15 +30,34 @@
 			{card.LM_quantity}×
 		</div>
 
-		<!-- Remove Overlay -->
+		<!-- Action Overlay -->
 		<div
-			class="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
+			class="absolute inset-0 flex items-end justify-center gap-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
 		>
+			<button
+				onclick={() => onAddToCollection(card)}
+				{disabled}
+				class="rounded-lg bg-green-600 p-2 font-semibold text-white shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+				title="Add to collection"
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M5 12h14" />
+					<path d="M12 5v14" />
+				</svg>
+			</button>
 			<button
 				onclick={() => onRemove(card)}
 				{disabled}
 				class="rounded-lg bg-red-500 p-2 font-semibold text-white shadow-lg transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-				title="Remove"
+				title="Remove from list"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
