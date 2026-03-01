@@ -173,7 +173,10 @@ export function exportDB() {
  * Load database from a file (JSON or Yjs format).
  * Clears existing data, imports from the file, then reloads the store.
  */
-export async function loadFromFile(file: File): Promise<void> {
+export async function loadFromFile(
+	file: File,
+	onProgress?: (current: number, total: number) => void
+): Promise<{ imported: number; merged: number; errors: number }> {
 	if (!db) {
 		db = await openDatabase();
 	}
@@ -182,8 +185,9 @@ export async function loadFromFile(file: File): Promise<void> {
 	const buffer = await file.arrayBuffer();
 	const data = new Uint8Array(buffer);
 
-	await importDatabase(db, data, false);
+	const result = await importDatabase(db, data, false, onProgress);
 	await Promise.all([loadCardLists(), loadCollection()]);
+	return result;
 }
 
 /**
@@ -193,7 +197,8 @@ export async function loadFromFile(file: File): Promise<void> {
 export async function importDatabase(
 	db: IDBDatabase,
 	data: Uint8Array,
-	merge: boolean = false
+	merge: boolean = false,
+	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
 	let cardLists: CardList[];
 
@@ -222,6 +227,8 @@ export async function importDatabase(
 	}
 
 	// Import card lists
+	const total = cardLists.length;
+	let current = 0;
 	for (const cardList of cardLists) {
 		try {
 			if (merge) {
@@ -258,6 +265,8 @@ export async function importDatabase(
 			console.error('Error importing card list:', error);
 			errors++;
 		}
+		current++;
+		onProgress?.(current, total);
 	}
 
 	return { imported, merged, errors };

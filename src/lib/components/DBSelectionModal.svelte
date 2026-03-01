@@ -8,6 +8,10 @@
 	let localDBexists = $state<boolean | null>(null);
 	let selectedFile: File | null = $state(null);
 	let isLoadingFile = $state(false);
+	let importCurrent = $state(0);
+	let importTotal = $state(0);
+	let importResult = $state<{ imported: number; merged: number; errors: number } | null>(null);
+	let importError = $state<string | null>(null);
 
 	onMount(() => {
 		if (store.dbMode === 'none') {
@@ -37,11 +41,22 @@
 	async function handleLoadFile() {
 		if (!selectedFile) return;
 		isLoadingFile = true;
+		importCurrent = 0;
+		importTotal = 0;
+		importResult = null;
+		importError = null;
 		try {
-			await loadFromFile(selectedFile);
-			closeModal();
+			const result = await loadFromFile(selectedFile, (current, total) => {
+				importCurrent = current;
+				importTotal = total;
+			});
+			importResult = result;
+			if (result.errors === 0) {
+				setTimeout(() => closeModal(), 1500);
+			}
 		} catch (e) {
 			console.error('Failed to import file:', e);
+			importError = e instanceof Error ? e.message : 'Failed to import file';
 		} finally {
 			isLoadingFile = false;
 		}
@@ -235,16 +250,39 @@
 								accept=".yjs,.json"
 								bind:this={fileInput}
 								onchange={handleFileSelect}
-								class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600"
+								disabled={isLoadingFile}
+								class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
 							/>
-							{#if selectedFile}
+							{#if selectedFile && !importResult && !importError}
 								<p class="mb-3 text-xs text-neutral-400">
 									Selected file: {selectedFile.name}
 								</p>
 							{/if}
+							{#if importResult}
+								{#if importResult.errors === 0}
+									<div
+										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
+									>
+										Imported {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+									</div>
+								{:else}
+									<div
+										class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+									>
+										Imported {importResult.imported}, failed {importResult.errors}.
+									</div>
+								{/if}
+							{/if}
+							{#if importError}
+								<div
+									class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+								>
+									{importError}
+								</div>
+							{/if}
 							<button
 								onclick={handleLoadFile}
-								disabled={!selectedFile || isLoadingFile}
+								disabled={!selectedFile || isLoadingFile || importResult !== null}
 								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 							>
 								{#if isLoadingFile}
@@ -264,7 +302,11 @@
 										/>
 										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
 									</svg>
-									Importing…
+									{#if importTotal > 0}
+										Importing… ({importCurrent}/{importTotal} lists)
+									{:else}
+										Importing…
+									{/if}
 								{:else}
 									Import File
 								{/if}
