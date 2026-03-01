@@ -272,6 +272,71 @@ export async function importDatabase(
 	return { imported, merged, errors };
 }
 
+// ==================== SCRYFALL BATCH FETCH ====================
+
+const SCRYFALL_COLLECTION_URL = 'https://api.scryfall.com/cards/collection';
+const SCRYFALL_BATCH_SIZE = 75;
+
+/**
+ * Batch-fetch cards by name using Scryfall's /cards/collection endpoint.
+ * Deduplicates names (case-insensitive), chunks into batches of 75,
+ * and returns a Map keyed by lowercase card name.
+ */
+async function fetchCardsByName(
+	names: string[],
+	onProgress?: (fetched: number, total: number) => void
+): Promise<{ found: Map<string, any>; notFound: string[] }> {
+	// Deduplicate names (case-insensitive)
+	const seen = new Set<string>();
+	const uniqueNames: string[] = [];
+	for (const name of names) {
+		const key = name.toLowerCase();
+		if (!seen.has(key)) {
+			seen.add(key);
+			uniqueNames.push(name);
+		}
+	}
+
+	const found = new Map<string, any>();
+	const notFound: string[] = [];
+	const totalBatches = Math.ceil(uniqueNames.length / SCRYFALL_BATCH_SIZE);
+	let completedBatches = 0;
+
+	// Process in chunks of 75
+	for (let i = 0; i < uniqueNames.length; i += SCRYFALL_BATCH_SIZE) {
+		const chunk = uniqueNames.slice(i, i + SCRYFALL_BATCH_SIZE);
+		const identifiers = chunk.map((name) => ({ name }));
+
+		try {
+			const response = await fetch(SCRYFALL_COLLECTION_URL, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ identifiers })
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				for (const card of result.data ?? []) {
+					found.set(card.name.toLowerCase(), card);
+				}
+				for (const entry of result.not_found ?? []) {
+					notFound.push(entry.name);
+				}
+			} else {
+				// Treat all cards in this batch as not found
+				notFound.push(...chunk);
+			}
+		} catch {
+			notFound.push(...chunk);
+		}
+
+		completedBatches++;
+		onProgress?.(completedBatches, totalBatches);
+	}
+
+	return { found, notFound };
+}
+
 // ==================== COLLECTION FUNCTIONS ====================
 
 /**
@@ -386,36 +451,46 @@ export function getOwnedQuantity(cardId: string) {
 }
 
 /**
- * Import collection from text
+ * Import collection from text.
+ * Uses Scryfall's /cards/collection endpoint to batch-fetch cards (up to 75 per request).
  */
-export async function importCollectionFromText(text: string) {
+export async function importCollectionFromText(
+	text: string,
+	onProgress?: (current: number, total: number) => void
+) {
 	assertWritable();
 	const lines = text.split('\n').filter((line) => line.trim());
 	const results = { success: 0, failed: 0 };
 
+	// 1. Parse all lines
+	const parsed: { quantity: number; name: string }[] = [];
 	for (const line of lines) {
 		if (line.startsWith('#')) continue;
-
 		const match = line.match(/^(\d+)\s+(.+)$/);
 		if (match) {
-			const quantity = parseInt(match[1]);
-			const cardName = match[2].trim();
+			parsed.push({ quantity: parseInt(match[1]), name: match[2].trim() });
+		}
+	}
 
+	// 2. Batch-fetch all unique card names
+	const uniqueNames = [...new Set(parsed.map((p) => p.name.toLowerCase()))].map(
+		(lower) => parsed.find((p) => p.name.toLowerCase() === lower)!.name
+	);
+	const { found } = await fetchCardsByName(uniqueNames, onProgress);
+
+	// 3. Process results
+	for (const entry of parsed) {
+		const card = found.get(entry.name.toLowerCase());
+		if (card) {
 			try {
-				const response = await fetch(
-					`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`
-				);
-				if (response.ok) {
-					const card = await response.json();
-					await updateCollectionQuantity(card, quantity);
-					results.success++;
-				} else {
-					results.failed++;
-				}
+				await updateCollectionQuantity(card, entry.quantity);
+				results.success++;
 			} catch {
-				console.error(`Failed to import ${cardName}`);
+				console.error(`Failed to import ${entry.name}`);
 				results.failed++;
 			}
+		} else {
+			results.failed++;
 		}
 	}
 
@@ -657,7 +732,8 @@ export async function removeCardFromList(card: any) {
 }
 
 /**
- * Import list from text
+ * Import list from text.
+ * Uses Scryfall's /cards/collection endpoint to batch-fetch cards (up to 75 per request).
  */
 export async function importListFromText(
 	text: string,
@@ -665,44 +741,43 @@ export async function importListFromText(
 ) {
 	assertWritable();
 	const lines = text.split('\n').filter((line) => line.trim());
-	const newCards: any[] = [];
 	let newName = store.currentCardList?.name || 'Nuovo mazzo';
 
-	const total = lines.filter((l) => !l.startsWith('#') && /^\d+\s+/.test(l)).length;
-	let current = 0;
-
+	// 1. Parse all lines
+	const parsed: { quantity: number; name: string }[] = [];
 	for (const line of lines) {
 		if (line.startsWith('#')) {
 			newName = line.replace('#', '').trim();
 			continue;
 		}
-
 		const match = line.match(/^(\d+)\s+(.+)$/);
 		if (match) {
-			const quantity = parseInt(match[1]);
-			const cardName = match[2].trim();
+			parsed.push({ quantity: parseInt(match[1]), name: match[2].trim() });
+		}
+	}
 
-			try {
-				const response = await fetch(
-					`https://api.scryfall.com/cards/named?exact=${encodeURIComponent(cardName)}`
-				);
-				if (response.ok) {
-					const card = await response.json();
-					newCards.push({
-						id: card.id,
-						name: card.name,
-						image_uris: card.image_uris,
-						card_faces: card.card_faces,
-						mana_cost: card.mana_cost,
-						type_line: card.type_line,
-						LM_quantity: quantity
-					});
-				}
-			} catch {
-				console.error(`Failed to import ${cardName}`);
-			}
-			current++;
-			onProgress?.(current, total);
+	// 2. Batch-fetch all unique card names
+	const uniqueNames = [...new Set(parsed.map((p) => p.name.toLowerCase()))].map(
+		(lower) => parsed.find((p) => p.name.toLowerCase() === lower)!.name
+	);
+	const { found } = await fetchCardsByName(uniqueNames, onProgress);
+
+	// 3. Build card list from results
+	const newCards: any[] = [];
+	for (const entry of parsed) {
+		const card = found.get(entry.name.toLowerCase());
+		if (card) {
+			newCards.push({
+				id: card.id,
+				name: card.name,
+				image_uris: card.image_uris,
+				card_faces: card.card_faces,
+				mana_cost: card.mana_cost,
+				type_line: card.type_line,
+				LM_quantity: entry.quantity
+			});
+		} else {
+			console.error(`Failed to import ${entry.name}`);
 		}
 	}
 
