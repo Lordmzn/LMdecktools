@@ -62,6 +62,18 @@ async function mockScryfallAPI(page: import('@playwright/test').Page) {
 			body: JSON.stringify(MOCK_NAMED_BOLT)
 		});
 	});
+	// Import flow uses POST /cards/collection to batch-resolve card names
+	await page.route('**/api.scryfall.com/cards/collection', (route) => {
+		route.fulfill({
+			status: 200,
+			contentType: 'application/json',
+			body: JSON.stringify({
+				object: 'list',
+				data: [MOCK_NAMED_BOLT],
+				not_found: []
+			})
+		});
+	});
 	// Mock card images to avoid network requests
 	await page.route('**/cards.scryfall.io/**', (route) => {
 		route.fulfill({
@@ -169,7 +181,7 @@ test.describe('Card Lists', () => {
 		await page.locator('button[title="Close"]').click();
 
 		await expect(
-			page.locator('[data-testid="list-cards"]').getByText('Lightning Bolt')
+			page.locator('[data-testid="list-cards"]').getByAltText('Lightning Bolt')
 		).toBeVisible();
 	});
 
@@ -183,15 +195,16 @@ test.describe('Card Lists', () => {
 		await page.locator('button[title="Close"]').click();
 
 		await expect(
-			page.locator('[data-testid="list-cards"]').getByText('Lightning Bolt')
+			page.locator('[data-testid="list-cards"]').getByAltText('Lightning Bolt')
 		).toBeVisible();
 
-		// Use force:true to bypass the opacity-0 hover-reveal overlay
+		// The decrement button (−) doubles as "Remove from list" at qty=1.
+		// Use evaluate to bypass CSS overlay issues.
 		await page
 			.locator('[data-testid="list-cards"] div.group')
 			.first()
-			.locator('button[title="Remove"]')
-			.click({ force: true });
+			.getByRole('button', { name: '−' })
+			.evaluate((btn) => (btn as HTMLElement).click());
 
 		await expect(page.getByText('No cards in list yet')).toBeVisible();
 	});
@@ -207,6 +220,8 @@ test.describe('Card Lists', () => {
 
 		// Add same card to a list
 		await spaGoto(page, '/card-lists');
+		// Wait for card-lists page to render before interacting
+		await expect(page.getByRole('heading', { name: 'A list' })).toBeVisible();
 		await page.getByRole('button', { name: 'Add Cards' }).click();
 		await addCardViaSearch(page);
 		await page.locator('button[title="Close"]').click();
@@ -267,10 +282,10 @@ test.describe('Card Lists', () => {
 
 		await page.getByRole('button', { name: 'Load List' }).click();
 
-		// Import calls the mocked named API for "Lightning Bolt"
+		// Import calls the mocked collection API for "Lightning Bolt"
 		await expect(page.getByRole('heading', { name: 'My Red List' })).toBeVisible();
 		await expect(
-			page.locator('[data-testid="list-cards"]').getByText('Lightning Bolt')
+			page.locator('[data-testid="list-cards"]').getByAltText('Lightning Bolt')
 		).toBeVisible();
 	});
 

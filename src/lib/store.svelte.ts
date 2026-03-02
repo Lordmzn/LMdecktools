@@ -667,7 +667,7 @@ export async function updateListParams(params: Partial<OwnershipCheckParams>) {
 	if (!currentListData) throw new Error('No card list selected');
 
 	const updatedList: CardList = {
-		...currentListData,
+		...$state.snapshot(currentListData),
 		...params,
 		updated_at: Date.now()
 	};
