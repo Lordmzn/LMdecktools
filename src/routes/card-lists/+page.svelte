@@ -446,7 +446,10 @@
 			<div class="flex items-center gap-2">
 				<a
 					href="/card-lists/compare"
-					class="flex items-center gap-2 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 {store.savedCardLists.length < 2 ? 'pointer-events-none opacity-50' : ''}"
+					class="flex items-center gap-2 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 {store
+						.savedCardLists.length < 2
+						? 'pointer-events-none opacity-50'
+						: ''}"
 					aria-disabled={store.savedCardLists.length < 2}
 				>
 					<svg

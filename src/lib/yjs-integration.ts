@@ -7,7 +7,7 @@
 
 import * as Y from 'yjs';
 import type { StoreInterface } from './store.svelte';
-import type { CardList, Card } from './db';
+import type { CardList, Card, CollectionCard } from './db';
 
 /**
  * Convert card lists to a Yjs document
@@ -267,10 +267,39 @@ export function exportWithMetadata(store: StoreInterface): Uint8Array {
 }
 
 /**
+ * Extract collection cards from a Yjs document
+ */
+export function yDocToCollection(ydoc: Y.Doc): CollectionCard[] {
+	const yCollection = ydoc.getMap('collection');
+	const collection: CollectionCard[] = [];
+
+	yCollection.forEach((yCardRaw) => {
+		const yCard = yCardRaw as Y.Map<any>;
+		const card: CollectionCard = {
+			id: yCard.get('id'),
+			name: yCard.get('name'),
+			quantity_owned: yCard.get('quantity_owned')
+		};
+
+		// Add other properties
+		yCard.forEach((value, key) => {
+			if (!['id', 'name', 'quantity_owned'].includes(key)) {
+				card[key] = value;
+			}
+		});
+
+		collection.push(card);
+	});
+
+	return collection;
+}
+
+/**
  * Import with metadata validation
  */
 export function importWithMetadata(data: Uint8Array): {
 	cardLists: CardList[];
+	collection: CollectionCard[];
 	metadata: {
 		version: string;
 		exported_at: number;
@@ -292,8 +321,9 @@ export function importWithMetadata(data: Uint8Array): {
 	};
 
 	const cardLists = yDocToCardLists(ydoc);
+	const collection = yDocToCollection(ydoc);
 
-	return { cardLists, metadata };
+	return { cardLists, collection, metadata };
 }
 
 /**

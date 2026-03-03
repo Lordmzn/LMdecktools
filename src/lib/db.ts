@@ -115,7 +115,7 @@ export async function clearDatabase(db: IDBDatabase): Promise<void> {
 			const request = store.clear();
 
 			request.onsuccess = () => {
-				updateMetadata(db, 'last_clear', Date.now());
+				putMetadata(db, 'last_clear', Date.now());
 				resolve();
 			};
 
@@ -129,7 +129,7 @@ export async function clearDatabase(db: IDBDatabase): Promise<void> {
 			const request = store.clear();
 
 			request.onsuccess = () => {
-				updateMetadata(db, 'last_clear', Date.now());
+				putMetadata(db, 'last_clear', Date.now());
 				resolve();
 			};
 
@@ -182,7 +182,7 @@ export async function saveCardList(db: IDBDatabase, cardList: CardList): Promise
 		}
 
 		request.onsuccess = () => {
-			updateMetadata(db, 'last_save', Date.now());
+			putMetadata(db, 'last_save', Date.now());
 			resolve(request.result as number);
 		};
 
@@ -202,7 +202,7 @@ export async function deleteCardList(db: IDBDatabase, listId: number): Promise<v
 		const request = store.delete(listId);
 
 		request.onsuccess = () => {
-			updateMetadata(db, 'last_save', Date.now());
+			putMetadata(db, 'last_save', Date.now());
 			resolve();
 		};
 
@@ -215,7 +215,7 @@ export async function deleteCardList(db: IDBDatabase, listId: number): Promise<v
 /**
  * Update metadata in the database
  */
-async function updateMetadata(db: IDBDatabase, key: string, value: any): Promise<void> {
+export async function putMetadata(db: IDBDatabase, key: string, value: any): Promise<void> {
 	return new Promise((resolve, reject) => {
 		const transaction = db.transaction(METADATA_STORE, 'readwrite');
 		const store = transaction.objectStore(METADATA_STORE);
@@ -229,9 +229,9 @@ async function updateMetadata(db: IDBDatabase, key: string, value: any): Promise
 /**
  * Get metadata in the database
  */
-export async function getMetadata(db: IDBDatabase, key: string): Promise<void> {
+export async function getMetadata(db: IDBDatabase, key: string): Promise<any> {
 	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(METADATA_STORE, 'readwrite');
+		const transaction = db.transaction(METADATA_STORE, 'readonly');
 		const store = transaction.objectStore(METADATA_STORE);
 		const request = store.get(key);
 

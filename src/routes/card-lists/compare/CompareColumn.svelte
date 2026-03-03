@@ -12,36 +12,44 @@
 		nameB?: string;
 	}
 
-	let { title, color, cards, showBothQuantities = false, nameA = 'A', nameB = 'B' }: Props =
-		$props();
+	let {
+		title,
+		color,
+		cards,
+		showBothQuantities = false,
+		nameA = 'A',
+		nameB = 'B'
+	}: Props = $props();
 
-	const colorMap: Record<ColorVariant, { border: string; bg: string; text: string; badge: string }> =
-		{
-			amber: {
-				border: 'border-amber-800',
-				bg: 'bg-amber-950',
-				text: 'text-amber-400',
-				badge: 'bg-amber-500'
-			},
-			green: {
-				border: 'border-green-800',
-				bg: 'bg-green-950',
-				text: 'text-green-400',
-				badge: 'bg-green-500'
-			},
-			blue: {
-				border: 'border-blue-800',
-				bg: 'bg-blue-950',
-				text: 'text-blue-400',
-				badge: 'bg-blue-500'
-			}
-		};
+	const colorMap: Record<
+		ColorVariant,
+		{ border: string; bg: string; text: string; badge: string }
+	> = {
+		amber: {
+			border: 'border-amber-800',
+			bg: 'bg-amber-950',
+			text: 'text-amber-400',
+			badge: 'bg-amber-500'
+		},
+		green: {
+			border: 'border-green-800',
+			bg: 'bg-green-950',
+			text: 'text-green-400',
+			badge: 'bg-green-500'
+		},
+		blue: {
+			border: 'border-blue-800',
+			bg: 'bg-blue-950',
+			text: 'text-blue-400',
+			badge: 'bg-blue-500'
+		}
+	};
 
 	const colorClasses = $derived(colorMap[color]);
 </script>
 
 <div class="flex flex-col rounded-xl border {colorClasses.border} {colorClasses.bg} p-4">
-	<h3 class="mb-3 text-sm font-semibold uppercase tracking-wide {colorClasses.text}">
+	<h3 class="mb-3 text-sm font-semibold tracking-wide uppercase {colorClasses.text}">
 		{title}
 		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-white">
 			{cards.length}

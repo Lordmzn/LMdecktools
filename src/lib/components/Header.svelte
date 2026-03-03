@@ -18,7 +18,7 @@
 		<!-- DB Status Button -->
 		<button
 			onclick={() => (showStartupModal = !showStartupModal)}
-			class="inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-white transition-all duration-200 {store.dbMode ===
+			class="relative inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-white transition-all duration-200 {store.dbMode ===
 			'active'
 				? 'bg-orange-500 hover:bg-orange-600'
 				: store.dbMode === 'peek'
@@ -26,6 +26,22 @@
 					: 'bg-neutral-700 hover:bg-neutral-600'}"
 			title="Gestione Database"
 		>
+			{#if store.linkedFileStatus === 'active'}
+				<span class="absolute -top-1 -right-1 flex h-3 w-3">
+					<span
+						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+					></span>
+					<span class="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
+				</span>
+			{:else if store.linkedFileStatus === 'write-error' || store.linkedFileStatus === 'not-found'}
+				<span class="absolute -top-1 -right-1 flex h-3 w-3">
+					<span class="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
+				</span>
+			{:else if store.linkedFileStatus === 'reconnect'}
+				<span class="absolute -top-1 -right-1 flex h-3 w-3">
+					<span class="relative inline-flex h-3 w-3 rounded-full bg-amber-500"></span>
+				</span>
+			{/if}
 			{#if store.dbMode === 'none'}
 				<!-- Plain DB icon — no database selected yet -->
 				<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

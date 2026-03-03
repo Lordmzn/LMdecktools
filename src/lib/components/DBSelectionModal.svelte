@@ -2,7 +2,22 @@
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
 	import { checkLocalDatabase } from '$lib/db';
-	import { store, initDB, peekDB, clearDB, exportDB, loadFromFile } from '$lib/store.svelte';
+	import {
+		store,
+		initDB,
+		peekDB,
+		clearDB,
+		exportDB,
+		loadFromFile,
+		isFileSystemAccessSupported,
+		linkFile,
+		linkExistingFile,
+		unlinkFile,
+		changeFile,
+		reconnectFile
+	} from '$lib/store.svelte';
+
+	const fsAccessSupported = isFileSystemAccessSupported();
 
 	let fileInput: HTMLInputElement;
 	let localDBexists = $state<boolean | null>(null);
@@ -51,7 +66,7 @@
 				importTotal = total;
 			});
 			importResult = result;
-			if (result.errors === 0) {
+			if (result.errors === 0 && !(fsAccessSupported && store.linkedFileStatus === 'none')) {
 				setTimeout(() => closeModal(), 1500);
 			}
 		} catch (e) {
@@ -265,6 +280,30 @@
 									>
 										Imported {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
 									</div>
+									{#if fsAccessSupported && store.linkedFileStatus === 'none'}
+										<div
+											class="mb-3 rounded-lg border border-blue-800 bg-blue-950 p-3 text-sm text-blue-300"
+										>
+											<p class="mb-2">Want to keep this file linked for auto-save?</p>
+											<div class="flex gap-2">
+												<button
+													onclick={async () => {
+														await linkExistingFile();
+														closeModal();
+													}}
+													class="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+												>
+													Link File...
+												</button>
+												<button
+													onclick={() => closeModal()}
+													class="flex-1 rounded-lg bg-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-600"
+												>
+													No thanks
+												</button>
+											</div>
+										</div>
+									{/if}
 								{:else}
 									<div
 										class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
@@ -352,6 +391,220 @@
 						</div>
 					</div>
 				</div>
+
+				<!-- Linked File Option (File System Access API) -->
+				{#if fsAccessSupported}
+					<div
+						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+					>
+						<div class="flex items-start gap-4">
+							{#if store.linkedFileStatus === 'active'}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+								>
+									<svg
+										class="h-6 w-6 text-green-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+										/>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12l2 2 4-4"
+										/>
+									</svg>
+								</div>
+							{:else if store.linkedFileStatus === 'reconnect'}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-900"
+								>
+									<svg
+										class="h-6 w-6 text-amber-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+										/>
+									</svg>
+								</div>
+							{:else if store.linkedFileStatus === 'not-found' || store.linkedFileStatus === 'write-error'}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-900"
+								>
+									<svg
+										class="h-6 w-6 text-red-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
+									</svg>
+								</div>
+							{:else}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-900"
+								>
+									<svg
+										class="h-6 w-6 text-blue-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+										/>
+									</svg>
+								</div>
+							{/if}
+							<div class="flex-1">
+								{#if store.linkedFileStatus === 'none'}
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										Link a File (Bring Your Own Cloud)
+									</h3>
+									<p class="mb-3 text-sm text-neutral-400">
+										Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
+										iCloud, OneDrive) for cross-device sync with zero server involvement.
+									</p>
+									<p class="mb-4 text-xs text-neutral-500">
+										Supported in Chrome 86+, Edge 86+, and Safari 15.2+. Not available in Firefox.
+									</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => linkFile()}
+											disabled={store.dbMode !== 'active'}
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+										>
+											New File...
+										</button>
+										<button
+											onclick={() => linkExistingFile()}
+											disabled={store.dbMode !== 'active'}
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+										>
+											Existing File...
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'active'}
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										Linked: {store.linkedFileName}
+									</h3>
+									{#if store.linkedFileLastSaved}
+										<p class="mb-3 text-sm text-neutral-400">
+											Last saved: {new Date(store.linkedFileLastSaved).toLocaleString()}
+										</p>
+									{/if}
+									<p class="mb-4 text-sm text-neutral-400">
+										Changes are automatically saved to this file.
+									</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => changeFile()}
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700"
+										>
+											Change File...
+										</button>
+										<button
+											onclick={() => unlinkFile()}
+											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+										>
+											Unlink
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'reconnect'}
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										File link needs reconnection
+									</h3>
+									<p class="mb-4 text-sm text-neutral-400">
+										The browser needs your permission to access "{store.linkedFileName}" again.
+										Click Reconnect to re-grant access.
+									</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => reconnectFile()}
+											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-amber-700"
+										>
+											Reconnect
+										</button>
+										<button
+											onclick={() => unlinkFile()}
+											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+										>
+											Unlink
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'not-found'}
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Linked file not found</h3>
+									<p class="mb-4 text-sm text-neutral-400">
+										The previously linked file "{store.linkedFileName}" could not be found. It may
+										have been moved or deleted.
+									</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => linkFile()}
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700"
+										>
+											Link New File...
+										</button>
+										<button
+											onclick={() => unlinkFile()}
+											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+										>
+											Unlink
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'write-error'}
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">File write error</h3>
+									{#if store.linkedFileError}
+										<p
+											class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+										>
+											{store.linkedFileError}
+										</p>
+									{/if}
+									<p class="mb-4 text-sm text-neutral-400">
+										Failed to write to "{store.linkedFileName}". The file may be locked or
+										inaccessible.
+									</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => reconnectFile()}
+											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-amber-700"
+										>
+											Retry
+										</button>
+										<button
+											onclick={() => unlinkFile()}
+											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+										>
+											Unlink
+										</button>
+									</div>
+								{/if}
+							</div>
+						</div>
+					</div>
+				{/if}
 
 				<!-- Info Note -->
 				<div class="rounded-lg border border-neutral-800 bg-neutral-800/50 p-4">

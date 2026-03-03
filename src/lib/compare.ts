@@ -91,11 +91,7 @@ export function compareCardLists(
 /**
  * Export a comparison result to a human-readable text string.
  */
-export function exportCompareToText(
-	result: CompareResult,
-	nameA: string,
-	nameB: string
-): string {
+export function exportCompareToText(result: CompareResult, nameA: string, nameB: string): string {
 	let text = '';
 
 	text += `# Only in ${nameA}\n\n`;

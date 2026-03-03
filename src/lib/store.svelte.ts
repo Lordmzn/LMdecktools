@@ -17,7 +17,27 @@ import {
 	type LanguageMatching
 } from './db';
 
-import { exportWithMetadata } from './yjs-integration';
+import { exportWithMetadata, importWithMetadata, mergeCardLists } from './yjs-integration';
+import {
+	isFileSystemAccessSupported,
+	pickAndLinkNewFile,
+	pickAndLinkExistingFile,
+	loadStoredHandle,
+	unlinkFile as unlinkFileHandle,
+	checkPermission,
+	requestPermission,
+	writeToFile,
+	readFileData,
+	readFileLastModified,
+	scheduleDebouncedWrite,
+	cancelDebouncedWrite,
+	startPolling,
+	stopPolling,
+	updateLastKnownModified,
+	type LinkedFileStatus
+} from './linked-file';
+export type { LinkedFileStatus } from './linked-file';
+export { isFileSystemAccessSupported } from './linked-file';
 
 // Database reference
 let db: IDBDatabase | null = null;
@@ -78,6 +98,13 @@ class Store implements StoreInterface {
 		const card = this.collection.find((c) => c.id === cardId);
 		return card ? card.quantity_owned : 0;
 	}
+
+	// Linked file state
+	linkedFileStatus = $state<LinkedFileStatus>('none');
+	linkedFileName = $state<string | null>(null);
+	linkedFileLastSaved = $state<number | null>(null);
+	linkedFileError = $state<string | null>(null);
+	linkedFileExternalChange = $state(false);
 
 	// Derived ownership check for current list
 	listOwnershipCheck = $derived.by((): OwnershipCheckResult => {
@@ -142,11 +169,13 @@ export async function initDB() {
 		if (store.savedCardLists.length === 0) {
 			await createNewCardList();
 		}
+		await initLinkedFile();
 		return;
 	}
 	db = await openDatabase();
 	store.dbMode = 'active';
 	await Promise.all([loadCardLists(), loadCollection()]);
+	await initLinkedFile();
 	console.log('initDB done');
 }
 
@@ -169,6 +198,209 @@ export function exportDB() {
 	return exportWithMetadata(store);
 }
 
+// ==================== LINKED FILE ====================
+
+let linkedHandle: FileSystemFileHandle | null = null;
+
+function triggerAutoSave(): void {
+	if (store.linkedFileStatus !== 'active' || !linkedHandle) return;
+
+	scheduleDebouncedWrite(
+		linkedHandle,
+		() => exportWithMetadata(store),
+		(ts) => {
+			store.linkedFileLastSaved = ts;
+			store.linkedFileError = null;
+		},
+		(error) => {
+			console.error('Linked file write error:', error);
+			store.linkedFileStatus = 'write-error';
+			store.linkedFileError = error instanceof Error ? error.message : 'Write failed';
+		}
+	);
+}
+
+function handleExternalChange(): void {
+	store.linkedFileExternalChange = true;
+}
+
+export async function initLinkedFile(): Promise<void> {
+	if (!db || !isFileSystemAccessSupported()) return;
+
+	const handle = await loadStoredHandle(db);
+	if (!handle) {
+		store.linkedFileStatus = 'none';
+		return;
+	}
+
+	linkedHandle = handle;
+	store.linkedFileName = handle.name;
+
+	try {
+		const perm = await checkPermission(handle);
+		if (perm === 'granted') {
+			store.linkedFileStatus = 'active';
+			try {
+				const modified = await readFileLastModified(handle);
+				updateLastKnownModified(modified);
+			} catch {
+				// File may not exist yet — that's fine
+			}
+			startPolling(handle, handleExternalChange);
+		} else {
+			store.linkedFileStatus = 'reconnect';
+		}
+	} catch {
+		store.linkedFileStatus = 'not-found';
+	}
+}
+
+export async function linkFile(): Promise<void> {
+	if (!db) throw new Error('Database not initialized');
+
+	const handle = await pickAndLinkNewFile(db);
+	linkedHandle = handle;
+	store.linkedFileName = handle.name;
+	store.linkedFileStatus = 'active';
+	store.linkedFileError = null;
+
+	// Write current state to the file immediately
+	const data = exportWithMetadata(store);
+	await writeToFile(handle, data);
+	const ts = Date.now();
+	updateLastKnownModified(ts);
+	store.linkedFileLastSaved = ts;
+
+	startPolling(handle, handleExternalChange);
+}
+
+export async function linkExistingFile(): Promise<void> {
+	if (!db) throw new Error('Database not initialized');
+
+	const handle = await pickAndLinkExistingFile(db);
+	linkedHandle = handle;
+	store.linkedFileName = handle.name;
+	store.linkedFileStatus = 'active';
+	store.linkedFileError = null;
+
+	// Read existing file and merge into current DB
+	try {
+		const fileData = await readFileData(handle);
+		const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
+
+		// Merge card lists
+		const localLists = $state.snapshot(store.savedCardLists) as CardList[];
+		const mergedLists = mergeCardLists(localLists, remoteLists);
+
+		await clearDatabase(db);
+		for (const list of mergedLists) {
+			await dbSaveCardList(db, { ...list, id: undefined });
+		}
+
+		// Merge collection
+		for (const remoteCard of remoteCollection) {
+			const existing = await getCollectionCard(db, remoteCard.id);
+			if (existing) {
+				await saveCollectionCard(db, {
+					...remoteCard,
+					quantity_owned: Math.max(existing.quantity_owned, remoteCard.quantity_owned)
+				});
+			} else {
+				await saveCollectionCard(db, remoteCard);
+			}
+		}
+
+		await Promise.all([loadCardLists(), loadCollection()]);
+	} catch {
+		// File may be empty — that's fine, we'll write to it on next save
+	}
+
+	const modified = await readFileLastModified(handle);
+	updateLastKnownModified(modified);
+	store.linkedFileLastSaved = modified;
+
+	startPolling(handle, handleExternalChange);
+}
+
+export async function unlinkFile(): Promise<void> {
+	if (!db) throw new Error('Database not initialized');
+
+	cancelDebouncedWrite();
+	stopPolling();
+	await unlinkFileHandle(db);
+	linkedHandle = null;
+	store.linkedFileStatus = 'none';
+	store.linkedFileName = null;
+	store.linkedFileLastSaved = null;
+	store.linkedFileError = null;
+	store.linkedFileExternalChange = false;
+}
+
+export async function changeFile(): Promise<void> {
+	await unlinkFile();
+	await linkFile();
+}
+
+export async function reconnectFile(): Promise<void> {
+	if (!linkedHandle) return;
+
+	const granted = await requestPermission(linkedHandle);
+	if (granted) {
+		store.linkedFileStatus = 'active';
+		store.linkedFileError = null;
+		try {
+			const modified = await readFileLastModified(linkedHandle);
+			updateLastKnownModified(modified);
+		} catch {
+			// File may not exist yet
+		}
+		startPolling(linkedHandle, handleExternalChange);
+		// Retry the write that previously failed
+		triggerAutoSave();
+	}
+}
+
+export async function mergeFromFile(): Promise<void> {
+	if (!linkedHandle || !db) return;
+
+	const fileData = await readFileData(linkedHandle);
+	const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
+
+	// Merge card lists via Yjs CRDT
+	const localLists = $state.snapshot(store.savedCardLists) as CardList[];
+	const mergedLists = mergeCardLists(localLists, remoteLists);
+
+	// Save merged lists to IDB
+	await clearDatabase(db);
+	for (const list of mergedLists) {
+		await dbSaveCardList(db, { ...list, id: undefined });
+	}
+
+	// Merge collection: for each remote card, add or combine quantities
+	for (const remoteCard of remoteCollection) {
+		const existing = await getCollectionCard(db, remoteCard.id);
+		if (existing) {
+			await saveCollectionCard(db, {
+				...remoteCard,
+				quantity_owned: Math.max(existing.quantity_owned, remoteCard.quantity_owned)
+			});
+		} else {
+			await saveCollectionCard(db, remoteCard);
+		}
+	}
+
+	// Reload store
+	await Promise.all([loadCardLists(), loadCollection()]);
+
+	// Write merged result back to file
+	const data = exportWithMetadata(store);
+	await writeToFile(linkedHandle, data);
+	const ts = Date.now();
+	updateLastKnownModified(ts);
+	store.linkedFileLastSaved = ts;
+	store.linkedFileExternalChange = false;
+}
+
 /**
  * Load database from a file (JSON or Yjs format).
  * Clears existing data, imports from the file, then reloads the store.
@@ -187,6 +419,7 @@ export async function loadFromFile(
 
 	const result = await importDatabase(db, data, false, onProgress);
 	await Promise.all([loadCardLists(), loadCollection()]);
+	triggerAutoSave();
 	return result;
 }
 
@@ -201,6 +434,7 @@ export async function importDatabase(
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
 	let cardLists: CardList[];
+	let collection: CollectionCard[] = [];
 
 	// Try to detect format
 	try {
@@ -208,11 +442,14 @@ export async function importDatabase(
 		const jsonString = decoder.decode(data);
 		const importData = JSON.parse(jsonString);
 		cardLists = importData.cardLists ?? importData.decks ?? [];
+		collection = importData.collection ?? [];
 	} catch {
 		// If JSON parsing fails, try Yjs format
 		try {
-			const { importCardListsFromYjs } = await import('./yjs-integration');
-			cardLists = importCardListsFromYjs(data);
+			const { importWithMetadata } = await import('./yjs-integration');
+			const result = importWithMetadata(data);
+			cardLists = result.cardLists;
+			collection = result.collection;
 		} catch {
 			throw new Error('Invalid file format. Please use a valid .lmdb or .json export file.');
 		}
@@ -267,6 +504,28 @@ export async function importDatabase(
 		}
 		current++;
 		onProgress?.(current, total);
+	}
+
+	// Import collection cards
+	for (const card of collection) {
+		try {
+			if (merge) {
+				const existing = await getCollectionCard(db, card.id);
+				if (existing) {
+					await saveCollectionCard(db, {
+						...card,
+						quantity_owned: existing.quantity_owned + card.quantity_owned
+					});
+				} else {
+					await saveCollectionCard(db, card);
+				}
+			} else {
+				await saveCollectionCard(db, card);
+			}
+		} catch (error) {
+			console.error('Error importing collection card:', error);
+			errors++;
+		}
 	}
 
 	return { imported, merged, errors };
@@ -373,6 +632,7 @@ export async function addToCollection(card: any, quantity: number = 1) {
 		store.collection = [...store.collection, cardData];
 	}
 
+	triggerAutoSave();
 	return cardData;
 }
 
@@ -396,6 +656,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
 		await deleteCollectionCard(db, card.id);
 		const newCollection = store.collection.filter((c) => c.id !== card.id);
 		store.collection = newCollection;
+		triggerAutoSave();
 		return null;
 	} else {
 		// Update quantity
@@ -408,6 +669,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
 
 		const newCollection = store.collection.map((c) => (c.id === card.id ? cardData : c));
 		store.collection = newCollection;
+		triggerAutoSave();
 		return cardData;
 	}
 }
@@ -439,6 +701,7 @@ export async function updateCollectionQuantity(card: any, quantity: number) {
 		store.collection = [...store.collection, cardData];
 	}
 
+	triggerAutoSave();
 	return cardData;
 }
 
@@ -494,6 +757,7 @@ export async function importCollectionFromText(
 		}
 	}
 
+	triggerAutoSave();
 	return results;
 }
 
@@ -572,6 +836,7 @@ export async function createNewCardList() {
 	store.savedCardLists = newLists;
 	store.currentCardListIndex = newLists.length - 1;
 
+	triggerAutoSave();
 	return listWithId;
 }
 
@@ -600,6 +865,7 @@ export async function saveCardList(name: string, cards: any[]) {
 	newLists[index] = updatedList;
 	store.savedCardLists = newLists;
 
+	triggerAutoSave();
 	return updatedList;
 }
 
@@ -623,6 +889,7 @@ export async function deleteCardList() {
 
 	store.savedCardLists = store.savedCardLists.filter((_, i) => i !== index);
 	store.currentCardListIndex = Math.max(0, index - 1);
+	triggerAutoSave();
 }
 
 /**

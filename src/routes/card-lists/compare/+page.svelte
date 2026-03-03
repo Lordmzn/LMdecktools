@@ -131,7 +131,8 @@
 					<span class="font-medium text-neutral-400">Card Matching:</span>
 					<button
 						onclick={() => (matching = 'generic')}
-						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition {matching === 'generic'
+						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition {matching ===
+						'generic'
 							? 'bg-orange-500 text-white'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
@@ -192,9 +193,7 @@
 				>
 					{result.inBoth.length} in both
 				</span>
-				<span
-					class="rounded-lg border border-blue-800 bg-blue-950 px-3 py-1 text-sm text-blue-400"
-				>
+				<span class="rounded-lg border border-blue-800 bg-blue-950 px-3 py-1 text-sm text-blue-400">
 					{result.onlyInB.length} only in B
 				</span>
 			</div>
@@ -202,11 +201,7 @@
 
 		<!-- Desktop: 3-column grid (lg+) -->
 		<div class="hidden gap-4 lg:grid lg:grid-cols-3">
-			<CompareColumn
-				title="Only in {listA?.name ?? 'A'}"
-				color="amber"
-				cards={result.onlyInA}
-			/>
+			<CompareColumn title="Only in {listA?.name ?? 'A'}" color="amber" cards={result.onlyInA} />
 			<CompareColumn
 				title="In Both Lists"
 				color="green"
@@ -215,11 +210,7 @@
 				nameA={listA?.name ?? 'A'}
 				nameB={listB?.name ?? 'B'}
 			/>
-			<CompareColumn
-				title="Only in {listB?.name ?? 'B'}"
-				color="blue"
-				cards={result.onlyInB}
-			/>
+			<CompareColumn title="Only in {listB?.name ?? 'B'}" color="blue" cards={result.onlyInB} />
 		</div>
 
 		<!-- Mobile: tab bar + single column -->
@@ -252,11 +243,7 @@
 			</div>
 
 			{#if activeTab === 'onlyA'}
-				<CompareColumn
-					title="Only in {listA?.name ?? 'A'}"
-					color="amber"
-					cards={result.onlyInA}
-				/>
+				<CompareColumn title="Only in {listA?.name ?? 'A'}" color="amber" cards={result.onlyInA} />
 			{:else if activeTab === 'both'}
 				<CompareColumn
 					title="In Both Lists"
@@ -267,11 +254,7 @@
 					nameB={listB?.name ?? 'B'}
 				/>
 			{:else}
-				<CompareColumn
-					title="Only in {listB?.name ?? 'B'}"
-					color="blue"
-					cards={result.onlyInB}
-				/>
+				<CompareColumn title="Only in {listB?.name ?? 'B'}" color="blue" cards={result.onlyInB} />
 			{/if}
 		</div>
 	{/if}
