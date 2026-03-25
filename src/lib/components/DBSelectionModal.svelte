@@ -2,12 +2,12 @@
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
 	import { checkLocalDatabase } from '$lib/db';
+	import { getImageCacheStats, clearImageCache } from '$lib/image-cache';
 	import {
 		store,
 		initDB,
 		peekDB,
 		clearDB,
-		exportDB,
 		loadFromFile,
 		isFileSystemAccessSupported,
 		linkFile,
@@ -19,6 +19,9 @@
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
+	type Section = 'localdb' | 'link' | 'cache';
+	let activeSection = $state<Section | null>(null);
+
 	let fileInput: HTMLInputElement;
 	let localDBexists = $state<boolean | null>(null);
 	let selectedFile: File | null = $state(null);
@@ -27,8 +30,29 @@
 	let importTotal = $state(0);
 	let importResult = $state<{ imported: number; merged: number; errors: number } | null>(null);
 	let importError = $state<string | null>(null);
+	let imageCacheCount = $state(0);
+	let isClearingCache = $state(false);
+
+	function computeDefaultSection(): Section {
+		if (store.dbMode === 'none' || store.dbMode === 'peek') {
+			return 'localdb';
+		}
+		// dbMode === 'active'
+		if (store.linkedFileStatus === 'none') return 'link';
+		if (
+			store.linkedFileStatus === 'reconnect' ||
+			store.linkedFileStatus === 'not-found' ||
+			store.linkedFileStatus === 'write-error'
+		)
+			return 'link';
+		// linkedFileStatus === 'active'
+		return 'cache';
+	}
 
 	onMount(() => {
+		getImageCacheStats().then((stats) => {
+			imageCacheCount = stats.count;
+		});
 		if (store.dbMode === 'none') {
 			checkLocalDatabase().then(
 				(res) => {
@@ -38,13 +62,23 @@
 					} else {
 						localDBexists = false;
 					}
+					activeSection = computeDefaultSection();
 				},
 				() => {
 					localDBexists = false;
+					activeSection = computeDefaultSection();
 				}
 			);
+		} else {
+			// DB already active or peeking — we know localDB exists
+			localDBexists = true;
+			activeSection = computeDefaultSection();
 		}
 	});
+
+	function toggleSection(section: Section) {
+		activeSection = activeSection === section ? null : section;
+	}
 
 	function handleFileSelect(event: Event) {
 		const target = event.target as HTMLInputElement;
@@ -77,25 +111,9 @@
 		}
 	}
 
-	function handleLoadLocal() {
-		initDB();
+	async function handleLoadLocal() {
+		await initDB();
 		closeModal();
-	}
-
-	function handleExportLocal() {
-		const content = exportDB();
-
-		if (!content) return;
-		const blob = new Blob([content.buffer as ArrayBuffer], { type: 'application/octet-stream' });
-		const url = URL.createObjectURL(blob);
-
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = 'document.yjs';
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
 	}
 
 	async function handleCreateNew() {
@@ -135,38 +153,176 @@
 		>
 			<!-- Header -->
 			<div class="bg-gradient-to-r from-orange-900 to-orange-500 px-6 py-4">
-				<h2 class="flex items-center gap-2 text-2xl font-bold text-white">
+				<h2 class="flex items-center gap-2 text-2xl font-bold text-neutral-100">
 					⚔️ Welcome to LM Deck Tools 🏴‍☠️
 				</h2>
 				<p class="mt-1 text-sm text-orange-100">Choose how to start your MTG collection</p>
 			</div>
 
-			<!-- Content -->
-			<div class="space-y-6 p-6">
-				<!-- Local Database Option -->
-				<div
-					class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+			<!-- Toolbar -->
+			<div class="flex gap-1 border-b border-neutral-800 bg-neutral-900 px-4 py-2">
+				<button
+					onclick={() => toggleSection('localdb')}
+					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+						{activeSection === 'localdb' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
 				>
-					<div class="flex items-start gap-4">
-						{#if localDBexists === true}
-							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
-							>
-								<svg
-									class="h-6 w-6 text-green-400"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
+						></path>
+					</svg>
+					Local DB
+				</button>
+				{#if fsAccessSupported}
+					<button
+						onclick={() => toggleSection('link')}
+						class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+							{activeSection === 'link' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
+					>
+						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+							></path>
+						</svg>
+						Link
+					</button>
+				{/if}
+				<button
+					onclick={() => toggleSection('cache')}
+					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+						{activeSection === 'cache' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
+				>
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+						></path>
+					</svg>
+					Cache
+				</button>
+			</div>
+
+			<!-- Content -->
+			<div class="max-h-[60vh] overflow-y-auto p-6">
+				<!-- Local DB Section (merged: connect + import + create) -->
+				{#if activeSection === 'localdb'}
+					<!-- Connect to existing local DB (only if DB exists but not active) -->
+					{#if localDBexists === true && store.dbMode !== 'active'}
+						<div
+							class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+						>
+							<div class="flex items-start gap-4">
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
 								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M5 13l4 4L19 7"
-									></path>
-								</svg>
+									<svg
+										class="h-6 w-6 text-green-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M5 13l4 4L19 7"
+										></path>
+									</svg>
+								</div>
+								<div class="flex-1">
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										{#if localDBexists === null}
+											Searching for local database
+										{:else}
+											Local database found
+										{/if}
+									</h3>
+									<div class="mb-4 space-y-2 text-sm text-neutral-400">
+										<div class="flex justify-between">
+											<span class="font-medium">Total lists:</span>
+											<span class="font-mono">{store.savedCardLists.length}</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="font-medium">Total cards:</span>
+											<span class="font-mono">{store.totalCards}</span>
+										</div>
+									</div>
+									{#if store.dbMode === 'peek'}
+										<div
+											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+										>
+											Previewing in read-only mode. Click "Connect" to enable editing.
+										</div>
+									{/if}
+									<button
+										onclick={handleLoadLocal}
+										class="w-full rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700"
+									>
+										Connect to local DB
+									</button>
+								</div>
 							</div>
-						{:else}
+						</div>
+					{/if}
+
+					<!-- DB info when active -->
+					{#if store.dbMode === 'active'}
+						<div
+							class="rounded-xl border-2 border-green-800 p-5"
+						>
+							<div class="flex items-start gap-4">
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+								>
+									<svg
+										class="h-6 w-6 text-green-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M5 13l4 4L19 7"
+										></path>
+									</svg>
+								</div>
+								<div class="flex-1">
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										Local database active
+									</h3>
+									<div class="space-y-2 text-sm text-neutral-400">
+										<div class="flex justify-between">
+											<span class="font-medium">Total lists:</span>
+											<span class="font-mono">{store.savedCardLists.length}</span>
+										</div>
+										<div class="flex justify-between">
+											<span class="font-medium">Total cards:</span>
+											<span class="font-mono">{store.totalCards}</span>
+										</div>
+									</div>
+								</div>
+							</div>
+						</div>
+					{/if}
+
+					<!-- Separator -->
+					<div class="my-4 border-t border-neutral-800"></div>
+
+					<!-- Import from File sub-section -->
+					<div
+						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+					>
+						<div class="flex items-start gap-4">
 							<div
 								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
 							>
@@ -180,220 +336,150 @@
 										stroke-linecap="round"
 										stroke-linejoin="round"
 										stroke-width="2"
-										d="M6 18L18 6M6 6l12 12"
+										d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
 									></path>
 								</svg>
 							</div>
-						{/if}
-						<div class="flex-1">
-							<h3 class="mb-2 text-lg font-semibold text-neutral-100">
-								{#if localDBexists === null}
-									Searching for local database
-								{:else if localDBexists === true}
-									Local database found
-								{:else}
-									Local database not found
-								{/if}
-							</h3>
-							{#if localDBexists === true}
-								<div class="mb-4 space-y-2 text-sm text-neutral-400">
-									<div class="flex justify-between">
-										<span class="font-medium">Total lists:</span>
-										<span class="font-mono">{store.savedCardLists.length}</span>
-									</div>
-									<div class="flex justify-between">
-										<span class="font-medium">Total cards:</span>
-										<span class="font-mono">{store.totalCards}</span>
-									</div>
-								</div>
-								{#if store.dbMode === 'peek'}
-									<div
-										class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
-									>
-										Previewing in read-only mode. Click "Use Local DB" to enable editing.
-									</div>
-								{/if}
-								{#if store.dbMode !== 'active'}
-									<button
-										onclick={handleLoadLocal}
-										class="w-full rounded-lg bg-green-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-green-700"
-									>
-										Use Local DB
-									</button>
-								{:else}
-									<button
-										onclick={handleExportLocal}
-										class="w-full rounded-lg bg-green-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-green-700"
-									>
-										Download local DB
-									</button>
-								{/if}
-							{/if}
-						</div>
-					</div>
-				</div>
-
-				<!-- Import from File Option -->
-				<div
-					class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
-						>
-							<svg
-								class="h-6 w-6 text-orange-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
-							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-								></path>
-							</svg>
-						</div>
-						<div class="flex-1">
-							<h3 class="mb-2 text-lg font-semibold text-neutral-100">Import from File</h3>
-							<p class="mb-4 text-sm text-neutral-400">
-								Import a backup file. Merging with local data is supported.
-							</p>
-							<input
-								type="file"
-								accept=".yjs,.json"
-								bind:this={fileInput}
-								onchange={handleFileSelect}
-								disabled={isLoadingFile}
-								class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
-							/>
-							{#if selectedFile && !importResult && !importError}
-								<p class="mb-3 text-xs text-neutral-400">
-									Selected file: {selectedFile.name}
+							<div class="flex-1">
+								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Import from File</h3>
+								<p class="mb-4 text-sm text-neutral-400">
+									Import a backup file. Merging with local data is supported.
 								</p>
-							{/if}
-							{#if importResult}
-								{#if importResult.errors === 0}
-									<div
-										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
-									>
-										Imported {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
-									</div>
-									{#if fsAccessSupported && store.linkedFileStatus === 'none'}
+								<input
+									type="file"
+									accept=".yjs,.json"
+									bind:this={fileInput}
+									onchange={handleFileSelect}
+									disabled={isLoadingFile}
+									class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+								/>
+								{#if selectedFile && !importResult && !importError}
+									<p class="mb-3 text-xs text-neutral-400">
+										Selected file: {selectedFile.name}
+									</p>
+								{/if}
+								{#if importResult}
+									{#if importResult.errors === 0}
 										<div
-											class="mb-3 rounded-lg border border-blue-800 bg-blue-950 p-3 text-sm text-blue-300"
+											class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
 										>
-											<p class="mb-2">Want to keep this file linked for auto-save?</p>
-											<div class="flex gap-2">
-												<button
-													onclick={async () => {
-														await linkExistingFile();
-														closeModal();
-													}}
-													class="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
-												>
-													Link File...
-												</button>
-												<button
-													onclick={() => closeModal()}
-													class="flex-1 rounded-lg bg-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-600"
-												>
-													No thanks
-												</button>
+											Imported {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+										</div>
+										{#if fsAccessSupported && store.linkedFileStatus === 'none'}
+											<div
+												class="mb-3 rounded-lg border border-blue-800 bg-blue-950 p-3 text-sm text-blue-300"
+											>
+												<p class="mb-2">Want to keep this file linked for auto-save?</p>
+												<div class="flex gap-2">
+													<button
+														onclick={async () => {
+															await linkExistingFile();
+															closeModal();
+														}}
+														class="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-blue-700"
+													>
+														Link File...
+													</button>
+													<button
+														onclick={() => closeModal()}
+														class="flex-1 rounded-lg bg-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-600"
+													>
+														No thanks
+													</button>
+												</div>
 											</div>
+										{/if}
+									{:else}
+										<div
+											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+										>
+											Imported {importResult.imported}, failed {importResult.errors}.
 										</div>
 									{/if}
-								{:else}
+								{/if}
+								{#if importError}
 									<div
-										class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+										class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
 									>
-										Imported {importResult.imported}, failed {importResult.errors}.
+										{importError}
 									</div>
 								{/if}
-							{/if}
-							{#if importError}
-								<div
-									class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+								<button
+									onclick={handleLoadFile}
+									disabled={!selectedFile || isLoadingFile || importResult !== null}
+									class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 								>
-									{importError}
-								</div>
-							{/if}
-							<button
-								onclick={handleLoadFile}
-								disabled={!selectedFile || isLoadingFile || importResult !== null}
-								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
-							>
-								{#if isLoadingFile}
-									<svg
-										class="h-4 w-4 animate-spin"
-										xmlns="http://www.w3.org/2000/svg"
-										fill="none"
-										viewBox="0 0 24 24"
-									>
-										<circle
-											class="opacity-25"
-											cx="12"
-											cy="12"
-											r="10"
-											stroke="currentColor"
-											stroke-width="4"
-										/>
-										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-									</svg>
-									{#if importTotal > 0}
-										Importing… ({importCurrent}/{importTotal} lists)
+									{#if isLoadingFile}
+										<svg
+											class="h-4 w-4 animate-spin"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												class="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="4"
+											/>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+										</svg>
+										{#if importTotal > 0}
+											Importing… ({importCurrent}/{importTotal} lists)
+										{:else}
+											Importing…
+										{/if}
 									{:else}
-										Importing…
+										Import File
 									{/if}
-								{:else}
-									Import File
-								{/if}
-							</button>
+								</button>
+							</div>
 						</div>
 					</div>
-				</div>
 
-				<!-- Create New Option -->
-				<div
-					class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
-				>
-					<div class="flex items-start gap-4">
-						<div
-							class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-purple-900"
-						>
-							<svg
-								class="h-6 w-6 text-purple-400"
-								fill="none"
-								stroke="currentColor"
-								viewBox="0 0 24 24"
+					<!-- Create New sub-section -->
+					<div
+						class="mt-4 rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+					>
+						<div class="flex items-start gap-4">
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-purple-900"
 							>
-								<path
-									stroke-linecap="round"
-									stroke-linejoin="round"
-									stroke-width="2"
-									d="M12 4v16m8-8H4"
-								></path>
-							</svg>
-						</div>
-						<div class="flex-1">
-							<h3 class="mb-2 text-lg font-semibold text-neutral-100">Start from scratch</h3>
-							<p class="mb-4 text-sm text-neutral-400">
-								Create a new empty database. {#if localDBexists}The local database will be kept but
-									not used.{/if}
-							</p>
-							<button
-								onclick={handleCreateNew}
-								class="w-full rounded-lg bg-purple-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-purple-700"
-							>
-								Create New Database
-							</button>
+								<svg
+									class="h-6 w-6 text-purple-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 4v16m8-8H4"
+									></path>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Start from scratch</h3>
+								<p class="mb-4 text-sm text-neutral-400">
+									Create a new empty database. {#if localDBexists}The local database will be kept but
+										not used.{/if}
+								</p>
+								<button
+									onclick={handleCreateNew}
+									class="w-full rounded-lg bg-purple-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-purple-700"
+								>
+									Create New Database
+								</button>
+							</div>
 						</div>
 					</div>
-				</div>
+				{/if}
 
-				<!-- Linked File Option (File System Access API) -->
-				{#if fsAccessSupported}
+				<!-- Linked File Section -->
+				{#if activeSection === 'link' && fsAccessSupported}
 					<div
 						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
 					>
@@ -493,14 +579,14 @@
 										<button
 											onclick={() => linkFile()}
 											disabled={store.dbMode !== 'active'}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 										>
 											New File...
 										</button>
 										<button
 											onclick={() => linkExistingFile()}
 											disabled={store.dbMode !== 'active'}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 										>
 											Existing File...
 										</button>
@@ -520,7 +606,7 @@
 									<div class="flex gap-2">
 										<button
 											onclick={() => changeFile()}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700"
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
 										>
 											Change File...
 										</button>
@@ -542,7 +628,7 @@
 									<div class="flex gap-2">
 										<button
 											onclick={() => reconnectFile()}
-											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-amber-700"
+											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
 										>
 											Reconnect
 										</button>
@@ -562,7 +648,7 @@
 									<div class="flex gap-2">
 										<button
 											onclick={() => linkFile()}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-blue-700"
+											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
 										>
 											Link New File...
 										</button>
@@ -589,7 +675,7 @@
 									<div class="flex gap-2">
 										<button
 											onclick={() => reconnectFile()}
-											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-white shadow-sm transition-colors duration-200 hover:bg-amber-700"
+											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
 										>
 											Retry
 										</button>
@@ -606,8 +692,59 @@
 					</div>
 				{/if}
 
-				<!-- Info Note -->
-				<div class="rounded-lg border border-neutral-800 bg-neutral-800/50 p-4">
+				<!-- Image Cache Section -->
+				{#if activeSection === 'cache'}
+					<div
+						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+					>
+						<div class="flex items-start gap-4">
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
+							>
+								<svg
+									class="h-6 w-6 text-orange-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+									></path>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Image Cache</h3>
+								<p class="mb-3 text-sm text-neutral-400">
+									Card images are cached locally for faster loading.
+								</p>
+								<div class="mb-4 space-y-2 text-sm text-neutral-400">
+									<div class="flex justify-between">
+										<span class="font-medium">Cached images:</span>
+										<span class="font-mono">{imageCacheCount}</span>
+									</div>
+								</div>
+								<button
+									onclick={async () => {
+										isClearingCache = true;
+										await clearImageCache();
+										imageCacheCount = 0;
+										isClearingCache = false;
+									}}
+									disabled={isClearingCache || imageCacheCount === 0}
+									class="w-full rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{isClearingCache ? 'Clearing…' : 'Clear Image Cache'}
+								</button>
+							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Info Note (always visible) -->
+				<div class="mt-6 rounded-lg border border-neutral-800 bg-neutral-800/50 p-4">
 					<p class="text-xs text-neutral-400">
 						<strong>Note:</strong> You can always export or import your data later using the application
 						controls.

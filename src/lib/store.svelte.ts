@@ -1,6 +1,7 @@
 import {
 	openDatabase,
 	clearDatabase,
+	checkLocalDatabase,
 	loadAllCardLists,
 	saveCardList as dbSaveCardList,
 	deleteCardList as dbDeleteCardList,
@@ -11,6 +12,8 @@ import {
 	getCollectionCard,
 	findCardListByName,
 	mergeCards,
+	putMetadata,
+	getMetadata,
 	type CardList,
 	type CollectionCard,
 	type CardMatching,
@@ -41,6 +44,15 @@ export { isFileSystemAccessSupported } from './linked-file';
 
 // Database reference
 let db: IDBDatabase | null = null;
+
+/** Ensure db is open, re-opening if needed (e.g. after HMR or race condition). */
+async function ensureDB(): Promise<IDBDatabase> {
+	if (!db) {
+		db = await openDatabase();
+	}
+	return db;
+}
+
 
 // ==================== STORE ====================
 export type DBMode = 'none' | 'peek' | 'active';
@@ -150,6 +162,31 @@ function toPlainCard(card: any): any {
 // ==================== INITIALIZATION ====================
 
 /**
+ * Try to auto-load the local database if the user previously connected it.
+ * Called once on app startup from +layout.svelte.
+ */
+export async function tryAutoLoadDB() {
+	if (store.dbMode !== 'none') return;
+
+	const exists = await checkLocalDatabase();
+	if (!exists) return;
+
+	db = await openDatabase();
+	const autoLoad = await getMetadata(db, 'autoLoadDB');
+	if (!autoLoad) {
+		// DB exists but user never opted in — leave dbMode as 'none'
+		// so the modal can peek later if opened.
+		db.close();
+		db = null;
+		return;
+	}
+
+	store.dbMode = 'active';
+	await Promise.all([loadCardLists(), loadCollection()]);
+	await initLinkedFile();
+}
+
+/**
  * Open database in read-only peek mode (data visible, writes blocked)
  */
 export async function peekDB() {
@@ -169,19 +206,21 @@ export async function initDB() {
 		if (store.savedCardLists.length === 0) {
 			await createNewCardList();
 		}
+		await putMetadata(db!, 'autoLoadDB', true);
 		await initLinkedFile();
 		return;
 	}
 	db = await openDatabase();
 	store.dbMode = 'active';
 	await Promise.all([loadCardLists(), loadCollection()]);
+	await putMetadata(db!, 'autoLoadDB', true);
 	await initLinkedFile();
 	console.log('initDB done');
 }
 
 export async function clearDB() {
-	if (!db) throw new Error('Database not initialized');
-	await clearDatabase(db);
+	const _db = await ensureDB();
+	await clearDatabase(_db);
 	console.log('clearDB done');
 }
 
@@ -194,7 +233,6 @@ export function closeDB() {
 }
 
 export function exportDB() {
-	if (!db) throw new Error('Database not initialized');
 	return exportWithMetadata(store);
 }
 
@@ -256,9 +294,9 @@ export async function initLinkedFile(): Promise<void> {
 }
 
 export async function linkFile(): Promise<void> {
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
-	const handle = await pickAndLinkNewFile(db);
+	const handle = await pickAndLinkNewFile(_db);
 	linkedHandle = handle;
 	store.linkedFileName = handle.name;
 	store.linkedFileStatus = 'active';
@@ -275,9 +313,9 @@ export async function linkFile(): Promise<void> {
 }
 
 export async function linkExistingFile(): Promise<void> {
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
-	const handle = await pickAndLinkExistingFile(db);
+	const handle = await pickAndLinkExistingFile(_db);
 	linkedHandle = handle;
 	store.linkedFileName = handle.name;
 	store.linkedFileStatus = 'active';
@@ -292,21 +330,21 @@ export async function linkExistingFile(): Promise<void> {
 		const localLists = $state.snapshot(store.savedCardLists) as CardList[];
 		const mergedLists = mergeCardLists(localLists, remoteLists);
 
-		await clearDatabase(db);
+		await clearDatabase(_db);
 		for (const list of mergedLists) {
-			await dbSaveCardList(db, { ...list, id: undefined });
+			await dbSaveCardList(_db, { ...list, id: undefined });
 		}
 
 		// Merge collection
 		for (const remoteCard of remoteCollection) {
-			const existing = await getCollectionCard(db, remoteCard.id);
+			const existing = await getCollectionCard(_db, remoteCard.id);
 			if (existing) {
-				await saveCollectionCard(db, {
+				await saveCollectionCard(_db, {
 					...remoteCard,
 					quantity_owned: Math.max(existing.quantity_owned, remoteCard.quantity_owned)
 				});
 			} else {
-				await saveCollectionCard(db, remoteCard);
+				await saveCollectionCard(_db, remoteCard);
 			}
 		}
 
@@ -323,11 +361,11 @@ export async function linkExistingFile(): Promise<void> {
 }
 
 export async function unlinkFile(): Promise<void> {
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	cancelDebouncedWrite();
 	stopPolling();
-	await unlinkFileHandle(db);
+	await unlinkFileHandle(_db);
 	linkedHandle = null;
 	store.linkedFileStatus = 'none';
 	store.linkedFileName = null;
@@ -409,16 +447,15 @@ export async function loadFromFile(
 	file: File,
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
-	if (!db) {
-		db = await openDatabase();
-	}
+	const _db = await ensureDB();
 	store.dbMode = 'active';
 
 	const buffer = await file.arrayBuffer();
 	const data = new Uint8Array(buffer);
 
-	const result = await importDatabase(db, data, false, onProgress);
+	const result = await importDatabase(_db, data, false, onProgress);
 	await Promise.all([loadCardLists(), loadCollection()]);
+	await putMetadata(_db, 'autoLoadDB', true);
 	triggerAutoSave();
 	return result;
 }
@@ -602,9 +639,9 @@ async function fetchCardsByName(
  * Load collection from database
  */
 export async function loadCollection() {
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
-	const cards = await dbLoadCollection(db);
+	const cards = await dbLoadCollection(_db);
 	store.collection = cards;
 	return cards;
 }
@@ -614,16 +651,16 @@ export async function loadCollection() {
  */
 export async function addToCollection(card: any, quantity: number = 1) {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
-	const existingCard = await getCollectionCard(db, card.id);
+	const existingCard = await getCollectionCard(_db, card.id);
 
 	const cardData: CollectionCard = {
 		...toPlainCard(card),
 		quantity_owned: existingCard ? existingCard.quantity_owned + quantity : quantity
 	};
 
-	await saveCollectionCard(db, cardData);
+	await saveCollectionCard(_db, cardData);
 
 	if (existingCard) {
 		const newCollection = store.collection.map((c) => (c.id === card.id ? cardData : c));
@@ -641,7 +678,7 @@ export async function addToCollection(card: any, quantity: number = 1) {
  */
 export async function removeFromCollection(card: any, quantity: number = 1) {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	const existingCard = store.collection.find((c) => c.id === card.id);
 
@@ -653,7 +690,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
 
 	if (newQuantity <= 0) {
 		// Remove card entirely
-		await deleteCollectionCard(db, card.id);
+		await deleteCollectionCard(_db, card.id);
 		const newCollection = store.collection.filter((c) => c.id !== card.id);
 		store.collection = newCollection;
 		triggerAutoSave();
@@ -665,7 +702,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
 			quantity_owned: newQuantity
 		};
 
-		await saveCollectionCard(db, cardData);
+		await saveCollectionCard(_db, cardData);
 
 		const newCollection = store.collection.map((c) => (c.id === card.id ? cardData : c));
 		store.collection = newCollection;
@@ -679,7 +716,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
  */
 export async function updateCollectionQuantity(card: any, quantity: number) {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	if (quantity <= 0) {
 		return removeFromCollection(card, 9999);
@@ -690,7 +727,7 @@ export async function updateCollectionQuantity(card: any, quantity: number) {
 		quantity_owned: quantity
 	};
 
-	await saveCollectionCard(db, cardData);
+	await saveCollectionCard(_db, cardData);
 
 	const existingIndex = store.collection.findIndex((c) => c.id === card.id);
 	if (existingIndex >= 0) {
@@ -805,9 +842,9 @@ export function exportCollectionToText(fields: string[]) {
  * Load all card lists from database
  */
 export async function loadCardLists() {
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
-	store.savedCardLists = await loadAllCardLists(db);
+	store.savedCardLists = await loadAllCardLists(_db);
 
 	if (store.savedCardLists.length === 0) {
 		if (store.dbMode === 'active') {
@@ -825,10 +862,10 @@ export async function loadCardLists() {
  */
 export async function createNewCardList() {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	const newList = createEmptyCardList();
-	const listId = await dbSaveCardList(db, newList);
+	const listId = await dbSaveCardList(_db, newList);
 
 	const listWithId = { ...newList, id: listId };
 	const newLists = [...store.savedCardLists, listWithId];
@@ -845,7 +882,7 @@ export async function createNewCardList() {
  */
 export async function saveCardList(name: string, cards: any[]) {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	const index = store.currentCardListIndex;
 	const currentListData = store.savedCardLists[index];
@@ -859,7 +896,7 @@ export async function saveCardList(name: string, cards: any[]) {
 		updated_at: Date.now()
 	};
 
-	await dbSaveCardList(db, updatedList);
+	await dbSaveCardList(_db, updatedList);
 
 	const newLists = [...store.savedCardLists];
 	newLists[index] = updatedList;
@@ -874,7 +911,7 @@ export async function saveCardList(name: string, cards: any[]) {
  */
 export async function deleteCardList() {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	const index = store.currentCardListIndex;
 
@@ -884,7 +921,7 @@ export async function deleteCardList() {
 
 	const listToDelete = store.savedCardLists[index];
 	if (listToDelete.id) {
-		await dbDeleteCardList(db, listToDelete.id);
+		await dbDeleteCardList(_db, listToDelete.id);
 	}
 
 	store.savedCardLists = store.savedCardLists.filter((_, i) => i !== index);
@@ -926,7 +963,7 @@ export async function updateListName(name: string) {
  */
 export async function updateListParams(params: Partial<OwnershipCheckParams>) {
 	assertWritable();
-	if (!db) throw new Error('Database not initialized');
+	const _db = await ensureDB();
 
 	const index = store.currentCardListIndex;
 	const currentListData = store.savedCardLists[index];
@@ -939,7 +976,7 @@ export async function updateListParams(params: Partial<OwnershipCheckParams>) {
 		updated_at: Date.now()
 	};
 
-	await dbSaveCardList(db, updatedList);
+	await dbSaveCardList(_db, updatedList);
 
 	const newLists = [...store.savedCardLists];
 	newLists[index] = updatedList;
