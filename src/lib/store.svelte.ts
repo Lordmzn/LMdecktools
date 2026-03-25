@@ -940,12 +940,12 @@ export async function saveCardList(name: string, cards: any[]) {
 
 	if (!currentListData) throw new Error('No card list selected');
 
-	const updatedList: CardList = {
+	const updatedList: CardList = JSON.parse(JSON.stringify({
 		...currentListData,
 		name,
 		cards,
 		updated_at: Date.now()
-	};
+	}));
 
 	await dbSaveCardList(_db, updatedList);
 
