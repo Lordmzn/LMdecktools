@@ -117,6 +117,8 @@ class Store implements StoreInterface {
 	linkedFileLastSaved = $state<number | null>(null);
 	linkedFileError = $state<string | null>(null);
 	linkedFileExternalChange = $state(false);
+	linkedFileWriting = $state(false);
+	linkedFilePermissionDenied = $state(false);
 
 	// Derived ownership check for current list
 	listOwnershipCheck = $derived.by((): OwnershipCheckResult => {
@@ -240,22 +242,50 @@ export function exportDB() {
 
 let linkedHandle: FileSystemFileHandle | null = null;
 
+function isNotFoundError(error: unknown): boolean {
+	return error instanceof DOMException && error.name === 'NotFoundError';
+}
+
 function triggerAutoSave(): void {
 	if (store.linkedFileStatus !== 'active' || !linkedHandle) return;
 
+	store.linkedFileWriting = true;
 	scheduleDebouncedWrite(
 		linkedHandle,
 		() => exportWithMetadata(store),
 		(ts) => {
 			store.linkedFileLastSaved = ts;
 			store.linkedFileError = null;
+			store.linkedFileWriting = false;
 		},
 		(error) => {
 			console.error('Linked file write error:', error);
-			store.linkedFileStatus = 'write-error';
+			store.linkedFileStatus = isNotFoundError(error) ? 'not-found' : 'write-error';
 			store.linkedFileError = error instanceof Error ? error.message : 'Write failed';
+			store.linkedFileWriting = false;
 		}
 	);
+}
+
+export async function saveNow(): Promise<void> {
+	if (store.linkedFileStatus !== 'active' || !linkedHandle || store.linkedFileWriting) return;
+
+	cancelDebouncedWrite();
+	store.linkedFileWriting = true;
+	try {
+		const data = exportWithMetadata(store);
+		await writeToFile(linkedHandle, data);
+		const ts = Date.now();
+		updateLastKnownModified(ts);
+		store.linkedFileLastSaved = ts;
+		store.linkedFileError = null;
+	} catch (error) {
+		console.error('Linked file write error:', error);
+		store.linkedFileStatus = isNotFoundError(error) ? 'not-found' : 'write-error';
+		store.linkedFileError = error instanceof Error ? error.message : 'Write failed';
+	} finally {
+		store.linkedFileWriting = false;
+	}
 }
 
 function handleExternalChange(): void {
@@ -372,6 +402,9 @@ export async function unlinkFile(): Promise<void> {
 	store.linkedFileLastSaved = null;
 	store.linkedFileError = null;
 	store.linkedFileExternalChange = false;
+	store.linkedFileWriting = false;
+	store.linkedFilePermissionDenied = false;
+	permissionRequested = false;
 }
 
 export async function changeFile(): Promise<void> {
@@ -379,13 +412,29 @@ export async function changeFile(): Promise<void> {
 	await linkFile();
 }
 
+let permissionRequested = false;
+
+export async function retryWrite(): Promise<void> {
+	if (!linkedHandle) return;
+	store.linkedFileStatus = 'active';
+	store.linkedFileError = null;
+	triggerAutoSave();
+}
+
 export async function reconnectFile(): Promise<void> {
 	if (!linkedHandle) return;
 
+	if (permissionRequested) {
+		// Already requested this session — don't re-prompt
+		return;
+	}
+
+	permissionRequested = true;
 	const granted = await requestPermission(linkedHandle);
 	if (granted) {
 		store.linkedFileStatus = 'active';
 		store.linkedFileError = null;
+		store.linkedFilePermissionDenied = false;
 		try {
 			const modified = await readFileLastModified(linkedHandle);
 			updateLastKnownModified(modified);
@@ -395,6 +444,8 @@ export async function reconnectFile(): Promise<void> {
 		startPolling(linkedHandle, handleExternalChange);
 		// Retry the write that previously failed
 		triggerAutoSave();
+	} else {
+		store.linkedFilePermissionDenied = true;
 	}
 }
 

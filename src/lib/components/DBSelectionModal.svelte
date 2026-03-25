@@ -14,13 +14,38 @@
 		linkExistingFile,
 		unlinkFile,
 		changeFile,
-		reconnectFile
+		reconnectFile,
+		retryWrite,
+		saveNow
 	} from '$lib/store.svelte';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
 	type Section = 'localdb' | 'link' | 'cache';
 	let activeSection = $state<Section | null>(null);
+
+	// Clock tick for relative time display (updates every 60s)
+	let now = $state(Date.now());
+	let clockInterval: ReturnType<typeof setInterval> | undefined;
+
+	function formatRelativeTime(timestamp: number): string {
+		const delta = Math.floor((now - timestamp) / 1000);
+		if (delta < 60) return 'just now';
+		const mins = Math.floor(delta / 60);
+		if (mins < 60) return `${mins} min ago`;
+		const hours = Math.floor(mins / 60);
+		if (hours < 24) return `${hours}h ago`;
+		const days = Math.floor(hours / 24);
+		return `${days}d ago`;
+	}
+
+	let lastSavedText = $derived(
+		store.linkedFileWriting
+			? 'Saving…'
+			: store.linkedFileLastSaved
+				? `Last saved: ${formatRelativeTime(store.linkedFileLastSaved)}`
+				: null
+	);
 
 	let fileInput: HTMLInputElement;
 	let localDBexists = $state<boolean | null>(null);
@@ -53,6 +78,9 @@
 		getImageCacheStats().then((stats) => {
 			imageCacheCount = stats.count;
 		});
+		clockInterval = setInterval(() => {
+			now = Date.now();
+		}, 60_000);
 		if (store.dbMode === 'none') {
 			checkLocalDatabase().then(
 				(res) => {
@@ -74,6 +102,9 @@
 			localDBexists = true;
 			activeSection = computeDefaultSection();
 		}
+		return () => {
+			if (clockInterval) clearInterval(clockInterval);
+		};
 	});
 
 	function toggleSection(section: Section) {
@@ -595,15 +626,22 @@
 									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
 										Linked: {store.linkedFileName}
 									</h3>
-									{#if store.linkedFileLastSaved}
+									{#if lastSavedText}
 										<p class="mb-3 text-sm text-neutral-400">
-											Last saved: {new Date(store.linkedFileLastSaved).toLocaleString()}
+											{lastSavedText}
 										</p>
 									{/if}
 									<p class="mb-4 text-sm text-neutral-400">
 										Changes are automatically saved to this file.
 									</p>
 									<div class="flex gap-2">
+										<button
+											onclick={() => saveNow()}
+											disabled={store.linkedFileWriting}
+											class="flex-1 rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+										>
+											{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
+										</button>
 										<button
 											onclick={() => changeFile()}
 											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
@@ -625,10 +663,16 @@
 										The browser needs your permission to access "{store.linkedFileName}" again.
 										Click Reconnect to re-grant access.
 									</p>
+									{#if store.linkedFilePermissionDenied}
+										<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
+											Permission was denied. Reload the page to try again, or grant access in your browser settings.
+										</p>
+									{/if}
 									<div class="flex gap-2">
 										<button
 											onclick={() => reconnectFile()}
-											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
+											disabled={store.linkedFilePermissionDenied}
+											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 										>
 											Reconnect
 										</button>
@@ -641,24 +685,18 @@
 									</div>
 								{:else if store.linkedFileStatus === 'not-found'}
 									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Linked file not found</h3>
-									<p class="mb-4 text-sm text-neutral-400">
-										The previously linked file "{store.linkedFileName}" could not be found. It may
-										have been moved or deleted.
+									<p class="mb-3 text-sm text-neutral-400">
+										File not found — "{store.linkedFileName}" could not be located.
 									</p>
-									<div class="flex gap-2">
-										<button
-											onclick={() => linkFile()}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
-										>
-											Link New File...
-										</button>
-										<button
-											onclick={() => unlinkFile()}
-											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-										>
-											Unlink
-										</button>
-									</div>
+									<p class="mb-4 text-sm text-green-400">
+										Your data is safe in the browser.
+									</p>
+									<button
+										onclick={() => unlinkFile()}
+										class="rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+									>
+										Unlink
+									</button>
 								{:else if store.linkedFileStatus === 'write-error'}
 									<h3 class="mb-2 text-lg font-semibold text-neutral-100">File write error</h3>
 									{#if store.linkedFileError}
@@ -668,13 +706,16 @@
 											{store.linkedFileError}
 										</p>
 									{/if}
-									<p class="mb-4 text-sm text-neutral-400">
+									<p class="mb-3 text-sm text-neutral-400">
 										Failed to write to "{store.linkedFileName}". The file may be locked or
 										inaccessible.
 									</p>
+									<p class="mb-4 text-sm text-green-400">
+										Your data is safe in the browser.
+									</p>
 									<div class="flex gap-2">
 										<button
-											onclick={() => reconnectFile()}
+											onclick={() => retryWrite()}
 											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
 										>
 											Retry
