@@ -75,7 +75,7 @@
 |  +------------------------------------------------------------+  |
 |  | My Collection                                              |  |
 |  | 42 cards (18 unique)                                       |  |
-|  | [Filter cards...] [Sort by: Name v]  [+ Add Cards] [Export]|  |
+|  | [Filter cards...] [Sort by: Name v]  [+ Add Cards]         |  |
 |  |--------- --------------------------------------------------|  |
 |  |                                                            |  |
 |  | +----------+ +----------+ +----------+ +----------+        |  |
@@ -179,31 +179,35 @@
 
 ## DB Selection Modal
 
+Five-tab toolbar: **[In-browser DB]** **[Link File]** **[Cache]** **[Import]** **[Export]**
+
+Auto-load: If the user has previously connected to the local DB, the app auto-loads it on startup (no modal needed). The preference is stored in IndexedDB metadata.
+
 ```
 +----------------------------------------------------------+
 |                                                          |
 |        Welcome to LM Deck Tools                         |
 |   Choose how to start your MTG collection                |
 |                                                          |
+| [In-browser DB] [Link File] [Cache] [Import] [Export]    |
+|                                     <- toolbar (5 tabs)  |
+|                                                          |
+| === IN-BROWSER DB TAB ===                                |
+|                                                          |
+| (if local DB found + not yet connected):                 |
 | +------------------------------------------------------+ |
-| | [check/x icon]                                       | |
-| | Local database found / not found                     | |
-| |                                                      | |
-| | (if found + not loaded):                             | |
+| | [check icon]                                         | |
+| | Local database found                                 | |
 | |   Total lists: N   Total cards: N                    | |
-| |   [Use Local DB]                                     | |
-| |                                                      | |
-| | (if found + loaded):                                 | |
-| |   Total lists: N   Total cards: N                    | |
-| |   [Download local DB]                                | |
+| |   (read-only preview notice if peeking)              | |
+| |   [Connect to local DB]                              | |
 | +------------------------------------------------------+ |
 |                                                          |
+| (if DB already active):                                  |
 | +------------------------------------------------------+ |
-| | [upload icon]                                        | |
-| | Import from File                                     | |
-| | Import a backup file. Merging is supported.          | |
-| | [Choose file...  (.yjs, .json)]                      | |
-| | [Import File]                                        | |
+| | [check icon]                                         | |
+| | Local database active                                | |
+| |   Total lists: N   Total cards: N                    | |
 | +------------------------------------------------------+ |
 |                                                          |
 | +------------------------------------------------------+ |
@@ -213,51 +217,52 @@
 | | [Create New Database]                                | |
 | +------------------------------------------------------+ |
 |                                                          |
+| === LINK FILE TAB === (disabled when no DB active)       |
+|                                                          |
+| (if fsAccessSupported):                                  |
+| (same linked file states as before — link/unlink/etc.)   |
+| -------------------------------------------------------- |
+| +------------------------------------------------------+ |
+| | [download icon]                                      | |
+| | Download copy                                        | |
+| | Download full DB (collection + all card lists).      | |
+| | [Download .yjs file]                                 | |
+| +------------------------------------------------------+ |
+|                                                          |
+| (if !fsAccessSupported — Firefox fallback):              |
+| +------------------------------------------------------+ |
+| | Download copy + [Download .yjs file]                 | |
+| +------------------------------------------------------+ |
+| +------------------------------------------------------+ |
+| | Restore from file                                    | |
+| | [Choose file...  (.yjs, .json)]                      | |
+| | [Restore from file]                                  | |
+| +------------------------------------------------------+ |
+| Auto-save requires Chrome 86+, Edge 86+, Safari 15.2+.  |
+|                                                          |
+| === CACHE TAB ===                                        |
 | +------------------------------------------------------+ |
 | | [image icon]                                         | |
 | | Image Cache                                          | |
-| | Card images are cached locally for faster loading.   | |
-| |                                                      | |
-| | Cache size: 42 MB  (317 images cached)               | |
+| | Cached images: 317                                   | |
 | | [Clear Image Cache]                                  | |
 | +------------------------------------------------------+ |
 |                                                          |
+| === IMPORT TAB === (disabled when no DB active)          |
+| (card import from File/Paste/URL into Collection or List)|
+|                                                          |
+| === EXPORT TAB === (disabled when no DB active)          |
 | +------------------------------------------------------+ |
-| | [link icon]                                          | |
-| | Linked File                                          | |
-| |                                                      | |
-| | STATE 1 — No file linked (default):                  | |
-| |   Automatically save every change to a file          | |
-| |   on your computer. Place it in a cloud-synced       | |
-| |   folder for cross-device access with no backend.   | |
-| |   [Link a File...]                                   | |
-| |   Requires Chrome 86+, Edge 86+, or Safari 15.2+.   | |
-| |   Not supported in Firefox.                          | |
-| |                                                      | |
-| | STATE 2 — Active (handle in IDB, permission granted):| |
-| |   [green link icon] my-collection.yjs                | |
-| |   ~/Dropbox/MTG/my-collection.yjs                    | |
-| |   Last saved: 2 min ago                              | |
-| |   [Save Now]  [Change File...]  [Unlink]             | |
-| |                                                      | |
-| | STATE 3 — Reconnect needed                           | |
-| |   (handle in IDB, permission = 'prompt'):            | |
-| |   [amber link icon] my-collection.yjs                | |
-| |   Browser permission needed once per session.        | |
-| |   [Reconnect to File]  [Unlink]                      | |
-| |                                                      | |
-| | STATE 4 — File not found                             | |
-| |   (handle in IDB, file deleted or moved):            | |
-| |   [red alert icon] File not found                    | |
-| |   my-collection.yjs could not be located.            | |
-| |   Your data is safe in the browser.                  | |
-| |   [Unlink]                                           | |
-| |                                                      | |
-| | STATE 5 — Write failed (error during session write): | |
-| |   [red alert icon] Last save failed: disk full       | |
-| |   my-collection.yjs — ~/Dropbox/MTG/                 | |
-| |   Your data is safe in the browser.                  | |
-| |   [Save Now]  [Unlink]                               | |
+| | Export your collection as CSV.                       | |
+| | Include Fields:                                      | |
+| | [x] Count  [x] Name  [x] Edition  [ ] Collector #   | |
+| | [ ] Foil   [ ] Language  [ ] Scryfall ID             | |
+| | +--------------------------------------------------+ | |
+| | | # My Collection                                  | | |
+| | | 3  Lightning Bolt  BRO                           | | |
+| | | 1  Counterspell    MH2                           | | |
+| | +--------------------------------------------------+ | |
+| | [Download File]  [Copy to Clipboard]                 | |
 | +------------------------------------------------------+ |
 |                                                          |
 | Note: You can always export or import your data later.   |
@@ -293,31 +298,6 @@
 |             [magnifier icon]                             |
 |        Search for cards to add to your list              |
 |          Learn Scryfall syntax (link)                    |
-```
-
----
-
-## Export Modal
-
-```
-+----------------------------------------------------------+
-| Export                                                    |
-| Use this tool to share your collection outside this app. |
-| If you need to backup, use the DB management.            |
-|                                                          |
-| Include Fields:                                          |
-| [x] Count    [x] Name     [x] Edition    [ ] Collector # |
-| [ ] Foil     [ ] Language  [ ] Scryfall ID               |
-|                                                          |
-| +------------------------------------------------------+ |
-| | # My Collection                                      | |
-| | 3  Lightning Bolt  BRO                               | |
-| | 1  Counterspell    MH2                               | |
-| | ...                                                  | |
-| +------------------------------------------------------+ |
-|                                                          |
-| [Download File]   [Copy to Clipboard]   [Close]         |
-+----------------------------------------------------------+
 ```
 
 ---

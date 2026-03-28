@@ -8,7 +8,9 @@
 		initDB,
 		peekDB,
 		clearDB,
+		exportDB,
 		loadFromFile,
+		exportCollectionToText,
 		isFileSystemAccessSupported,
 		linkFile,
 		linkExistingFile,
@@ -16,13 +18,34 @@
 		changeFile,
 		reconnectFile,
 		retryWrite,
-		saveNow
+		saveNow,
+		importCardsToCollection,
+		importCardsToNewList
 	} from '$lib/store.svelte';
+	import { parseImportInput, detectSourceType } from '$lib/import-parser';
+	import type { ParseResult } from '$lib/import-parser';
+	import { fetchDeckFromUrl } from '$lib/import-url';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
-	type Section = 'localdb' | 'link' | 'cache';
+	type Section = 'localdb' | 'link' | 'cache' | 'import' | 'export';
 	let activeSection = $state<Section | null>(null);
+
+	// Import tab state
+	type ImportMode = 'file' | 'text' | 'url';
+	type ImportTarget = 'collection' | 'list';
+	let extImportMode = $state<ImportMode>('file');
+	let extImportTarget = $state<ImportTarget>('list');
+	let extImportFileInput: HTMLInputElement;
+	let extImportSelectedFile: File | null = $state(null);
+	let extImportText = $state('');
+	let extImportUrl = $state('');
+	let extImportRunning = $state(false);
+	let extImportProgress = $state({ current: 0, total: 0 });
+	let extImportPreview = $state<ParseResult | null>(null);
+	let extImportSummary = $state<{ success: number; failed: number; notFound: string[] } | null>(null);
+	let extImportErr = $state<string | null>(null);
+	let extImportFetching = $state(false);
 
 	// Clock tick for relative time display (updates every 60s)
 	let now = $state(Date.now());
@@ -57,6 +80,7 @@
 	let importError = $state<string | null>(null);
 	let imageCacheCount = $state(0);
 	let isClearingCache = $state(false);
+	let showCreateNewConfirm = $state(false);
 
 	function computeDefaultSection(): Section {
 		if (store.dbMode === 'none' || store.dbMode === 'peek') {
@@ -148,12 +172,150 @@
 	}
 
 	async function handleCreateNew() {
+		if (store.linkedFileStatus !== 'none') {
+			await unlinkFile();
+		}
 		if (store.dbMode !== 'none') {
 			await clearDB();
 			store.dbMode = 'none';
 		}
 		await initDB();
+		showCreateNewConfirm = false;
 		closeModal();
+	}
+
+	async function handleExtImportFileSelect(event: Event) {
+		const target = event.target as HTMLInputElement;
+		if (target.files && target.files.length > 0) {
+			extImportSelectedFile = target.files[0];
+			extImportSummary = null;
+			extImportErr = null;
+			try {
+				const text = await extImportSelectedFile.text();
+				extImportPreview = parseImportInput(text);
+			} catch {
+				extImportErr = 'Could not read file';
+				extImportPreview = null;
+			}
+		}
+	}
+
+	function handleExtImportTextChange() {
+		extImportSummary = null;
+		extImportErr = null;
+		if (extImportText.trim()) {
+			extImportPreview = parseImportInput(extImportText);
+		} else {
+			extImportPreview = null;
+		}
+	}
+
+	async function handleExtImportUrlFetch() {
+		extImportFetching = true;
+		extImportSummary = null;
+		extImportErr = null;
+		extImportPreview = null;
+		try {
+			const deck = await fetchDeckFromUrl(extImportUrl);
+			extImportPreview = { listName: deck.name, cards: deck.cards, warnings: [] };
+		} catch (e) {
+			extImportErr = e instanceof Error ? e.message : 'Failed to fetch deck';
+		} finally {
+			extImportFetching = false;
+		}
+	}
+
+	async function handleExtImportRun() {
+		if (extImportRunning || !extImportPreview || extImportPreview.cards.length === 0) return;
+		extImportRunning = true;
+		extImportSummary = null;
+		extImportErr = null;
+		extImportProgress = { current: 0, total: 0 };
+		try {
+			const progressCb = (current: number, total: number) => {
+				extImportProgress = { current, total };
+			};
+			// Strip Svelte $state proxy — plain objects are needed for Map lookups in the store
+			const cards = $state.snapshot(extImportPreview.cards);
+			const listName = extImportPreview.listName || 'Imported List';
+			if (extImportTarget === 'collection') {
+				extImportSummary = await importCardsToCollection(cards, progressCb);
+			} else {
+				extImportSummary = await importCardsToNewList(cards, listName, progressCb);
+			}
+		} catch (e) {
+			extImportErr = e instanceof Error ? e.message : 'Import failed';
+		} finally {
+			extImportRunning = false;
+		}
+	}
+
+	function resetExtImport() {
+		extImportSelectedFile = null;
+		extImportText = '';
+		extImportUrl = '';
+		extImportPreview = null;
+		extImportSummary = null;
+		extImportErr = null;
+		extImportFetching = false;
+		extImportRunning = false;
+	}
+
+	// Backup export state
+	let isExportingBackup = $state(false);
+	let exportBackupSuccess = $state(false);
+
+	function handleExportBackup() {
+		isExportingBackup = true;
+		exportBackupSuccess = false;
+		try {
+			const data = exportDB();
+			const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' });
+			const url = URL.createObjectURL(blob);
+			const link = document.createElement('a');
+			link.href = url;
+			const timestamp = new Date().toISOString().slice(0, 10);
+			link.download = `lm-decktools-backup-${timestamp}.yjs`;
+			document.body.appendChild(link);
+			link.click();
+			document.body.removeChild(link);
+			URL.revokeObjectURL(url);
+			exportBackupSuccess = true;
+		} catch (e) {
+			console.error('Failed to export backup:', e);
+		} finally {
+			isExportingBackup = false;
+		}
+	}
+
+	// CSV collection export state
+	const csvFieldOptions = [
+		{ label: 'Count', value: 'Count' },
+		{ label: 'Name', value: 'Name' },
+		{ label: 'Edition', value: 'Edition' },
+		{ label: 'Collector #', value: 'Collector Number' },
+		{ label: 'Foil', value: 'Foil' },
+		{ label: 'Language', value: 'Language' },
+		{ label: 'Scryfall ID', value: 'Scryfall ID' }
+	];
+	let csvSelectedFields = $state(['Count', 'Name', 'Edition']);
+	let csvText = $derived.by(() => exportCollectionToText(csvSelectedFields));
+
+	function handleCsvCopy() {
+		navigator.clipboard.writeText(csvText);
+	}
+
+	function handleCsvDownload() {
+		if (!csvText) return;
+		const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = 'mtg_collection_export.csv';
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
 	}
 
 	function closeModal() {
@@ -205,25 +367,25 @@
 							d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
 						></path>
 					</svg>
-					Local DB
+					In-browser DB
 				</button>
-				{#if fsAccessSupported}
-					<button
-						onclick={() => toggleSection('link')}
-						class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-							{activeSection === 'link' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
-					>
-						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-							<path
-								stroke-linecap="round"
-								stroke-linejoin="round"
-								stroke-width="2"
-								d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-							></path>
-						</svg>
-						Link
-					</button>
-				{/if}
+				<button
+					onclick={() => { toggleSection('link'); exportBackupSuccess = false; }}
+					disabled={store.dbMode !== 'active'}
+					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+						{activeSection === 'link' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+						></path>
+					</svg>
+					Link File
+				</button>
 				<button
 					onclick={() => toggleSection('cache')}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
@@ -238,6 +400,40 @@
 						></path>
 					</svg>
 					Cache
+				</button>
+				<button
+					onclick={() => { toggleSection('import'); resetExtImport(); }}
+					disabled={store.dbMode !== 'active'}
+					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+						{activeSection === 'import' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
+						></path>
+					</svg>
+					Import
+				</button>
+				<button
+					onclick={() => toggleSection('export')}
+					disabled={store.dbMode !== 'active'}
+					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+						{activeSection === 'export' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l4 4m0 0l4-4m-4 4V4"
+						></path>
+					</svg>
+					Export
 				</button>
 			</div>
 
@@ -349,127 +545,6 @@
 					<!-- Separator -->
 					<div class="my-4 border-t border-neutral-800"></div>
 
-					<!-- Import from File sub-section -->
-					<div
-						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
-					>
-						<div class="flex items-start gap-4">
-							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
-							>
-								<svg
-									class="h-6 w-6 text-orange-400"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-									></path>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Import from File</h3>
-								<p class="mb-4 text-sm text-neutral-400">
-									Import a backup file. Merging with local data is supported.
-								</p>
-								<input
-									type="file"
-									accept=".yjs,.json"
-									bind:this={fileInput}
-									onchange={handleFileSelect}
-									disabled={isLoadingFile}
-									class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
-								/>
-								{#if selectedFile && !importResult && !importError}
-									<p class="mb-3 text-xs text-neutral-400">
-										Selected file: {selectedFile.name}
-									</p>
-								{/if}
-								{#if importResult}
-									{#if importResult.errors === 0}
-										<div
-											class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
-										>
-											Imported {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
-										</div>
-										{#if fsAccessSupported && store.linkedFileStatus === 'none'}
-											<div
-												class="mb-3 rounded-lg border border-blue-800 bg-blue-950 p-3 text-sm text-blue-300"
-											>
-												<p class="mb-2">Want to keep this file linked for auto-save?</p>
-												<div class="flex gap-2">
-													<button
-														onclick={async () => {
-															await linkExistingFile();
-															closeModal();
-														}}
-														class="flex-1 rounded-lg bg-blue-600 px-3 py-1.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-blue-700"
-													>
-														Link File...
-													</button>
-													<button
-														onclick={() => closeModal()}
-														class="flex-1 rounded-lg bg-neutral-700 px-3 py-1.5 text-sm font-medium text-neutral-300 transition-colors hover:bg-neutral-600"
-													>
-														No thanks
-													</button>
-												</div>
-											</div>
-										{/if}
-									{:else}
-										<div
-											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
-										>
-											Imported {importResult.imported}, failed {importResult.errors}.
-										</div>
-									{/if}
-								{/if}
-								{#if importError}
-									<div
-										class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
-									>
-										{importError}
-									</div>
-								{/if}
-								<button
-									onclick={handleLoadFile}
-									disabled={!selectedFile || isLoadingFile || importResult !== null}
-									class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
-								>
-									{#if isLoadingFile}
-										<svg
-											class="h-4 w-4 animate-spin"
-											xmlns="http://www.w3.org/2000/svg"
-											fill="none"
-											viewBox="0 0 24 24"
-										>
-											<circle
-												class="opacity-25"
-												cx="12"
-												cy="12"
-												r="10"
-												stroke="currentColor"
-												stroke-width="4"
-											/>
-											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-										</svg>
-										{#if importTotal > 0}
-											Importing… ({importCurrent}/{importTotal} lists)
-										{:else}
-											Importing…
-										{/if}
-									{:else}
-										Import File
-									{/if}
-								</button>
-							</div>
-						</div>
-					</div>
-
 					<!-- Create New sub-section -->
 					<div
 						class="mt-4 rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
@@ -495,11 +570,10 @@
 							<div class="flex-1">
 								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Start from scratch</h3>
 								<p class="mb-4 text-sm text-neutral-400">
-									Create a new empty database. {#if localDBexists}The local database will be kept but
-										not used.{/if}
+									Create a new empty database. All existing data will be cleared.
 								</p>
 								<button
-									onclick={handleCreateNew}
+									onclick={() => (showCreateNewConfirm = true)}
 									class="w-full rounded-lg bg-purple-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-purple-700"
 								>
 									Create New Database
@@ -509,228 +583,432 @@
 					</div>
 				{/if}
 
+				<!-- Export Section (CSV collection export) -->
+				{#if activeSection === 'export'}
+					<div class="space-y-4">
+						<p class="text-sm text-neutral-400">
+							Export your collection as CSV to share with other tools and services.
+						</p>
+
+						<div>
+							<label class="mb-2 block text-sm font-semibold text-neutral-300">Include Fields:</label>
+							<div class="grid grid-cols-2 gap-2 text-sm text-neutral-300 sm:grid-cols-4">
+								{#each csvFieldOptions as option (option.value)}
+									<label class="flex cursor-pointer items-center gap-2">
+										<input
+											type="checkbox"
+											bind:group={csvSelectedFields}
+											value={option.value}
+											class="h-4 w-4 accent-orange-500"
+										/>
+										<span>{option.label}</span>
+									</label>
+								{/each}
+							</div>
+						</div>
+
+						<textarea
+							value={csvText}
+							readonly
+							class="h-64 w-full rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm text-neutral-300"
+							placeholder="Select fields to generate preview..."
+						></textarea>
+
+						<div class="flex gap-3">
+							<button
+								onclick={handleCsvDownload}
+								disabled={!csvText}
+								class="flex-1 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500 sm:flex-none"
+							>
+								Download File
+							</button>
+							<button
+								onclick={handleCsvCopy}
+								disabled={!csvText}
+								class="rounded-lg bg-neutral-700 px-4 py-2 text-neutral-200 transition hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								Copy to Clipboard
+							</button>
+						</div>
+					</div>
+				{/if}
+
 				<!-- Linked File Section -->
-				{#if activeSection === 'link' && fsAccessSupported}
+				{#if activeSection === 'link'}
+					{#if fsAccessSupported}
+						<!-- Auto-save link controls -->
+						<div
+							class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+						>
+							<div class="flex items-start gap-4">
+								{#if store.linkedFileStatus === 'active'}
+									<div
+										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+									>
+										<svg
+											class="h-6 w-6 text-green-400"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+											/>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M9 12l2 2 4-4"
+											/>
+										</svg>
+									</div>
+								{:else if store.linkedFileStatus === 'reconnect'}
+									<div
+										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-900"
+									>
+										<svg
+											class="h-6 w-6 text-amber-400"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+											/>
+										</svg>
+									</div>
+								{:else if store.linkedFileStatus === 'not-found' || store.linkedFileStatus === 'write-error'}
+									<div
+										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-900"
+									>
+										<svg
+											class="h-6 w-6 text-red-400"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+											/>
+										</svg>
+									</div>
+								{:else}
+									<div
+										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-900"
+									>
+										<svg
+											class="h-6 w-6 text-blue-400"
+											fill="none"
+											stroke="currentColor"
+											viewBox="0 0 24 24"
+										>
+											<path
+												stroke-linecap="round"
+												stroke-linejoin="round"
+												stroke-width="2"
+												d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+											/>
+										</svg>
+									</div>
+								{/if}
+								<div class="flex-1">
+									{#if store.linkedFileStatus === 'none'}
+										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+											Link a File (Bring Your Own Cloud)
+										</h3>
+										<p class="mb-3 text-sm text-neutral-400">
+											Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
+											iCloud, OneDrive) for cross-device sync with zero server involvement.
+										</p>
+										<div class="flex gap-2">
+											<button
+												onclick={() => linkFile()}
+												disabled={store.dbMode !== 'active'}
+												class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+											>
+												New File...
+											</button>
+											<button
+												onclick={() => linkExistingFile()}
+												disabled={store.dbMode !== 'active'}
+												class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+											>
+												Existing File...
+											</button>
+										</div>
+									{:else if store.linkedFileStatus === 'active'}
+										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+											Linked: {store.linkedFileName}
+										</h3>
+										{#if lastSavedText}
+											<p class="mb-3 text-sm text-neutral-400">
+												{lastSavedText}
+											</p>
+										{/if}
+										<p class="mb-4 text-sm text-neutral-400">
+											Changes are automatically saved to this file.
+										</p>
+										<div class="flex gap-2">
+											<button
+												onclick={() => saveNow()}
+												disabled={store.linkedFileWriting}
+												class="flex-1 rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+											>
+												{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
+											</button>
+											<button
+												onclick={() => changeFile()}
+												class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
+											>
+												Change File...
+											</button>
+											<button
+												onclick={() => unlinkFile()}
+												class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+											>
+												Unlink
+											</button>
+										</div>
+									{:else if store.linkedFileStatus === 'reconnect'}
+										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+											File link needs reconnection
+										</h3>
+										<p class="mb-4 text-sm text-neutral-400">
+											The browser needs your permission to access "{store.linkedFileName}" again.
+											Click Reconnect to re-grant access.
+										</p>
+										{#if store.linkedFilePermissionDenied}
+											<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
+												Permission was denied. Reload the page to try again, or grant access in your browser settings.
+											</p>
+										{/if}
+										<div class="flex gap-2">
+											<button
+												onclick={() => reconnectFile()}
+												disabled={store.linkedFilePermissionDenied}
+												class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+											>
+												Reconnect
+											</button>
+											<button
+												onclick={() => unlinkFile()}
+												class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+											>
+												Unlink
+											</button>
+										</div>
+									{:else if store.linkedFileStatus === 'not-found'}
+										<h3 class="mb-2 text-lg font-semibold text-neutral-100">Linked file not found</h3>
+										<p class="mb-3 text-sm text-neutral-400">
+											File not found — "{store.linkedFileName}" could not be located.
+										</p>
+										<p class="mb-4 text-sm text-green-400">
+											Your data is safe in the browser.
+										</p>
+										<button
+											onclick={() => unlinkFile()}
+											class="rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+										>
+											Unlink
+										</button>
+									{:else if store.linkedFileStatus === 'write-error'}
+										<h3 class="mb-2 text-lg font-semibold text-neutral-100">File write error</h3>
+										{#if store.linkedFileError}
+											<p
+												class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+											>
+												{store.linkedFileError}
+											</p>
+										{/if}
+										<p class="mb-3 text-sm text-neutral-400">
+											Failed to write to "{store.linkedFileName}". The file may be locked or
+											inaccessible.
+										</p>
+										<p class="mb-4 text-sm text-green-400">
+											Your data is safe in the browser.
+										</p>
+										<div class="flex gap-2">
+											<button
+												onclick={() => retryWrite()}
+												class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
+											>
+												Retry
+											</button>
+											<button
+												onclick={() => unlinkFile()}
+												class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+											>
+												Unlink
+											</button>
+										</div>
+									{/if}
+								</div>
+							</div>
+						</div>
+
+						<!-- Separator -->
+						<div class="my-4 border-t border-neutral-800"></div>
+					{/if}
+
+					<!-- Download copy (all browsers) -->
 					<div
 						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
 					>
 						<div class="flex items-start gap-4">
-							{#if store.linkedFileStatus === 'active'}
-								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+							>
+								<svg
+									class="h-6 w-6 text-green-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
 								>
-									<svg
-										class="h-6 w-6 text-green-400"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-										/>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M9 12l2 2 4-4"
-										/>
-									</svg>
-								</div>
-							{:else if store.linkedFileStatus === 'reconnect'}
-								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-900"
-								>
-									<svg
-										class="h-6 w-6 text-amber-400"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-										/>
-									</svg>
-								</div>
-							{:else if store.linkedFileStatus === 'not-found' || store.linkedFileStatus === 'write-error'}
-								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-900"
-								>
-									<svg
-										class="h-6 w-6 text-red-400"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-										/>
-									</svg>
-								</div>
-							{:else}
-								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-900"
-								>
-									<svg
-										class="h-6 w-6 text-blue-400"
-										fill="none"
-										stroke="currentColor"
-										viewBox="0 0 24 24"
-									>
-										<path
-											stroke-linecap="round"
-											stroke-linejoin="round"
-											stroke-width="2"
-											d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-										/>
-									</svg>
-								</div>
-							{/if}
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+									></path>
+								</svg>
+							</div>
 							<div class="flex-1">
-								{#if store.linkedFileStatus === 'none'}
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
-										Link a File (Bring Your Own Cloud)
-									</h3>
-									<p class="mb-3 text-sm text-neutral-400">
-										Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
-										iCloud, OneDrive) for cross-device sync with zero server involvement.
-									</p>
-									<p class="mb-4 text-xs text-neutral-500">
-										Supported in Chrome 86+, Edge 86+, and Safari 15.2+. Not available in Firefox.
-									</p>
-									<div class="flex gap-2">
-										<button
-											onclick={() => linkFile()}
-											disabled={store.dbMode !== 'active'}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
-										>
-											New File...
-										</button>
-										<button
-											onclick={() => linkExistingFile()}
-											disabled={store.dbMode !== 'active'}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
-										>
-											Existing File...
-										</button>
-									</div>
-								{:else if store.linkedFileStatus === 'active'}
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
-										Linked: {store.linkedFileName}
-									</h3>
-									{#if lastSavedText}
-										<p class="mb-3 text-sm text-neutral-400">
-											{lastSavedText}
-										</p>
-									{/if}
-									<p class="mb-4 text-sm text-neutral-400">
-										Changes are automatically saved to this file.
-									</p>
-									<div class="flex gap-2">
-										<button
-											onclick={() => saveNow()}
-											disabled={store.linkedFileWriting}
-											class="flex-1 rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
-										>
-											{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
-										</button>
-										<button
-											onclick={() => changeFile()}
-											class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
-										>
-											Change File...
-										</button>
-										<button
-											onclick={() => unlinkFile()}
-											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-										>
-											Unlink
-										</button>
-									</div>
-								{:else if store.linkedFileStatus === 'reconnect'}
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
-										File link needs reconnection
-									</h3>
-									<p class="mb-4 text-sm text-neutral-400">
-										The browser needs your permission to access "{store.linkedFileName}" again.
-										Click Reconnect to re-grant access.
-									</p>
-									{#if store.linkedFilePermissionDenied}
-										<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
-											Permission was denied. Reload the page to try again, or grant access in your browser settings.
-										</p>
-									{/if}
-									<div class="flex gap-2">
-										<button
-											onclick={() => reconnectFile()}
-											disabled={store.linkedFilePermissionDenied}
-											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
-										>
-											Reconnect
-										</button>
-										<button
-											onclick={() => unlinkFile()}
-											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-										>
-											Unlink
-										</button>
-									</div>
-								{:else if store.linkedFileStatus === 'not-found'}
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Linked file not found</h3>
-									<p class="mb-3 text-sm text-neutral-400">
-										File not found — "{store.linkedFileName}" could not be located.
-									</p>
-									<p class="mb-4 text-sm text-green-400">
-										Your data is safe in the browser.
-									</p>
-									<button
-										onclick={() => unlinkFile()}
-										class="rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
+								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Download copy</h3>
+								<p class="mb-4 text-sm text-neutral-400">
+									Download a full copy of your database (collection + all card lists).
+								</p>
+								{#if exportBackupSuccess}
+									<div
+										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
 									>
-										Unlink
-									</button>
-								{:else if store.linkedFileStatus === 'write-error'}
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">File write error</h3>
-									{#if store.linkedFileError}
-										<p
-											class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
-										>
-											{store.linkedFileError}
-										</p>
-									{/if}
-									<p class="mb-3 text-sm text-neutral-400">
-										Failed to write to "{store.linkedFileName}". The file may be locked or
-										inaccessible.
-									</p>
-									<p class="mb-4 text-sm text-green-400">
-										Your data is safe in the browser.
-									</p>
-									<div class="flex gap-2">
-										<button
-											onclick={() => retryWrite()}
-											class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
-										>
-											Retry
-										</button>
-										<button
-											onclick={() => unlinkFile()}
-											class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-										>
-											Unlink
-										</button>
+										Download started.
 									</div>
 								{/if}
+								<button
+									onclick={handleExportBackup}
+									disabled={isExportingBackup}
+									class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+								>
+									{isExportingBackup ? 'Preparing…' : 'Download .yjs file'}
+								</button>
 							</div>
 						</div>
 					</div>
+
+					{#if !fsAccessSupported}
+						<!-- Separator -->
+						<div class="my-4 border-t border-neutral-800"></div>
+
+						<!-- Restore from file (Firefox fallback) -->
+						<div
+							class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+						>
+							<div class="flex items-start gap-4">
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
+								>
+									<svg
+										class="h-6 w-6 text-orange-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+										></path>
+									</svg>
+								</div>
+								<div class="flex-1">
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Restore from file</h3>
+									<p class="mb-4 text-sm text-neutral-400">
+										Restore your database from a previously downloaded copy. This replaces all current data.
+									</p>
+									<input
+										type="file"
+										accept=".yjs,.json"
+										bind:this={fileInput}
+										onchange={handleFileSelect}
+										disabled={isLoadingFile}
+										class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+									/>
+									{#if selectedFile && !importResult && !importError}
+										<p class="mb-3 text-xs text-neutral-400">
+											Selected file: {selectedFile.name}
+										</p>
+									{/if}
+									{#if importResult}
+										{#if importResult.errors === 0}
+											<div
+												class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
+											>
+												Restored {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+											</div>
+										{:else}
+											<div
+												class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+											>
+												Restored {importResult.imported}, failed {importResult.errors}.
+											</div>
+										{/if}
+									{/if}
+									{#if importError}
+										<div
+											class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+										>
+											{importError}
+										</div>
+									{/if}
+									<button
+										onclick={handleLoadFile}
+										disabled={!selectedFile || isLoadingFile || importResult !== null}
+										class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+									>
+										{#if isLoadingFile}
+											<svg
+												class="h-4 w-4 animate-spin"
+												xmlns="http://www.w3.org/2000/svg"
+												fill="none"
+												viewBox="0 0 24 24"
+											>
+												<circle
+													class="opacity-25"
+													cx="12"
+													cy="12"
+													r="10"
+													stroke="currentColor"
+													stroke-width="4"
+												/>
+												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+											</svg>
+											{#if importTotal > 0}
+												Restoring… ({importCurrent}/{importTotal} lists)
+											{:else}
+												Restoring…
+											{/if}
+										{:else}
+											Restore from file
+										{/if}
+									</button>
+								</div>
+							</div>
+						</div>
+
+						<p class="mt-4 text-xs text-neutral-500">
+							Auto-save to a linked file requires Chrome 86+, Edge 86+, or Safari 15.2+.
+						</p>
+					{/if}
 				{/if}
 
 				<!-- Image Cache Section -->
@@ -784,6 +1062,169 @@
 					</div>
 				{/if}
 
+				<!-- Import Section -->
+				{#if activeSection === 'import'}
+					<div class="space-y-4">
+						<!-- Source mode selector -->
+						<div>
+							<label class="mb-2 block text-sm font-medium text-neutral-400">Source</label>
+							<div class="flex gap-1">
+								{#each [{ value: 'file', label: 'File' }, { value: 'text', label: 'Paste' }, { value: 'url', label: 'URL' }] as opt (opt.value)}
+									<button
+										onclick={() => { extImportMode = opt.value as ImportMode; resetExtImport(); }}
+										class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+											{extImportMode === opt.value ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+									>
+										{opt.label}
+									</button>
+								{/each}
+							</div>
+						</div>
+
+						<!-- Target selector -->
+						<div>
+							<label class="mb-2 block text-sm font-medium text-neutral-400">Import into</label>
+							<div class="flex gap-1">
+								<button
+									onclick={() => (extImportTarget = 'list')}
+									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+										{extImportTarget === 'list' ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+								>
+									New List
+								</button>
+								<button
+									onclick={() => (extImportTarget = 'collection')}
+									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
+										{extImportTarget === 'collection' ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+								>
+									Collection
+								</button>
+							</div>
+						</div>
+
+						<!-- Input area -->
+						<div>
+							{#if extImportMode === 'file'}
+								<input
+									type="file"
+									accept=".csv,.txt,.dec"
+									bind:this={extImportFileInput}
+									onchange={handleExtImportFileSelect}
+									disabled={extImportRunning}
+									class="block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+								/>
+								{#if extImportSelectedFile}
+									<p class="mt-2 text-xs text-neutral-500">{extImportSelectedFile.name}</p>
+								{/if}
+							{:else if extImportMode === 'text'}
+								<textarea
+									bind:value={extImportText}
+									oninput={handleExtImportTextChange}
+									disabled={extImportRunning}
+									placeholder="4 Lightning Bolt&#10;2 Counterspell&#10;&#10;Or paste CSV data..."
+									class="h-36 w-full rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
+								></textarea>
+							{:else if extImportMode === 'url'}
+								<div class="flex gap-2">
+									<input
+										type="url"
+										bind:value={extImportUrl}
+										disabled={extImportRunning || extImportFetching}
+										placeholder="https://moxfield.com/decks/... or archidekt.com/decks/..."
+										class="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
+									/>
+									<button
+										onclick={handleExtImportUrlFetch}
+										disabled={!extImportUrl.trim() || extImportFetching || extImportRunning}
+										class="rounded-lg bg-neutral-700 px-4 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+									>
+										{extImportFetching ? 'Fetching…' : 'Fetch'}
+									</button>
+								</div>
+								<p class="mt-2 text-xs text-neutral-500">
+									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file import as fallback.
+								</p>
+							{/if}
+						</div>
+
+						<!-- Preview -->
+						{#if extImportPreview}
+							<div class="rounded-lg border border-neutral-700 bg-neutral-800/50 p-3">
+								<div class="flex items-center gap-2 text-sm text-neutral-300">
+									<span class="font-medium">{extImportPreview.cards.length} card{extImportPreview.cards.length !== 1 ? 's' : ''} parsed</span>
+									{#if extImportPreview.listName}
+										<span class="text-neutral-500">—</span>
+										<span class="text-neutral-400">"{extImportPreview.listName}"</span>
+									{/if}
+								</div>
+								{#if extImportPreview.warnings.length > 0}
+									<div class="mt-2 space-y-1">
+										{#each extImportPreview.warnings as warning}
+											<p class="text-xs text-amber-400">{warning}</p>
+										{/each}
+									</div>
+								{/if}
+							</div>
+						{/if}
+
+						<!-- Error -->
+						{#if extImportErr}
+							<div class="rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400">
+								{extImportErr}
+							</div>
+						{/if}
+
+						<!-- Results -->
+						{#if extImportSummary}
+							<div class="rounded-lg border {extImportSummary.failed === 0 ? 'border-green-800 bg-green-950' : 'border-amber-800 bg-amber-950'} p-3">
+								<p class="text-sm {extImportSummary.failed === 0 ? 'text-green-400' : 'text-amber-400'}">
+									Imported {extImportSummary.success} card{extImportSummary.success !== 1 ? 's' : ''}{extImportSummary.failed > 0 ? `, ${extImportSummary.failed} failed` : ' successfully'}.
+								</p>
+								{#if extImportSummary.notFound.length > 0}
+									<details class="mt-2">
+										<summary class="cursor-pointer text-xs text-neutral-400">
+											{extImportSummary.notFound.length} card{extImportSummary.notFound.length !== 1 ? 's' : ''} not found on Scryfall
+										</summary>
+										<ul class="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-xs text-neutral-500">
+											{#each extImportSummary.notFound as name}
+												<li>{name}</li>
+											{/each}
+										</ul>
+									</details>
+								{/if}
+							</div>
+						{/if}
+
+						<!-- Import button -->
+						{#if !extImportSummary}
+							<button
+								onclick={handleExtImportRun}
+								disabled={extImportRunning || !extImportPreview || extImportPreview.cards.length === 0}
+								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+							>
+								{#if extImportRunning}
+									<svg
+										class="h-4 w-4 animate-spin"
+										xmlns="http://www.w3.org/2000/svg"
+										fill="none"
+										viewBox="0 0 24 24"
+									>
+										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+									</svg>
+									{#if extImportProgress.total > 0}
+										Importing… ({extImportProgress.current}/{extImportProgress.total} batches)
+									{:else}
+										Importing…
+									{/if}
+								{:else}
+									Import {extImportTarget === 'collection' ? 'to Collection' : 'as New List'}
+								{/if}
+							</button>
+						{/if}
+					</div>
+				{/if}
+
 				<!-- Info Note (always visible) -->
 				<div class="mt-6 rounded-lg border border-neutral-800 bg-neutral-800/50 p-4">
 					<p class="text-xs text-neutral-400">
@@ -791,6 +1232,49 @@
 						controls.
 					</p>
 				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Create New Database Confirmation -->
+{#if showCreateNewConfirm}
+	<div
+		class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		onclick={() => (showCreateNewConfirm = false)}
+		role="dialog"
+		aria-modal="true"
+		aria-label="Confirm new database"
+	>
+		<div
+			class="panel mx-4 w-full max-w-md rounded-xl p-6 shadow-2xl"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<h3 class="mb-3 text-lg font-bold text-neutral-100">Create new database?</h3>
+			<p class="mb-3 text-sm text-neutral-400">
+				This will <strong class="text-red-400">permanently delete</strong> all your current data — card lists, collection, and settings.
+			</p>
+			{#if store.linkedFileStatus !== 'none'}
+				<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
+					Your linked file "{store.linkedFileName}" will be unlinked. The file itself won't be deleted, but it will no longer sync with the app.
+				</p>
+			{/if}
+			<p class="mb-5 text-sm text-neutral-500">
+				This action cannot be undone. Make sure you have a backup if needed.
+			</p>
+			<div class="flex gap-3">
+				<button
+					onclick={() => (showCreateNewConfirm = false)}
+					class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 transition hover:bg-neutral-600"
+				>
+					Cancel
+				</button>
+				<button
+					onclick={handleCreateNew}
+					class="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-neutral-100 transition hover:bg-red-700"
+				>
+					Delete and Create New
+				</button>
 			</div>
 		</div>
 	</div>

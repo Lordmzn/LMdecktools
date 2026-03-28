@@ -9,8 +9,8 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 - **[done]** As a user, I want to check if a local database exists on launch, so that I can continue where I left off.
 - **[done]** As a user, I want to load my existing local database, so that I can access my saved collection and decks.
 - **[done]** As a user, I want to create a new empty database, so that I can start fresh without affecting any existing data.
-- **[done]** As a user, I want to download my local database as a `.yjs` file, so that I can back up my data.
-- **[planned]** As a user, I want to import a database from a `.yjs` or `.json` file, so that I can restore a backup or merge external data.
+- **[done]** As a user, I want to download a full copy of my database as a `.yjs` file from the Link File tab, so that I can manually back up my data.
+- **[done]** As a user, I want the app to automatically load my local database on return visits after I connect it, so that I don't have to click "Connect" every session.
 
 ---
 
@@ -37,9 +37,9 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 
 ---
 
-## Export
+## Export (CSV Collection Export)
 
-- **[done]** As a user, I want to select which fields to include in my export (Count, Name, Edition, Collector #, Foil, Language, Scryfall ID), so that I only export the data I need.
+- **[done]** As a user, I want to select which fields to include in my CSV export (Count, Name, Edition, Collector #, Foil, Language, Scryfall ID) from the Export tab in the DB modal, so that I only export the data I need.
 - **[done]** As a user, I want to see a live preview of my export, so that I can verify the output before downloading.
 - **[done]** As a user, I want to download my collection as a CSV file, so that I can use it in spreadsheets or other tools.
 - **[done]** As a user, I want to copy my export to the clipboard, so that I can quickly paste it somewhere.
@@ -48,8 +48,8 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 
 ## Image Caching
 
-- **[planned]** As a user, I want card images to be cached in my browser after their first load, so that they display instantly on repeat visits without fetching from Scryfall again.
-- **[planned]** As a user, I want to see how much storage my image cache uses and be able to clear it, so that I can reclaim browser storage when needed.
+- **[done]** As a user, I want card images to be cached in my browser after their first load, so that they display instantly on repeat visits without fetching from Scryfall again.
+- **[done]** As a user, I want to see how much storage my image cache uses and be able to clear it, so that I can reclaim browser storage when needed.
 
 ---
 
@@ -82,17 +82,18 @@ Status legend: **[done]** = implemented | **[planned]** = not yet implemented
 
 ## File-Based Sync
 
-- **[planned]** As a user, I want to link a file on my local filesystem via the OS file picker (`showSaveFilePicker`), so that the app has a designated location to persist my data automatically.
-- **[planned]** As a user, I want every change I make (adding a card, editing a quantity, updating a list) to be saved silently to the linked file, so that my data is always up to date without any manual action.
-- **[planned]** As a user, I want the app to request write permission for the linked file once per browser session (not on every change), so that I am not interrupted by repeated permission dialogs.
-- **[planned]** As a user, I want to see the linked file's name, path, and the time of the last successful save displayed in the DB modal, so that I always know the current sync status.
+- **[done]** As a user, I want to link a file on my local filesystem via the OS file picker (`showSaveFilePicker`), so that the app has a designated location to persist my data automatically.
+- **[done]** As a user, I want every change I make (adding a card, editing a quantity, updating a list) to be saved silently to the linked file, so that my data is always up to date without any manual action.
+- **[done]** As a user, I want the app to request write permission for the linked file once per browser session (not on every change), so that I am not interrupted by repeated permission dialogs.
+- **[done]** As a user, I want to see the linked file's name, path, and the time of the last successful save displayed in the DB modal, so that I always know the current sync status.
 - **[planned]** As a user, I want a "Save Now" button in the DB modal, so that I can trigger a manual save whenever I want without waiting for the next automatic write.
-- **[planned]** As a user, I want to unlink the current file, so that auto-save stops and I return to browser-only storage without deleting any of my data.
-- **[planned]** As a user, I want to change the linked file (re-link to a different location), so that I can move my data file without losing the auto-save connection.
-- **[planned]** As a user, I want the app to detect when the linked file has been changed externally (e.g., synced from another device) and show a toast notification with "Reload" and "Ignore" options, so that I can pull in changes made elsewhere without risk of data loss.
-- **[planned]** As a user, I want to see a clear error state in the DB modal when the linked file can no longer be found (e.g., it was moved or deleted), so that I understand what happened and can unlink or re-link.
-- **[planned]** As a user, I want to see a clear error state when a write to the linked file fails mid-session (e.g., disk full, permissions revoked), so that I know my last change may not have been persisted and can act accordingly.
-- **[planned]** As a user, I want to see a note in the DB modal that file linking requires a compatible browser (Chrome 86+, Edge 86+, Safari 15.2+) and is not available in Firefox, so that I understand why the feature may be absent in my browser.
+- **[done]** As a user, I want to unlink the current file, so that auto-save stops and I return to browser-only storage without deleting any of my data.
+- **[done]** As a user, I want to change the linked file (re-link to a different location), so that I can move my data file without losing the auto-save connection.
+- **[done]** As a user, I want the app to detect when the linked file has been changed externally (e.g., synced from another device) and show a toast notification with "Reload" and "Ignore" options, so that I can pull in changes made elsewhere without risk of data loss.
+- **[done]** As a user, I want to see a clear error state in the DB modal when the linked file can no longer be found (e.g., it was moved or deleted), so that I understand what happened and can unlink or re-link.
+- **[done]** As a user, I want to see a clear error state when a write to the linked file fails mid-session (e.g., disk full, permissions revoked), so that I know my last change may not have been persisted and can act accordingly.
+- **[done]** As a user, I want to see a note in the DB modal that file linking requires a compatible browser (Chrome 86+, Edge 86+, Safari 15.2+) and is not available in Firefox, so that I understand why the feature may be absent in my browser.
+- **[done]** As a user on Firefox (no File System Access API), I want to restore my database from a previously downloaded `.yjs` file via the Link File tab, so that I can recover from data loss even without auto-save support.
 
 ---
 

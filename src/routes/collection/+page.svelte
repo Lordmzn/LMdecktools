@@ -1,6 +1,5 @@
 <script lang="ts">
 	import NotificationToast from '$lib/components/NotificationToast.svelte';
-	import ExportModal from '$lib/components/ExportModal.svelte';
 	import SearchBar from '$lib/components/SearchBar.svelte';
 	import SearchResults from '$lib/components/SearchResults.svelte';
 	import CollectionCard from './CollectionCard.svelte';
@@ -18,9 +17,11 @@
 	let showNotification = $state(false);
 	let notificationMessage = $state('');
 	let showSearchModal = $state(false);
-	let showImportExport = $state(false);
 	let filterText = $state('');
 	let sortBy = $state('name'); // name, quantity, set
+	const PAGE_SIZE = 50;
+	let visibleCount = $state(PAGE_SIZE);
+	let sentinelEl = $state<HTMLDivElement | null>(null);
 
 	// Filtered and sorted collection
 	let filteredCollection = $derived(
@@ -40,6 +41,31 @@
 					})
 			: []
 	);
+
+	let visibleCollection = $derived(filteredCollection.slice(0, visibleCount));
+	let hasMore = $derived(visibleCount < filteredCollection.length);
+
+	// Reset visible count when filter/sort changes
+	$effect(() => {
+		filterText;
+		sortBy;
+		visibleCount = PAGE_SIZE;
+	});
+
+	// Infinite scroll via IntersectionObserver
+	$effect(() => {
+		if (!sentinelEl) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && hasMore) {
+					visibleCount += PAGE_SIZE;
+				}
+			},
+			{ rootMargin: '200px' }
+		);
+		observer.observe(sentinelEl);
+		return () => observer.disconnect();
+	});
 
 	// Query Scryfall API
 	async function queryScryfall(querystring: string) {
@@ -111,11 +137,6 @@
 		}
 	}
 
-	// Export collection
-	function handleExportCollection() {
-		showImportExport = true;
-	}
-
 	// Show notification
 	function notify(message: string, _type = 'success') {
 		notificationMessage = message;
@@ -127,7 +148,6 @@
 </script>
 
 <NotificationToast bind:show={showNotification} message={notificationMessage} />
-<ExportModal bind:show={showImportExport} />
 
 <!-- Search Modal -->
 {#if showSearchModal}
@@ -207,7 +227,7 @@
 				<button
 					onclick={() => (showSearchModal = true)}
 					disabled={store.dbMode === 'none'}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600"
+					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600"
 					class:disabled={store.dbMode === 'none'}
 				>
 					<svg
@@ -225,45 +245,12 @@
 					Add Cards
 				</button>
 
-				<button
-					onclick={handleExportCollection}
-					disabled={!store.dbLoaded}
-					class="flex items-center gap-2 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-200 transition hover:bg-neutral-700"
-					class:disabled={!store.dbLoaded}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="20"
-						height="20"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
-						stroke-linecap="round"
-						stroke-linejoin="round"
-					>
-						<g transform="scale(0.6)" transform-origin="center">
-							<circle cx="12" cy="12" r="10" />
-							<path d="M12 2a15.3 15.3 0 0 1 0 20 15.3 15.3 0 0 1 0-20" />
-							<line x1="2" y1="12" x2="22" y2="12" />
-						</g>
-
-						<g stroke-width="2.2">
-							<path d="M15 3h6v6" />
-							<path d="M21 3l-6.5 6.5" />
-
-							<path d="M9 21H3v-6" />
-							<path d="M3 21l6.5-6.5" />
-						</g>
-					</svg>
-					Export
-				</button>
 			</div>
 		</div>
 
 		{#if filteredCollection.length > 0}
 			<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-				{#each filteredCollection as card (card.id)}
+				{#each visibleCollection as card (card.id)}
 					<CollectionCard
 						{card}
 						onAdd={handleAddOne}
@@ -272,6 +259,13 @@
 					/>
 				{/each}
 			</div>
+			{#if hasMore}
+				<div bind:this={sentinelEl} class="flex justify-center py-8">
+					<p class="text-sm text-neutral-500">
+						Showing {visibleCount} of {filteredCollection.length} cards...
+					</p>
+				</div>
+			{/if}
 		{:else if filterText !== ''}
 			<div class="py-12 text-center text-neutral-400">
 				<p>No cards match your filter</p>
