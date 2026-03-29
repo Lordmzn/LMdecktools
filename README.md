@@ -20,30 +20,29 @@ Features that conflict with these principles (cloud sync, social feeds, price tr
 
 ## Key Features
 
-### Deck Building
-
-- Search the full MTG card database via Scryfall
-- Create, edit, and manage multiple decks
-- Import/export decks in standard text format (`4 Lightning Bolt`)
-
 ### Collection Tracking
 
-- Log owned cards with quantities
+- Search the full MTG card database via Scryfall
+- Log owned cards with quantities; increment, decrement, or set exact counts
 - Filter and sort by name, set, or quantity
-- Import/export your full collection for backup
-
-### Deck Completion Analysis
-
-- Automatic cross-reference between decks and collection
-- Visual indicators: cards you own, cards you need, completion status
 - Search results show ownership badges so you know what you already have
+- Export your collection as CSV with selectable fields, or copy to clipboard
+
+### Card Lists
+
+- Create, rename, and manage multiple named card lists
+- Add cards from Scryfall search results; import/export in standard text format (`4 Lightning Bolt`)
+- Per-card owned/missing indicators and an overall completion banner
+- Toggle card matching (generic vs. exact printing) and language matching (any vs. strict)
+- Compare two card lists side-by-side to spot overlap and differences
+- "Add all to collection" to bulk-add every card in a list
 
 ### Data Management
 
 - All data stored locally in IndexedDB — no server, no account
 - Card images cached via the browser Cache API — instant repeat loads, no Scryfall round-trip
 - Link a file on your local filesystem (Chrome/Edge/Safari 15.2+): every change writes silently to your chosen location — place it in a cloud-synced folder for "Bring Your Own Cloud" multi-device access, with no backend and no data leaving your machine
-- Export/import decks and collections as text or JSON
+- Export/import card lists and collections as text, CSV, or JSON
 - Merge imports with existing data or replace entirely
 
 ## Tech Stack
@@ -96,8 +95,9 @@ src/
   tests/
     setup.ts        # Test setup (fake-indexeddb, jest-dom)
   routes/
-    +page.svelte    # Home / deck builder
+    +page.svelte    # Home / landing page
     collection/     # Collection management page
+    card-lists/     # Card list manager and comparison
   app.css           # Global styles
 tests/
   e2e/              # Playwright E2E tests
@@ -108,10 +108,12 @@ messages/
 
 ## Routes
 
-| Path          | Description                |
-| ------------- | -------------------------- |
-| `/`           | Home page and deck builder |
-| `/collection` | Collection management      |
+| Path                  | Description                          |
+| --------------------- | ------------------------------------ |
+| `/`                   | Home / landing page                  |
+| `/collection`         | Collection management                |
+| `/card-lists`         | Card list manager                    |
+| `/card-lists/compare` | Side-by-side card list comparison    |
 
 ## Built With
 
