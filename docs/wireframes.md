@@ -12,7 +12,8 @@
 |                                                                  |
 +------------------------------------------------------------------+
 |  FOOTER                                                          |
-|  (c) 2025 Lord M'zn              [About Us] [Contribute] [Contact]|
+|  (c) 2025 Lord M'zn       [GitHub] [Contribute]                  |
+|                            ♥ Support: [GitHub Sponsors] [Ko-fi]   |
 +------------------------------------------------------------------+
 ```
 

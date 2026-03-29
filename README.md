@@ -123,6 +123,13 @@ Developed with substantial assistance from [Claude Code](https://claude.ai/claud
 
 Active development is tracked on the [GitHub Project board](https://github.com/users/Lordmzn/projects/2).
 
+## Support
+
+LM Deck Tools is free and open-source. If you find it useful, consider supporting development:
+
+- [GitHub Sponsors](https://github.com/sponsors/Lordmzn) — zero fees, directly supports the developer
+- [Ko-fi](https://ko-fi.com/lordmzn) — one-time or recurring support
+
 ## License
 
 This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).

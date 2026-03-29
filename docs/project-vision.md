@@ -80,8 +80,8 @@ The Zero Backend principle rules out any business model that depends on fixed in
 **Affiliate Marketing**
 Integrate with the TCGplayer Affiliate Program by surfacing "Buy Missing Cards" links on deck lists and the missing-cards view. The app already knows which cards a user needs to complete a list; a contextual affiliate link turns that insight into commission revenue with zero extra friction. This is the same model used by Moxfield and other established competitors.
 
-**Community Support (Patreon / Donations)**
-WotC's Fan Content Policy generally prohibits charging for access to fan tools that use their IP. A Patreon or donation model sidesteps this by letting users become patrons who fund ongoing development rather than paying for content. This also strengthens the community relationship and keeps the tool in the "hobby project" category from a legal standpoint.
+**Community Support (GitHub Sponsors / Ko-fi)**
+WotC's Fan Content Policy generally prohibits charging for access to fan tools that use their IP. A sponsorship model sidesteps this by letting users fund the developer's general work rather than paying for MTG-specific features. The chosen channels are [GitHub Sponsors](https://github.com/sponsors/Lordmzn) (primary — zero fees, developer-native) and [Ko-fi](https://ko-fi.com/lordmzn) (secondary — for supporters outside the GitHub ecosystem). The MTG project itself remains entirely free and open-source. This framing strengthens the community relationship and keeps the tool in the "hobby project" category from a legal standpoint.
 
 **Privacy-First Advertising**
 If display advertising is added (e.g., Google AdSense), ads must be non-intrusive and must not introduce any third-party tracking that conflicts with the Absolute Privacy principle. Passive, contextual ad revenue is a standard route for niche tools and does not constitute "commercial activity" under most fan-content interpretations.
