@@ -1,5 +1,7 @@
 # LM Deck Tools
 
+[![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
+
 A Magic: The Gathering deck builder and collection manager. Build decks, track your card collection, and see at a glance which cards you still need.
 
 ## Objective
@@ -121,4 +123,4 @@ Active development is tracked on the [GitHub Project board](https://github.com/u
 
 ## License
 
-Private project.
+This project is licensed under the [GNU Affero General Public License v3.0](LICENSE).
