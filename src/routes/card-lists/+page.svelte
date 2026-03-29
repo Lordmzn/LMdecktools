@@ -34,6 +34,9 @@
 	let exportText = $state('');
 	let filterText = $state('');
 	let sortBy = $state('name');
+	const PAGE_SIZE = 50;
+	let visibleCount = $state(PAGE_SIZE);
+	let sentinelEl = $state<HTMLDivElement | null>(null);
 
 	async function queryScryfall(querystring: string) {
 		if (!querystring.trim()) return;
@@ -201,8 +204,26 @@
 	let ownershipCheck = $derived(store.listOwnershipCheck);
 	let missingCount = $derived(ownershipCheck.cards.filter((r) => !r.owned).length);
 
+	let dedupedCards = $derived.by(() => {
+		const seen = new Map<string, { card: any; owned: boolean }>();
+		for (const entry of ownershipCheck.cards) {
+			const existing = seen.get(entry.card.id);
+			if (existing) {
+				// Merge duplicate: sum quantities, owned only if both owned
+				existing.card = {
+					...existing.card,
+					LM_quantity: existing.card.LM_quantity + entry.card.LM_quantity
+				};
+				existing.owned = existing.owned && entry.owned;
+			} else {
+				seen.set(entry.card.id, { card: { ...entry.card }, owned: entry.owned });
+			}
+		}
+		return [...seen.values()];
+	});
+
 	let filteredListCards = $derived(
-		ownershipCheck.cards
+		dedupedCards
 			.filter(
 				({ card }) =>
 					filterText === '' ||
@@ -216,6 +237,31 @@
 				return 0;
 			})
 	);
+
+	let visibleListCards = $derived(filteredListCards.slice(0, visibleCount));
+	let hasMore = $derived(visibleCount < filteredListCards.length);
+
+	// Reset visible count when filter/sort changes
+	$effect(() => {
+		filterText;
+		sortBy;
+		visibleCount = PAGE_SIZE;
+	});
+
+	// Infinite scroll via IntersectionObserver
+	$effect(() => {
+		if (!sentinelEl) return;
+		const observer = new IntersectionObserver(
+			(entries) => {
+				if (entries[0].isIntersecting && hasMore) {
+					visibleCount += PAGE_SIZE;
+				}
+			},
+			{ rootMargin: '200px' }
+		);
+		observer.observe(sentinelEl);
+		return () => observer.disconnect();
+	});
 </script>
 
 <NotificationToast bind:show={showNotification} message={notificationMessage} />
@@ -299,7 +345,7 @@
 				<button
 					onclick={handleImport}
 					disabled={isImporting}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-75"
+					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-75"
 				>
 					{#if isImporting}
 						<svg
@@ -355,7 +401,7 @@
 				</button>
 				<button
 					onclick={handleDeleteList}
-					class="rounded-lg bg-red-600 px-4 py-2 text-white transition hover:bg-red-700"
+					class="rounded-lg bg-red-600 px-4 py-2 text-neutral-100 transition hover:bg-red-700"
 				>
 					Delete
 				</button>
@@ -390,7 +436,7 @@
 				</button>
 				<button
 					onclick={() => (showExportModal = false)}
-					class="rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600"
+					class="rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600"
 				>
 					Close
 				</button>
@@ -424,7 +470,7 @@
 					disabled={store.dbMode === 'none' ||
 						!store.currentCardList ||
 						store.savedCardLists.length <= 1}
-					class="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+					class="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-neutral-100 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
 					title="Delete this list"
 				>
 					<svg
@@ -471,7 +517,7 @@
 				<button
 					onclick={handleCreateList}
 					disabled={store.dbMode === 'none'}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -573,7 +619,7 @@
 				<button
 					onclick={() => (showAddCardsModal = true)}
 					disabled={store.dbMode === 'none' || !store.currentCardList}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -616,7 +662,7 @@
 						disabled={store.dbMode === 'none'}
 						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
 							.currentCardList.cardMatching === 'generic'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Generic
@@ -626,7 +672,7 @@
 						disabled={store.dbMode === 'none'}
 						class="-ml-px rounded-r-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
 							.currentCardList.cardMatching === 'specific'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Specific
@@ -639,7 +685,7 @@
 						disabled={store.dbMode === 'none'}
 						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
 							.currentCardList.languageMatching === 'any'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Any
@@ -649,7 +695,7 @@
 						disabled={store.dbMode === 'none'}
 						class="-ml-px rounded-r-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
 							.currentCardList.languageMatching === 'strict'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Strict
@@ -702,7 +748,7 @@
 				</div>
 			{:else}
 				<div class="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-					{#each filteredListCards as { card, owned } (card.id)}
+					{#each visibleListCards as { card, owned } (card.id)}
 						<CardListCard
 							{card}
 							{owned}
@@ -714,6 +760,13 @@
 						/>
 					{/each}
 				</div>
+				{#if hasMore}
+					<div bind:this={sentinelEl} class="flex justify-center py-8">
+						<p class="text-sm text-neutral-500">
+							Showing {visibleCount} of {filteredListCards.length} cards...
+						</p>
+					</div>
+				{/if}
 			{/if}
 		</div>
 	</div>
