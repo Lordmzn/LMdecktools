@@ -39,7 +39,7 @@
 				fill="rgba(0,0,0,0.4)"
 			/>
 		</svg>
-		<span class="font-bold text-white">LM Deck Tools</span>
+		<span class="font-bold text-neutral-100">LM Deck Tools</span>
 	</a>
 
 	<a

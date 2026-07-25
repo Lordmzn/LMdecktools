@@ -1,7 +1,7 @@
 <div class="mx-auto max-w-7xl p-4">
 	<!-- Hero Section -->
 	<div class="mb-6 p-12 text-center">
-		<h1 class="mb-4 text-5xl font-bold text-white">Welcome to LM Deck Tools</h1>
+		<h1 class="mb-4 text-5xl font-bold text-neutral-100">Welcome to LM Deck Tools</h1>
 		<p class="mb-8 text-xl text-neutral-400">
 			Manage your Magic: The Gathering card lists and collection
 		</p>
@@ -28,7 +28,7 @@
 
 			<a
 				href="/collection"
-				class="flex items-center gap-2 rounded-full bg-neutral-800 px-8 py-4 text-lg font-semibold text-neutral-200 transition hover:bg-neutral-700"
+				class="flex items-center gap-2 rounded-full border border-orange-500/40 bg-transparent px-8 py-4 text-lg font-semibold text-neutral-200 transition hover:bg-orange-500/10"
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -51,7 +51,7 @@
 	<div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
 		<!-- Feature 1 -->
 		<div class="panel rounded-xl p-6">
-			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-800">
+			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="24"
@@ -75,7 +75,7 @@
 
 		<!-- Feature 2 -->
 		<div class="panel rounded-xl p-6">
-			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-800">
+			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="24"
@@ -98,7 +98,7 @@
 
 		<!-- Feature 3 -->
 		<div class="panel rounded-xl p-6">
-			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-neutral-800">
+			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="24"
@@ -126,10 +126,10 @@
 	<div class="panel rounded-xl p-8">
 		<h2 class="mb-6 text-center text-2xl font-bold text-orange-400">Getting Started</h2>
 
-		<div class="grid grid-cols-1 gap-6 md:grid-cols-2">
+		<div class="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
 			<div class="flex items-start gap-4">
 				<div
-					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 font-bold text-white"
+					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-orange-500 bg-orange-500/15 font-bold text-orange-400"
 				>
 					1
 				</div>
@@ -144,7 +144,7 @@
 
 			<div class="flex items-start gap-4">
 				<div
-					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 font-bold text-white"
+					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-orange-500 bg-orange-500/15 font-bold text-orange-400"
 				>
 					2
 				</div>
@@ -159,7 +159,7 @@
 
 			<div class="flex items-start gap-4">
 				<div
-					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 font-bold text-white"
+					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-orange-500 bg-orange-500/15 font-bold text-orange-400"
 				>
 					3
 				</div>
@@ -173,7 +173,7 @@
 
 			<div class="flex items-start gap-4">
 				<div
-					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 font-bold text-white"
+					class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-orange-500 bg-orange-500/15 font-bold text-orange-400"
 				>
 					4
 				</div>

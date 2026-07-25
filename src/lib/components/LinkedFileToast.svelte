@@ -21,7 +21,7 @@
 			<div class="flex gap-2">
 				<button
 					onclick={onmerge}
-					class="flex-1 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+					class="flex-1 rounded-lg bg-amber-600 px-3 py-1.5 text-sm font-medium text-neutral-100 transition-colors hover:bg-amber-700"
 				>
 					Merge
 				</button>

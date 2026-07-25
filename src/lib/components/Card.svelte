@@ -1,7 +1,16 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
+	import { getImageUrl } from '$lib/image-cache';
 
 	let { card, add = () => null, showOwned = true, target = 'collection' } = $props();
+	const isDFC = $derived(card.card_faces?.length > 1);
+	let flipped = $state(false);
+	const faceIndex = $derived(flipped ? 1 : 0);
+	const imageUrl = $derived(
+		card.image_uris?.normal
+			?? card.card_faces?.[faceIndex]?.image_uris?.normal
+			?? card.card_faces?.[0]?.image_uris?.normal
+	);
 	let isAdding = $state(false);
 	let ownedQuantity = $derived(store.isCardOwned(card.id));
 
@@ -19,19 +28,33 @@
 >
 	<!-- Card Image -->
 	<div class="relative w-full overflow-hidden rounded-lg shadow-lg">
-		<img
-			src={card.image_uris ? card.image_uris.normal : card.card_faces[0].image_uris.normal}
-			alt={card.name}
-			class="h-auto w-full"
-		/>
+		{#await getImageUrl(imageUrl) then cachedUrl}
+			<img src={cachedUrl} alt={card.name} class="h-auto w-full" />
+		{/await}
 
 		<!-- Owned Badge -->
 		{#if showOwned && ownedQuantity > 0}
 			<div
-				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-white shadow-lg"
+				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-neutral-100 shadow-lg"
 			>
 				Own: {ownedQuantity}
 			</div>
+		{/if}
+
+		<!-- Flip Button for DFCs -->
+		{#if isDFC}
+			<button
+				onclick={() => (flipped = !flipped)}
+				class="absolute top-2 left-2 rounded-full bg-neutral-800/80 p-1.5 text-neutral-100 shadow-lg transition hover:bg-neutral-700"
+				title="Flip card"
+			>
+				<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+					<path d="M3 3v5h5" />
+					<path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16" />
+					<path d="M16 16h5v5" />
+				</svg>
+			</button>
 		{/if}
 
 		<!-- Overlay on Hover -->
