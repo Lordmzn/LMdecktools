@@ -51,7 +51,7 @@
 <div class="flex flex-col rounded-xl border {colorClasses.border} {colorClasses.bg} p-4">
 	<h3 class="mb-3 text-sm font-semibold tracking-wide uppercase {colorClasses.text}">
 		{title}
-		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-white">
+		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-neutral-100">
 			{cards.length}
 		</span>
 	</h3>
@@ -61,13 +61,36 @@
 	{:else}
 		<div class="space-y-2">
 			{#each cards as { card, quantityA, quantityB } (card.id + card.name)}
+				{@const isDFC = card.card_faces?.length > 1}
 				<div class="flex items-center gap-3 rounded-lg bg-black/30 p-2">
 					<!-- Thumbnail -->
-					<img
-						src={card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small}
-						alt={card.name}
-						class="h-12 w-9 rounded object-cover"
-					/>
+					{#if isDFC}
+						<button
+							onclick={(e: MouseEvent) => {
+								const img = (e.currentTarget as HTMLElement).querySelector('img');
+								if (!img) return;
+								const isFlipped = img.dataset.flipped === 'true';
+								const newFace = isFlipped ? 0 : 1;
+								img.src = card.card_faces[newFace].image_uris.small;
+								img.dataset.flipped = String(!isFlipped);
+							}}
+							class="shrink-0 cursor-pointer"
+							title="Flip card"
+						>
+							<img
+								src={card.card_faces[0].image_uris.small}
+								alt={card.name}
+								data-flipped="false"
+								class="h-12 w-9 rounded object-cover"
+							/>
+						</button>
+					{:else}
+						<img
+							src={card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small}
+							alt={card.name}
+							class="h-12 w-9 rounded object-cover"
+						/>
+					{/if}
 
 					<!-- Name -->
 					<span class="min-w-0 flex-1 truncate text-sm text-neutral-200">{card.name}</span>
@@ -81,7 +104,7 @@
 						</span>
 					{:else}
 						<span
-							class="rounded-full {colorClasses.badge} min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-bold text-white"
+							class="rounded-full {colorClasses.badge} min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-bold text-neutral-100"
 						>
 							{quantityA || quantityB}
 						</span>

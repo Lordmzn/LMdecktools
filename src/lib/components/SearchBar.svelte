@@ -29,7 +29,7 @@
 		/>
 		<button
 			onclick={handleSearch}
-			class="rounded-lg bg-orange-500 px-6 py-2 text-white transition hover:bg-orange-600 disabled:opacity-50"
+			class="rounded-lg bg-orange-500 px-6 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:opacity-50"
 			disabled={isSearching}
 		>
 			{isSearching ? 'Searching...' : 'Search'}

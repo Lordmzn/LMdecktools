@@ -54,7 +54,7 @@
 				</button>
 				<button
 					onclick={() => (showExportModal = false)}
-					class="rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600"
+					class="rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600"
 				>
 					Close
 				</button>
@@ -70,7 +70,7 @@
 			<p class="mb-4 text-neutral-400">You need at least two card lists to compare.</p>
 			<a
 				href="/card-lists"
-				class="inline-block rounded-lg bg-orange-500 px-4 py-2 text-white transition hover:bg-orange-600"
+				class="inline-block rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600"
 			>
 				Back to Card Lists
 			</a>
@@ -133,7 +133,7 @@
 						onclick={() => (matching = 'generic')}
 						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition {matching ===
 						'generic'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Generic
@@ -142,7 +142,7 @@
 						onclick={() => (matching = 'specific')}
 						class="-ml-px rounded-r-lg border border-neutral-700 px-3 py-1 transition {matching ===
 						'specific'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Specific
@@ -154,7 +154,7 @@
 						onclick={() => (languageMatching = 'any')}
 						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition {languageMatching ===
 						'any'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Any
@@ -163,7 +163,7 @@
 						onclick={() => (languageMatching = 'strict')}
 						class="-ml-px rounded-r-lg border border-neutral-700 px-3 py-1 transition {languageMatching ===
 						'strict'
-							? 'bg-orange-500 text-white'
+							? 'bg-orange-500 text-neutral-100'
 							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
 					>
 						Strict
@@ -219,7 +219,7 @@
 				<button
 					onclick={() => (activeTab = 'onlyA')}
 					class="flex-1 rounded-l-lg px-3 py-2 transition {activeTab === 'onlyA'
-						? 'bg-amber-500 text-white'
+						? 'bg-amber-500 text-neutral-100'
 						: 'text-neutral-300 hover:bg-neutral-700'}"
 				>
 					Only A ({result.onlyInA.length})
@@ -227,7 +227,7 @@
 				<button
 					onclick={() => (activeTab = 'both')}
 					class="flex-1 border-x border-neutral-700 px-3 py-2 transition {activeTab === 'both'
-						? 'bg-green-500 text-white'
+						? 'bg-green-500 text-neutral-100'
 						: 'text-neutral-300 hover:bg-neutral-700'}"
 				>
 					Both ({result.inBoth.length})
@@ -235,7 +235,7 @@
 				<button
 					onclick={() => (activeTab = 'onlyB')}
 					class="flex-1 rounded-r-lg px-3 py-2 transition {activeTab === 'onlyB'
-						? 'bg-blue-500 text-white'
+						? 'bg-blue-500 text-neutral-100'
 						: 'text-neutral-300 hover:bg-neutral-700'}"
 				>
 					Only B ({result.onlyInB.length})

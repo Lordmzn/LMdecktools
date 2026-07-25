@@ -18,7 +18,7 @@
 		<!-- DB Status Button -->
 		<button
 			onclick={() => (showStartupModal = !showStartupModal)}
-			class="relative inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-white transition-all duration-200 {store.dbMode ===
+			class="relative inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-neutral-100 transition-all duration-200 {store.dbMode ===
 			'active'
 				? 'bg-orange-500 hover:bg-orange-600'
 				: store.dbMode === 'peek'

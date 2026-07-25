@@ -1,16 +1,21 @@
 <script lang="ts">
+	import { onMount } from 'svelte';
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import LinkedFileToast from '$lib/components/LinkedFileToast.svelte';
 	import { i18n } from '$lib/i18n';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
-	import { store, mergeFromFile } from '$lib/store.svelte';
+	import { store, mergeFromFile, tryAutoLoadDB } from '$lib/store.svelte';
 	import '../app.css';
 	import type { LayoutProps } from './$types';
 
 	let { children }: LayoutProps = $props();
 
 	let showLinkedFileToast = $state(false);
+
+	onMount(() => {
+		tryAutoLoadDB();
+	});
 
 	$effect(() => {
 		if (store.linkedFileExternalChange) {

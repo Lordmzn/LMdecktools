@@ -684,6 +684,53 @@ async function fetchCardsByName(
 	return { found, notFound };
 }
 
+/**
+ * Batch-fetch cards by Scryfall ID using /cards/collection endpoint.
+ * Returns a Map keyed by card ID.
+ */
+async function fetchCardsByIds(
+	ids: string[],
+	onProgress?: (fetched: number, total: number) => void
+): Promise<{ found: Map<string, any>; notFound: string[] }> {
+	const uniqueIds = [...new Set(ids)];
+	const found = new Map<string, any>();
+	const notFound: string[] = [];
+	const totalBatches = Math.ceil(uniqueIds.length / SCRYFALL_BATCH_SIZE);
+	let completedBatches = 0;
+
+	for (let i = 0; i < uniqueIds.length; i += SCRYFALL_BATCH_SIZE) {
+		const chunk = uniqueIds.slice(i, i + SCRYFALL_BATCH_SIZE);
+		const identifiers = chunk.map((id) => ({ id }));
+
+		try {
+			const response = await fetch(SCRYFALL_COLLECTION_URL, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ identifiers })
+			});
+
+			if (response.ok) {
+				const result = await response.json();
+				for (const card of result.data ?? []) {
+					found.set(card.id, card);
+				}
+				for (const entry of result.not_found ?? []) {
+					notFound.push(entry.id);
+				}
+			} else {
+				notFound.push(...chunk);
+			}
+		} catch {
+			notFound.push(...chunk);
+		}
+
+		completedBatches++;
+		onProgress?.(completedBatches, totalBatches);
+	}
+
+	return { found, notFound };
+}
+
 // ==================== COLLECTION FUNCTIONS ====================
 
 /**
@@ -847,6 +894,133 @@ export async function importCollectionFromText(
 
 	triggerAutoSave();
 	return results;
+}
+
+/**
+ * Resolve a ParsedCard to Scryfall card data.
+ * Uses the Scryfall ID when available (exact printing), falls back to name lookup.
+ * Returns the card keyed by scryfallId or lowercase name for consistent lookup.
+ */
+async function fetchParsedCards(
+	cards: { quantity: number; name: string; scryfallId?: string }[],
+	onProgress?: (current: number, total: number) => void
+): Promise<{ byId: Map<string, any>; byName: Map<string, any>; notFound: string[] }> {
+	const uniqueIds = [...new Set(cards.filter((c) => c.scryfallId).map((c) => c.scryfallId!))];
+	const namesWithoutId = cards.filter((c) => !c.scryfallId);
+	const uniqueNames = [...new Set(namesWithoutId.map((c) => c.name.toLowerCase()))].map(
+		(lower) => namesWithoutId.find((c) => c.name.toLowerCase() === lower)!.name
+	);
+
+	const idBatches = uniqueIds.length > 0 ? Math.ceil(uniqueIds.length / SCRYFALL_BATCH_SIZE) : 0;
+	const nameBatches =
+		uniqueNames.length > 0 ? Math.ceil(uniqueNames.length / SCRYFALL_BATCH_SIZE) : 0;
+	const totalBatches = idBatches + nameBatches;
+	let completedBatches = 0;
+
+	const reportProgress = () => {
+		completedBatches++;
+		onProgress?.(completedBatches, totalBatches);
+	};
+
+	const byId = new Map<string, any>();
+	const byName = new Map<string, any>();
+	const notFound: string[] = [];
+
+	if (uniqueIds.length > 0) {
+		const result = await fetchCardsByIds(uniqueIds, reportProgress);
+		for (const [id, card] of result.found) byId.set(id, card);
+		notFound.push(...result.notFound);
+	}
+
+	if (uniqueNames.length > 0) {
+		const result = await fetchCardsByName(uniqueNames, reportProgress);
+		for (const [name, card] of result.found) byName.set(name, card);
+		notFound.push(...result.notFound);
+	}
+
+	return { byId, byName, notFound };
+}
+
+/** Look up a card from the fetch results. */
+function resolveCard(
+	entry: { name: string; scryfallId?: string },
+	byId: Map<string, any>,
+	byName: Map<string, any>
+): any | undefined {
+	if (entry.scryfallId) return byId.get(entry.scryfallId);
+	return byName.get(entry.name.toLowerCase());
+}
+
+/**
+ * Import pre-parsed cards into the collection.
+ * Uses Scryfall IDs when available (e.g. TopDecked CSV), falls back to name lookup.
+ */
+export async function importCardsToCollection(
+	cards: { quantity: number; name: string; scryfallId?: string }[],
+	onProgress?: (current: number, total: number) => void
+): Promise<{ success: number; failed: number; notFound: string[] }> {
+	assertWritable();
+
+	const { byId, byName, notFound } = await fetchParsedCards(cards, onProgress);
+
+	let success = 0;
+	let failed = 0;
+	for (const entry of cards) {
+		const card = resolveCard(entry, byId, byName);
+		if (card) {
+			try {
+				await updateCollectionQuantity(card, entry.quantity);
+				success++;
+			} catch {
+				failed++;
+			}
+		} else {
+			failed++;
+		}
+	}
+
+	triggerAutoSave();
+	return { success, failed, notFound };
+}
+
+/**
+ * Import pre-parsed cards as a new card list.
+ * Creates a new list rather than overwriting the current one.
+ * Uses Scryfall IDs when available, falls back to name lookup.
+ */
+export async function importCardsToNewList(
+	cards: { quantity: number; name: string; scryfallId?: string }[],
+	listName: string,
+	onProgress?: (current: number, total: number) => void
+): Promise<{ success: number; failed: number; notFound: string[] }> {
+	assertWritable();
+
+	const { byId, byName, notFound } = await fetchParsedCards(cards, onProgress);
+
+	const newCards: any[] = [];
+	let failed = 0;
+	for (const entry of cards) {
+		const card = resolveCard(entry, byId, byName);
+		if (card) {
+			newCards.push({
+				id: card.id,
+				name: card.name,
+				image_uris: card.image_uris,
+				card_faces: card.card_faces,
+				mana_cost: card.mana_cost,
+				type_line: card.type_line,
+				LM_quantity: entry.quantity
+			});
+		} else {
+			failed++;
+		}
+	}
+
+	// Create a new list, switch to it, then save with the imported cards
+	await createNewCardList();
+	await saveCardList(listName, newCards);
+
+	return { success: newCards.length, failed, notFound };
 }
 
 /**
@@ -1117,24 +1291,30 @@ export async function importListFromText(
 	);
 	const { found } = await fetchCardsByName(uniqueNames, onProgress);
 
-	// 3. Build card list from results
-	const newCards: any[] = [];
+	// 3. Build card list from results, merging duplicates by card id
+	const cardMap = new Map<string, any>();
 	for (const entry of parsed) {
 		const card = found.get(entry.name.toLowerCase());
 		if (card) {
-			newCards.push({
-				id: card.id,
-				name: card.name,
-				image_uris: card.image_uris,
-				card_faces: card.card_faces,
-				mana_cost: card.mana_cost,
-				type_line: card.type_line,
-				LM_quantity: entry.quantity
-			});
+			const existing = cardMap.get(card.id);
+			if (existing) {
+				existing.LM_quantity += entry.quantity;
+			} else {
+				cardMap.set(card.id, {
+					id: card.id,
+					name: card.name,
+					image_uris: card.image_uris,
+					card_faces: card.card_faces,
+					mana_cost: card.mana_cost,
+					type_line: card.type_line,
+					LM_quantity: entry.quantity
+				});
+			}
 		} else {
 			console.error(`Failed to import ${entry.name}`);
 		}
 	}
+	const newCards = [...cardMap.values()];
 
 	return saveCardList(newName, newCards);
 }

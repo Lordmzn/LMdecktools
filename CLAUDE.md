@@ -92,6 +92,7 @@ The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall ima
 Task advancement is tracked via **GitHub Issues** on [`Lordmzn/LMdecktools`](https://github.com/Lordmzn/LMdecktools) and on the [**"LM Deck Tools" GitHub Project** board](https://github.com/users/Lordmzn/projects/2). Each task maps to a GitHub issue; keep issue status current.
 
 - Before starting a task, check if an issue already exists (`gh issue list`); if not, create one with `gh issue create`
+- **Always add new issues to the project board** (`gh project item-add 2 --owner Lordmzn --url <issue-url>`)
 - Reference the issue number in commit messages (e.g. `fix: resolve silent failure (#12)`)
 - Keep issue status current: open issues are in progress or pending; close an issue when the work is merged
 - The GitHub Project board reflects issue status — update labels/milestones as needed so the board stays accurate
