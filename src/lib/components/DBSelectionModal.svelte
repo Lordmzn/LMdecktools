@@ -324,6 +324,24 @@
 	}
 </script>
 
+<!-- What the database actually holds: lists plus the collection -->
+{#snippet dbContentStats()}
+	<div class="flex justify-between">
+		<span class="font-medium">Card lists:</span>
+		<span class="font-mono" data-testid="db-stat-lists">{store.savedCardLists.length}</span>
+	</div>
+	<div class="flex justify-between">
+		<span class="font-medium">Cards in lists:</span>
+		<span class="font-mono" data-testid="db-stat-list-cards">{store.totalListCards}</span>
+	</div>
+	<div class="flex justify-between">
+		<span class="font-medium">Collection cards:</span>
+		<span class="font-mono" data-testid="db-stat-collection"
+			>{store.totalOwnedCards} ({store.uniqueOwnedCards} unique)</span
+		>
+	</div>
+{/snippet}
+
 {#if show}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300"
@@ -473,14 +491,7 @@
 										{/if}
 									</h3>
 									<div class="mb-4 space-y-2 text-sm text-neutral-400">
-										<div class="flex justify-between">
-											<span class="font-medium">Total lists:</span>
-											<span class="font-mono">{store.savedCardLists.length}</span>
-										</div>
-										<div class="flex justify-between">
-											<span class="font-medium">Total cards:</span>
-											<span class="font-mono">{store.totalCards}</span>
-										</div>
+										{@render dbContentStats()}
 									</div>
 									{#if store.dbMode === 'peek'}
 										<div
@@ -528,14 +539,7 @@
 										Local database active
 									</h3>
 									<div class="space-y-2 text-sm text-neutral-400">
-										<div class="flex justify-between">
-											<span class="font-medium">Total lists:</span>
-											<span class="font-mono">{store.savedCardLists.length}</span>
-										</div>
-										<div class="flex justify-between">
-											<span class="font-medium">Total cards:</span>
-											<span class="font-mono">{store.totalCards}</span>
-										</div>
+										{@render dbContentStats()}
 									</div>
 								</div>
 							</div>

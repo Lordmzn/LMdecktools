@@ -53,6 +53,15 @@ async function ensureDB(): Promise<IDBDatabase> {
 	return db;
 }
 
+/** Total number of physical copies in a set of cards (sum of LM_quantity). */
+export function countCards(cards: { LM_quantity: number }[]): number {
+	return cards.reduce((sum, card) => sum + card.LM_quantity, 0);
+}
+
+/** Total number of physical copies across every card list. */
+export function countCardsInLists(lists: { cards: { LM_quantity: number }[] }[]): number {
+	return lists.reduce((sum, list) => sum + countCards(list.cards), 0);
+}
 
 // ==================== STORE ====================
 export type DBMode = 'none' | 'peek' | 'active';
@@ -99,8 +108,11 @@ class Store implements StoreInterface {
 	);
 	listCards = $derived(this.currentCardList?.cards || []);
 	listNames = $derived(this.savedCardLists.map((list) => list.name));
-	totalCards = $derived(this.listCards.reduce((sum, card) => sum + card.LM_quantity, 0));
+	totalCards = $derived(countCards(this.listCards));
 	uniqueCards = $derived(this.listCards.length);
+
+	// DB-wide list stats (all lists, not just the selected one)
+	totalListCards = $derived(countCardsInLists(this.savedCardLists));
 
 	// Collection state
 	collection = $state<CollectionCard[]>([]);
@@ -203,11 +215,6 @@ export async function peekDB() {
 export async function initDB() {
 	if (store.dbMode === 'peek') {
 		store.dbMode = 'active';
-		// If loadCardLists() ran in peek mode with an empty DB, it skipped
-		// createNewCardList(). Re-run now that we have write access.
-		if (store.savedCardLists.length === 0) {
-			await createNewCardList();
-		}
 		await putMetadata(db!, 'autoLoadDB', true);
 		await initLinkedFile();
 		return;
@@ -1071,15 +1078,9 @@ export async function loadCardLists() {
 
 	store.savedCardLists = await loadAllCardLists(_db);
 
-	if (store.savedCardLists.length === 0) {
-		if (store.dbMode === 'active') {
-			// createNewCardList sets currentCardListIndex
-			await createNewCardList();
-		}
-		// in peek mode with empty DB: leave savedCardLists empty
-	} else {
-		store.currentCardListIndex = 0;
-	}
+	// A database with no lists stays with no lists — one is created lazily the
+	// first time the user adds a card (see addCardToList).
+	store.currentCardListIndex = store.savedCardLists.length === 0 ? NaN : 0;
 }
 
 /**
@@ -1114,12 +1115,14 @@ export async function saveCardList(name: string, cards: any[]) {
 
 	if (!currentListData) throw new Error('No card list selected');
 
-	const updatedList: CardList = JSON.parse(JSON.stringify({
-		...currentListData,
-		name,
-		cards,
-		updated_at: Date.now()
-	}));
+	const updatedList: CardList = JSON.parse(
+		JSON.stringify({
+			...currentListData,
+			name,
+			cards,
+			updated_at: Date.now()
+		})
+	);
 
 	await dbSaveCardList(_db, updatedList);
 
@@ -1139,18 +1142,19 @@ export async function deleteCardList() {
 	const _db = await ensureDB();
 
 	const index = store.currentCardListIndex;
+	const listToDelete = store.savedCardLists[index];
 
-	if (store.savedCardLists.length <= 1) {
-		throw new Error('Cannot delete the last card list');
+	if (!listToDelete) {
+		throw new Error('No card list selected');
 	}
 
-	const listToDelete = store.savedCardLists[index];
 	if (listToDelete.id) {
 		await dbDeleteCardList(_db, listToDelete.id);
 	}
 
-	store.savedCardLists = store.savedCardLists.filter((_, i) => i !== index);
-	store.currentCardListIndex = Math.max(0, index - 1);
+	const remaining = store.savedCardLists.filter((_, i) => i !== index);
+	store.savedCardLists = remaining;
+	store.currentCardListIndex = remaining.length === 0 ? NaN : Math.max(0, index - 1);
 	triggerAutoSave();
 }
 
@@ -1215,6 +1219,10 @@ export async function updateListParams(params: Partial<OwnershipCheckParams>) {
  */
 export async function addCardToList(card: any) {
 	assertWritable();
+
+	// No list yet (fresh or list-less database): create one on demand
+	if (!store.currentCardList) await createNewCardList();
+
 	const cards = store.listCards;
 	const name = store.currentCardList?.name || 'Nuovo mazzo';
 
@@ -1269,6 +1277,10 @@ export async function importListFromText(
 	onProgress?: (current: number, total: number) => void
 ) {
 	assertWritable();
+
+	// No list yet (fresh or list-less database): create one on demand
+	if (!store.currentCardList) await createNewCardList();
+
 	const lines = text.split('\n').filter((line) => line.trim());
 	let newName = store.currentCardList?.name || 'Nuovo mazzo';
 

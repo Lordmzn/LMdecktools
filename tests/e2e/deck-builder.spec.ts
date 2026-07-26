@@ -104,7 +104,9 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
-	await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
+	// Confirm the destructive create-new action
+	await page.getByRole('button', { name: 'Delete and Create New' }).click();
+	await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 }
 
 // SPA navigation — clicks the first matching nav link so SvelteKit routes
@@ -163,9 +165,13 @@ test.describe('Card Lists', () => {
 		await setupWithDB(page);
 		await spaGoto(page, '/card-lists');
 
-		// DB auto-creates 1 list ("A list") on init
+		// A fresh DB has no lists until the user makes one
 		const select = page.locator('select').first();
-		await expect(select.locator('option')).toHaveCount(1);
+		await expect(select.locator('option')).toHaveText(['No lists']);
+
+		await page.getByRole('button', { name: 'New List' }).click();
+
+		await expect(select.locator('option')).toHaveText(['A list']);
 
 		await page.getByRole('button', { name: 'New List' }).click();
 
@@ -220,8 +226,9 @@ test.describe('Card Lists', () => {
 
 		// Add same card to a list
 		await spaGoto(page, '/card-lists');
-		// Wait for card-lists page to render before interacting
-		await expect(page.getByRole('heading', { name: 'A list' })).toBeVisible();
+		// Wait for card-lists page to render before interacting (no list yet —
+		// adding the first card creates one)
+		await expect(page.getByRole('heading', { name: 'No list selected' })).toBeVisible();
 		await page.getByRole('button', { name: 'Add Cards' }).click();
 		await addCardViaSearch(page);
 		await page.locator('button[title="Close"]').click();
@@ -305,5 +312,32 @@ test.describe('Card Lists', () => {
 		await expect(exportPre).toBeVisible();
 		const text = await exportPre.textContent();
 		expect(text).toContain('Lightning Bolt');
+	});
+});
+
+// ==================== DB Modal Stats ====================
+
+test.describe('DB modal content stats', () => {
+	test.beforeEach(async ({ page }) => {
+		await mockScryfallAPI(page);
+	});
+
+	test('reports collection size and list count of the whole database', async ({ page }) => {
+		await setupWithDB(page);
+
+		// Collection-only database: one card owned, no lists
+		await spaGoto(page, '/collection');
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
+		await waitForToastGone(page);
+
+		await page
+			.getByRole('button', { name: 'Database', exact: true })
+			.evaluate((btn) => (btn as HTMLElement).click());
+
+		await expect(page.getByTestId('db-stat-lists')).toHaveText('0');
+		await expect(page.getByTestId('db-stat-list-cards')).toHaveText('0');
+		await expect(page.getByTestId('db-stat-collection')).toHaveText('1 (1 unique)');
 	});
 });

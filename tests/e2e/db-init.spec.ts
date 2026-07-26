@@ -27,7 +27,7 @@ test.describe('Database Initialization', () => {
 		await page.goto('/');
 		await openDBModal(page);
 
-		await expect(page.getByText('Import from File')).toBeVisible();
+		await expect(page.getByRole('button', { name: 'In-browser DB', exact: true })).toBeVisible();
 		await expect(page.getByText('Start from scratch')).toBeVisible();
 		await expect(
 			page.getByRole('button', { name: 'Create New Database', exact: true })
@@ -40,12 +40,14 @@ test.describe('Database Initialization', () => {
 
 		// Click "Create New Database"
 		await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
+		// Confirm the destructive create-new action
+		await page.getByRole('button', { name: 'Delete and Create New' }).click();
 
 		// Modal should be dismissed
 		await expect(page.getByText('Start from scratch')).not.toBeVisible();
 
 		// DB button should now show "Database" (loaded state)
-		await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 	});
 
 	test('home page renders correctly', async ({ page }) => {

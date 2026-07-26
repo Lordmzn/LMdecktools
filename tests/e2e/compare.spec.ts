@@ -78,7 +78,9 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
-	await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
+	// Confirm the destructive create-new action
+	await page.getByRole('button', { name: 'Delete and Create New' }).click();
+	await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 }
 
 async function spaGoto(page: import('@playwright/test').Page, href: string) {
