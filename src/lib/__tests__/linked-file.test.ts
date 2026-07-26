@@ -2,10 +2,14 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { openDatabase, getMetadata } from '../db';
 import {
 	isFileSystemAccessSupported,
-	pickAndLinkNewFile,
 	loadStoredHandle,
 	unlinkFile,
 	writeToFile,
+	writeWithRetry,
+	enqueueWrite,
+	isWriteQueueBusy,
+	classifyWriteError,
+	describeWriteError,
 	readFileData,
 	scheduleDebouncedWrite,
 	cancelDebouncedWrite,
@@ -79,6 +83,203 @@ describe('writeToFile', () => {
 		const closeOrder = closeFn.mock.invocationCallOrder[0];
 		expect(writeOrder).toBeLessThan(closeOrder);
 	});
+
+	it('writes only the view, not the whole backing buffer', async () => {
+		const writeFn = vi.fn().mockResolvedValue(undefined);
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({ write: writeFn, close: vi.fn() })
+		} as unknown as FileSystemFileHandle;
+
+		// A view into the middle of a larger pooled buffer, as Yjs may return
+		const backing = new Uint8Array([9, 9, 1, 2, 3, 9, 9]);
+		await writeToFile(mockHandle, backing.subarray(2, 5));
+
+		expect(writeFn).toHaveBeenCalledWith(new Uint8Array([1, 2, 3]));
+	});
+
+	it('aborts the writable when write fails, releasing the file lock', async () => {
+		const error = new Error('disk full');
+		const abortFn = vi.fn().mockResolvedValue(undefined);
+		const closeFn = vi.fn();
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({
+				write: vi.fn().mockRejectedValue(error),
+				close: closeFn,
+				abort: abortFn
+			})
+		} as unknown as FileSystemFileHandle;
+
+		await expect(writeToFile(mockHandle, new Uint8Array([1]))).rejects.toThrow('disk full');
+		expect(abortFn).toHaveBeenCalledOnce();
+		expect(closeFn).not.toHaveBeenCalled();
+	});
+
+	it('aborts the writable when close fails', async () => {
+		const abortFn = vi.fn().mockResolvedValue(undefined);
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({
+				write: vi.fn().mockResolvedValue(undefined),
+				close: vi.fn().mockRejectedValue(new Error('close failed')),
+				abort: abortFn
+			})
+		} as unknown as FileSystemFileHandle;
+
+		await expect(writeToFile(mockHandle, new Uint8Array([1]))).rejects.toThrow('close failed');
+		expect(abortFn).toHaveBeenCalledOnce();
+	});
+
+	it('does not abort on a successful write', async () => {
+		const abortFn = vi.fn();
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({
+				write: vi.fn().mockResolvedValue(undefined),
+				close: vi.fn().mockResolvedValue(undefined),
+				abort: abortFn
+			})
+		} as unknown as FileSystemFileHandle;
+
+		await writeToFile(mockHandle, new Uint8Array([1]));
+		expect(abortFn).not.toHaveBeenCalled();
+	});
+});
+
+describe('classifyWriteError', () => {
+	it.each([
+		['NotFoundError', 'not-found'],
+		['NotAllowedError', 'permission'],
+		['SecurityError', 'permission'],
+		['NoModificationAllowedError', 'transient'],
+		['InvalidStateError', 'transient'],
+		['AbortError', 'transient'],
+		['QuotaExceededError', 'other']
+	])('maps %s to %s', (name, expected) => {
+		expect(classifyWriteError(new DOMException('boom', name))).toBe(expected);
+	});
+
+	it('treats non-DOMException failures as other', () => {
+		expect(classifyWriteError(new Error('boom'))).toBe('other');
+	});
+});
+
+describe('describeWriteError', () => {
+	it('includes the DOMException name so failures are diagnosable', () => {
+		const error = new DOMException('file is locked', 'NoModificationAllowedError');
+		expect(describeWriteError(error)).toBe('NoModificationAllowedError: file is locked');
+	});
+
+	it('falls back to the message for plain errors', () => {
+		expect(describeWriteError(new Error('boom'))).toBe('boom');
+	});
+
+	it('falls back to a generic message for non-errors', () => {
+		expect(describeWriteError('nope')).toBe('Write failed');
+	});
+});
+
+describe('writeWithRetry', () => {
+	beforeEach(() => {
+		vi.useFakeTimers();
+	});
+
+	afterEach(() => {
+		vi.useRealTimers();
+	});
+
+	it('retries transient failures and succeeds', async () => {
+		const createWritable = vi
+			.fn()
+			.mockRejectedValueOnce(new DOMException('locked', 'NoModificationAllowedError'))
+			.mockResolvedValue({
+				write: vi.fn().mockResolvedValue(undefined),
+				close: vi.fn().mockResolvedValue(undefined)
+			});
+		const mockHandle = { createWritable } as unknown as FileSystemFileHandle;
+
+		const promise = writeWithRetry(mockHandle, new Uint8Array([1]));
+		await vi.advanceTimersByTimeAsync(300);
+
+		await expect(promise).resolves.toBeUndefined();
+		expect(createWritable).toHaveBeenCalledTimes(2);
+	});
+
+	it('does not retry permission failures', async () => {
+		const error = new DOMException('denied', 'NotAllowedError');
+		const createWritable = vi.fn().mockRejectedValue(error);
+		const mockHandle = { createWritable } as unknown as FileSystemFileHandle;
+
+		await expect(writeWithRetry(mockHandle, new Uint8Array([1]))).rejects.toBe(error);
+		expect(createWritable).toHaveBeenCalledOnce();
+	});
+
+	it('does not retry not-found failures', async () => {
+		const error = new DOMException('gone', 'NotFoundError');
+		const createWritable = vi.fn().mockRejectedValue(error);
+		const mockHandle = { createWritable } as unknown as FileSystemFileHandle;
+
+		await expect(writeWithRetry(mockHandle, new Uint8Array([1]))).rejects.toBe(error);
+		expect(createWritable).toHaveBeenCalledOnce();
+	});
+
+	it('reports the first error after exhausting retries', async () => {
+		const first = new DOMException('locked by sync client', 'NoModificationAllowedError');
+		const createWritable = vi
+			.fn()
+			.mockRejectedValueOnce(first)
+			.mockRejectedValue(new DOMException('locked', 'NoModificationAllowedError'));
+		const mockHandle = { createWritable } as unknown as FileSystemFileHandle;
+
+		const promise = writeWithRetry(mockHandle, new Uint8Array([1]));
+		const assertion = expect(promise).rejects.toBe(first);
+		await vi.advanceTimersByTimeAsync(4000);
+		await assertion;
+
+		// Initial attempt + one per retry delay
+		expect(createWritable).toHaveBeenCalledTimes(4);
+	});
+});
+
+describe('enqueueWrite', () => {
+	beforeEach(() => {
+		_resetState();
+	});
+
+	it('never runs two writes concurrently', async () => {
+		let concurrent = 0;
+		let maxConcurrent = 0;
+		const task = async () => {
+			concurrent++;
+			maxConcurrent = Math.max(maxConcurrent, concurrent);
+			await Promise.resolve();
+			concurrent--;
+		};
+
+		await Promise.all([enqueueWrite(task), enqueueWrite(task), enqueueWrite(task)]);
+
+		expect(maxConcurrent).toBe(1);
+	});
+
+	it('keeps draining the queue after a failed write', async () => {
+		const failing = enqueueWrite(async () => {
+			throw new Error('boom');
+		});
+		await expect(failing).rejects.toThrow('boom');
+
+		await expect(enqueueWrite(async () => 'ok')).resolves.toBe('ok');
+	});
+
+	it('reports queue busy state', async () => {
+		expect(isWriteQueueBusy()).toBe(false);
+
+		const inFlight = enqueueWrite(async () => {
+			expect(isWriteQueueBusy()).toBe(true);
+		});
+		expect(isWriteQueueBusy()).toBe(true);
+
+		await inFlight;
+		// Let the bookkeeping continuation settle
+		await Promise.resolve();
+		expect(isWriteQueueBusy()).toBe(false);
+	});
 });
 
 describe('readFileData', () => {
@@ -134,7 +335,7 @@ describe('scheduleDebouncedWrite', () => {
 		expect(onError).not.toHaveBeenCalled();
 	});
 
-	it('calls onError when write fails after retry', async () => {
+	it('calls onError when write fails after retries', async () => {
 		const error = new Error('Write failed');
 		const mockHandle = {
 			createWritable: vi.fn().mockRejectedValue(error)
@@ -145,11 +346,110 @@ describe('scheduleDebouncedWrite', () => {
 		const onError = vi.fn();
 
 		scheduleDebouncedWrite(mockHandle, getData, onSuccess, onError);
-		// Advance past debounce (500ms) + retry delay (1000ms)
-		await vi.advanceTimersByTimeAsync(1600);
+		// Advance past debounce (500ms) + all retry delays (250 + 1000 + 2000ms)
+		await vi.advanceTimersByTimeAsync(4000);
 
 		expect(onSuccess).not.toHaveBeenCalled();
 		expect(onError).toHaveBeenCalledWith(error);
+	});
+
+	it('reads data at write time, not at schedule time', async () => {
+		let state = 1;
+		const writeFn = vi.fn().mockResolvedValue(undefined);
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({ write: writeFn, close: vi.fn() })
+		} as unknown as FileSystemFileHandle;
+
+		scheduleDebouncedWrite(mockHandle, () => new Uint8Array([state]), vi.fn(), vi.fn());
+		state = 2;
+		await vi.advanceTimersByTimeAsync(600);
+
+		expect(writeFn).toHaveBeenCalledWith(new Uint8Array([2]));
+	});
+
+	it('queues a follow-up write instead of dropping it when one is in flight', async () => {
+		let releaseFirstWrite: () => void = () => {};
+		const writeFn = vi
+			.fn()
+			.mockImplementationOnce(() => new Promise<void>((resolve) => (releaseFirstWrite = resolve)))
+			.mockResolvedValue(undefined);
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({ write: writeFn, close: vi.fn() })
+		} as unknown as FileSystemFileHandle;
+
+		const onSuccess = vi.fn();
+		const getData = vi.fn().mockReturnValue(new Uint8Array([1]));
+
+		// First write starts and hangs
+		scheduleDebouncedWrite(mockHandle, getData, onSuccess, vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+		expect(writeFn).toHaveBeenCalledOnce();
+		expect(onSuccess).not.toHaveBeenCalled();
+
+		// A second write is scheduled while the first is still in flight
+		scheduleDebouncedWrite(mockHandle, getData, onSuccess, vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+
+		releaseFirstWrite();
+		await vi.advanceTimersByTimeAsync(0);
+
+		// The second write ran after the first rather than being dropped
+		expect(writeFn).toHaveBeenCalledTimes(2);
+		expect(onSuccess).toHaveBeenCalledTimes(2);
+	});
+
+	it('coalesces writes that are still waiting in the queue', async () => {
+		let releaseFirstWrite: () => void = () => {};
+		const writeFn = vi
+			.fn()
+			.mockImplementationOnce(() => new Promise<void>((resolve) => (releaseFirstWrite = resolve)))
+			.mockResolvedValue(undefined);
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({ write: writeFn, close: vi.fn() })
+		} as unknown as FileSystemFileHandle;
+
+		const getData = vi.fn().mockReturnValue(new Uint8Array([1]));
+
+		scheduleDebouncedWrite(mockHandle, getData, vi.fn(), vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+
+		// Two more debounce cycles complete while the first write is still stuck;
+		// both should collapse into the single queued write.
+		scheduleDebouncedWrite(mockHandle, getData, vi.fn(), vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+		scheduleDebouncedWrite(mockHandle, getData, vi.fn(), vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+
+		releaseFirstWrite();
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(writeFn).toHaveBeenCalledTimes(2);
+	});
+
+	it('cancelDebouncedWrite drops a write already waiting in the queue', async () => {
+		let releaseFirstWrite: () => void = () => {};
+		const writeFn = vi
+			.fn()
+			.mockImplementationOnce(() => new Promise<void>((resolve) => (releaseFirstWrite = resolve)))
+			.mockResolvedValue(undefined);
+		const mockHandle = {
+			createWritable: vi.fn().mockResolvedValue({ write: writeFn, close: vi.fn() })
+		} as unknown as FileSystemFileHandle;
+
+		const getData = vi.fn().mockReturnValue(new Uint8Array([1]));
+
+		scheduleDebouncedWrite(mockHandle, getData, vi.fn(), vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+
+		scheduleDebouncedWrite(mockHandle, getData, vi.fn(), vi.fn());
+		await vi.advanceTimersByTimeAsync(600);
+
+		// Unlink-style cancellation while the second write sits in the queue
+		cancelDebouncedWrite();
+		releaseFirstWrite();
+		await vi.advanceTimersByTimeAsync(0);
+
+		expect(writeFn).toHaveBeenCalledOnce();
 	});
 });
 

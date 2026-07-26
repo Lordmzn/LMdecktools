@@ -64,12 +64,117 @@ export async function requestPermission(handle: FileSystemFileHandle): Promise<b
 	return result === 'granted';
 }
 
+// ==================== ERROR CLASSIFICATION ====================
+
+export type WriteErrorKind = 'not-found' | 'permission' | 'transient' | 'other';
+
+/**
+ * Classify a File System Access failure so callers can pick the right recovery.
+ * `transient` errors are worth retrying; `permission` and `not-found` never are.
+ */
+export function classifyWriteError(error: unknown): WriteErrorKind {
+	if (!(error instanceof DOMException)) return 'other';
+
+	switch (error.name) {
+		case 'NotFoundError':
+			return 'not-found';
+		case 'NotAllowedError':
+		case 'SecurityError':
+			return 'permission';
+		// NoModificationAllowedError means the file is locked — by another
+		// writable stream, or by a cloud-sync client (Dropbox, iCloud, OneDrive).
+		case 'NoModificationAllowedError':
+		case 'InvalidStateError':
+		case 'AbortError':
+			return 'transient';
+		default:
+			return 'other';
+	}
+}
+
+/** Human-readable error text, keeping the DOMException name so failures are diagnosable. */
+export function describeWriteError(error: unknown): string {
+	if (error instanceof DOMException) return `${error.name}: ${error.message}`;
+	if (error instanceof Error) return error.message;
+	return 'Write failed';
+}
+
 // ==================== READ / WRITE ====================
 
 export async function writeToFile(handle: FileSystemFileHandle, data: Uint8Array): Promise<void> {
 	const writable = await handle.createWritable();
-	await writable.write(new Blob([data.buffer as ArrayBuffer]));
-	await writable.close();
+	try {
+		// Write an exact view: passing `data.buffer` ignores byteOffset/byteLength
+		// and appends trailing bytes when Yjs hands back a pooled buffer.
+		await writable.write(
+			new Uint8Array(data.buffer as ArrayBuffer, data.byteOffset, data.byteLength)
+		);
+		await writable.close();
+	} catch (error) {
+		// Releasing the stream is mandatory: createWritable() takes an exclusive
+		// lock on the file, and an unclosed stream keeps holding it — turning one
+		// transient failure into a permanent "file is locked" state.
+		try {
+			await writable.abort();
+		} catch {
+			// Stream already closed or errored out — nothing left to release.
+		}
+		throw error;
+	}
+}
+
+const RETRY_DELAYS_MS = [250, 1000, 2000];
+
+/**
+ * Write with backoff on transient failures. Reports the *first* error, since the
+ * root cause is more useful than whatever the last attempt tripped over.
+ */
+export async function writeWithRetry(
+	handle: FileSystemFileHandle,
+	data: Uint8Array
+): Promise<void> {
+	let firstError: unknown;
+
+	for (let attempt = 0; ; attempt++) {
+		try {
+			await writeToFile(handle, data);
+			return;
+		} catch (error) {
+			if (attempt === 0) firstError = error;
+
+			const kind = classifyWriteError(error);
+			if (kind === 'permission' || kind === 'not-found') throw firstError;
+			if (attempt >= RETRY_DELAYS_MS.length) throw firstError;
+
+			await new Promise((resolve) => setTimeout(resolve, RETRY_DELAYS_MS[attempt]));
+		}
+	}
+}
+
+// ==================== WRITE QUEUE ====================
+
+/**
+ * Every write goes through this chain so two createWritable() calls can never
+ * overlap on the same handle — overlapping calls are themselves a lock error.
+ */
+let writeChain: Promise<unknown> = Promise.resolve();
+let queuedWrites = 0;
+
+export function enqueueWrite<T>(task: () => Promise<T>): Promise<T> {
+	queuedWrites++;
+	// Run the task whether the previous one resolved or rejected: a failed write
+	// must not wedge the queue.
+	const run = writeChain.then(task, task);
+	writeChain = run.then(
+		() => queuedWrites--,
+		() => queuedWrites--
+	);
+	return run;
+}
+
+/** True while any write is queued or in flight. */
+export function isWriteQueueBusy(): boolean {
+	return queuedWrites > 0;
 }
 
 export async function readFileData(handle: FileSystemFileHandle): Promise<Uint8Array> {
@@ -85,8 +190,13 @@ export async function readFileLastModified(handle: FileSystemFileHandle): Promis
 
 // ==================== DEBOUNCED WRITE ====================
 
+const DEBOUNCE_MS = 500;
+
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-let writeInFlight = false;
+/** A debounced write sits in the queue but hasn't started running yet. */
+let debouncedWriteQueued = false;
+/** Bumped by cancelDebouncedWrite() so already-queued writes bail out. */
+let writeGeneration = 0;
 
 export function scheduleDebouncedWrite(
 	handle: FileSystemFileHandle,
@@ -98,36 +208,44 @@ export function scheduleDebouncedWrite(
 		clearTimeout(debounceTimer);
 	}
 
-	debounceTimer = setTimeout(async () => {
-		if (writeInFlight) return;
-		writeInFlight = true;
-		try {
-			const data = getData();
+	debounceTimer = setTimeout(() => {
+		debounceTimer = null;
+
+		// A queued-but-not-yet-started write will read fresh data when it runs,
+		// so there is nothing to gain from enqueuing a second one.
+		if (debouncedWriteQueued) return;
+		debouncedWriteQueued = true;
+
+		const generation = writeGeneration;
+
+		void enqueueWrite(async () => {
+			debouncedWriteQueued = false;
+			// Cancelled while waiting in the queue (e.g. the file was unlinked).
+			// The caller owns any UI state it set before scheduling.
+			if (generation !== writeGeneration) return;
+
 			try {
-				await writeToFile(handle, data);
-			} catch (firstError) {
-				// Retry once after a short delay — handles transient filesystem
-				// locks from cloud-sync clients (Dropbox, iCloud, OneDrive).
-				await new Promise((r) => setTimeout(r, 1000));
-				await writeToFile(handle, data);
+				// Read at write time, not schedule time, so a write that waited in
+				// the queue still persists the latest state.
+				await writeWithRetry(handle, getData());
+				const ts = Date.now();
+				updateLastKnownModified(ts);
+				onSuccess(ts);
+			} catch (error) {
+				onError(error);
 			}
-			const ts = Date.now();
-			updateLastKnownModified(ts);
-			onSuccess(ts);
-		} catch (error) {
-			onError(error);
-		} finally {
-			writeInFlight = false;
-		}
-	}, 500);
+		});
+	}, DEBOUNCE_MS);
 }
 
-/** Cancel any pending debounced write (used when unlinking). */
+/** Cancel any pending debounced write, queued or merely scheduled (used when unlinking). */
 export function cancelDebouncedWrite(): void {
 	if (debounceTimer) {
 		clearTimeout(debounceTimer);
 		debounceTimer = null;
 	}
+	writeGeneration++;
+	debouncedWriteQueued = false;
 }
 
 // ==================== POLLING ====================
@@ -143,7 +261,7 @@ export function startPolling(handle: FileSystemFileHandle, onExternalChange: () 
 	stopPolling();
 
 	pollInterval = setInterval(async () => {
-		if (writeInFlight) return;
+		if (isWriteQueueBusy()) return;
 
 		try {
 			const modified = await readFileLastModified(handle);
@@ -171,6 +289,7 @@ export function stopPolling(): void {
 export function _resetState(): void {
 	cancelDebouncedWrite();
 	stopPolling();
-	writeInFlight = false;
+	writeChain = Promise.resolve();
+	queuedWrites = 0;
 	lastKnownModified = null;
 }
