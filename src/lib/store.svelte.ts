@@ -29,7 +29,10 @@ import {
 	unlinkFile as unlinkFileHandle,
 	checkPermission,
 	requestPermission,
-	writeToFile,
+	writeWithRetry,
+	enqueueWrite,
+	classifyWriteError,
+	describeWriteError,
 	readFileData,
 	readFileLastModified,
 	scheduleDebouncedWrite,
@@ -249,8 +252,44 @@ export function exportDB() {
 
 let linkedHandle: FileSystemFileHandle | null = null;
 
-function isNotFoundError(error: unknown): boolean {
-	return error instanceof DOMException && error.name === 'NotFoundError';
+function applyWriteSuccess(timestamp: number): void {
+	store.linkedFileLastSaved = timestamp;
+	store.linkedFileError = null;
+	store.linkedFileWriting = false;
+}
+
+function applyWriteError(error: unknown): void {
+	console.error('Linked file write error:', error);
+
+	const kind = classifyWriteError(error);
+	if (kind === 'permission') {
+		// Access was revoked rather than the write failing — reconnecting
+		// re-prompts for permission, which "Retry" cannot do.
+		store.linkedFileStatus = 'reconnect';
+		store.linkedFilePermissionDenied = false;
+		permissionRequested = false;
+		stopPolling();
+	} else {
+		store.linkedFileStatus = kind === 'not-found' ? 'not-found' : 'write-error';
+	}
+
+	store.linkedFileError = describeWriteError(error);
+	store.linkedFileWriting = false;
+}
+
+/** Serialized write of the current store state, with shared status handling. */
+function performWrite(handle: FileSystemFileHandle): Promise<void> {
+	store.linkedFileWriting = true;
+	return enqueueWrite(async () => {
+		try {
+			await writeWithRetry(handle, exportWithMetadata(store));
+			const ts = Date.now();
+			updateLastKnownModified(ts);
+			applyWriteSuccess(ts);
+		} catch (error) {
+			applyWriteError(error);
+		}
+	});
 }
 
 function triggerAutoSave(): void {
@@ -260,39 +299,17 @@ function triggerAutoSave(): void {
 	scheduleDebouncedWrite(
 		linkedHandle,
 		() => exportWithMetadata(store),
-		(ts) => {
-			store.linkedFileLastSaved = ts;
-			store.linkedFileError = null;
-			store.linkedFileWriting = false;
-		},
-		(error) => {
-			console.error('Linked file write error:', error);
-			store.linkedFileStatus = isNotFoundError(error) ? 'not-found' : 'write-error';
-			store.linkedFileError = error instanceof Error ? error.message : 'Write failed';
-			store.linkedFileWriting = false;
-		}
+		applyWriteSuccess,
+		applyWriteError
 	);
 }
 
 export async function saveNow(): Promise<void> {
-	if (store.linkedFileStatus !== 'active' || !linkedHandle || store.linkedFileWriting) return;
+	if (store.linkedFileStatus !== 'active' || !linkedHandle) return;
 
+	// Supersede any pending autosave; this write carries the same state.
 	cancelDebouncedWrite();
-	store.linkedFileWriting = true;
-	try {
-		const data = exportWithMetadata(store);
-		await writeToFile(linkedHandle, data);
-		const ts = Date.now();
-		updateLastKnownModified(ts);
-		store.linkedFileLastSaved = ts;
-		store.linkedFileError = null;
-	} catch (error) {
-		console.error('Linked file write error:', error);
-		store.linkedFileStatus = isNotFoundError(error) ? 'not-found' : 'write-error';
-		store.linkedFileError = error instanceof Error ? error.message : 'Write failed';
-	} finally {
-		store.linkedFileWriting = false;
-	}
+	await performWrite(linkedHandle);
 }
 
 function handleExternalChange(): void {
@@ -340,11 +357,7 @@ export async function linkFile(): Promise<void> {
 	store.linkedFileError = null;
 
 	// Write current state to the file immediately
-	const data = exportWithMetadata(store);
-	await writeToFile(handle, data);
-	const ts = Date.now();
-	updateLastKnownModified(ts);
-	store.linkedFileLastSaved = ts;
+	await performWrite(handle);
 
 	startPolling(handle, handleExternalChange);
 }
@@ -488,12 +501,10 @@ export async function mergeFromFile(): Promise<void> {
 	// Reload store
 	await Promise.all([loadCardLists(), loadCollection()]);
 
-	// Write merged result back to file
-	const data = exportWithMetadata(store);
-	await writeToFile(linkedHandle, data);
-	const ts = Date.now();
-	updateLastKnownModified(ts);
-	store.linkedFileLastSaved = ts;
+	// Write merged result back to file. Reloading the store above fires autosaves,
+	// so this must go through the same queue rather than racing them.
+	cancelDebouncedWrite();
+	await performWrite(linkedHandle);
 	store.linkedFileExternalChange = false;
 }
 
