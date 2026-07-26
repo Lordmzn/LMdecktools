@@ -62,9 +62,15 @@ Features that conflict with these principles (cloud sync, social feeds, price tr
 
 ## Getting Started
 
-Requires **Node 22+** (use `nvm use` to activate the version pinned in `.nvmrc`).
+Requires **Node 22** and **pnpm 11**, both pinned in `.tool-versions`.
 
 ```bash
+# With asdf: install the pinned toolchain
+asdf install
+
+# Or with nvm (Node only, from .nvmrc) + corepack
+nvm use && corepack enable
+
 # Install dependencies
 pnpm install
 

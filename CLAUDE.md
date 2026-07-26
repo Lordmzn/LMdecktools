@@ -21,7 +21,7 @@ pnpm test:ui          # Vitest browser UI
 pnpm test:e2e         # Playwright E2E tests (needs dev server)
 ```
 
-Requires Node 22+ (see `.nvmrc`). Use `nvm use` to switch.
+Requires Node 22 and pnpm 11 (see `.tool-versions`). With [asdf](https://asdf-vm.com) installed, run `asdf install` in the repo root to get both; `.nvmrc` is kept for CI and `nvm use`.
 
 ## Tech Stack
 
