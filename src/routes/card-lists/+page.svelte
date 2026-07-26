@@ -467,9 +467,7 @@
 				</select>
 				<button
 					onclick={() => (showDeleteConfirmModal = true)}
-					disabled={store.dbMode === 'none' ||
-						!store.currentCardList ||
-						store.savedCardLists.length <= 1}
+					disabled={store.dbMode === 'none' || !store.currentCardList}
 					class="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-neutral-100 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
 					title="Delete this list"
 				>
@@ -618,7 +616,7 @@
 				</button>
 				<button
 					onclick={() => (showAddCardsModal = true)}
-					disabled={store.dbMode === 'none' || !store.currentCardList}
+					disabled={store.dbMode === 'none'}
 					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					<svg

@@ -17,7 +17,9 @@ async function _setupWithDB(page: import('@playwright/test').Page) {
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
-	await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
+	// Confirm the destructive create-new action
+	await page.getByRole('button', { name: 'Delete and Create New' }).click();
+	await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 }
 
 // Helper: open DB modal
@@ -78,7 +80,7 @@ test.describe('Database Import', () => {
 		await expect(page.getByText('Import from File')).not.toBeVisible({ timeout: 5000 });
 
 		// DB should be loaded
-		await expect(page.locator('button', { hasText: 'Database' })).toBeVisible();
+		await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 	});
 
 	test('importing a .yjs file loads deck data', async ({ page }) => {

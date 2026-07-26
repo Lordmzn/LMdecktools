@@ -8,6 +8,9 @@ import {
 	removeFromCollection,
 	createNewCardList,
 	deleteCardList,
+	saveCardList,
+	countCards,
+	countCardsInLists,
 	peekDB,
 	initDB,
 	closeDB,
@@ -78,17 +81,70 @@ describe('deleteCardList operations', () => {
 		});
 	});
 
-	it('throws when trying to delete the only remaining list', async () => {
-		await initDB(); // active mode; seeds 1 default list
-		await expect(deleteCardList()).rejects.toThrow('Cannot delete the last card list');
+	it('throws when no list is selected', async () => {
+		await initDB(); // active mode; empty DB stays with zero lists
+		expect(store.savedCardLists.length).toBe(0);
+		await expect(deleteCardList()).rejects.toThrow('No card list selected');
 	});
 
 	it('deletes a list and adjusts currentCardListIndex', async () => {
 		await initDB();
-		await createNewCardList(); // now 2 lists; index points to new one
+		await createNewCardList();
+		await createNewCardList(); // now 2 lists; index points to the new one
 		const countBefore = store.savedCardLists.length;
 		await deleteCardList();
 		expect(store.savedCardLists.length).toBe(countBefore - 1);
 		expect(store.currentCardListIndex).toBeGreaterThanOrEqual(0);
+	});
+
+	it('deleting the last list leaves no list selected', async () => {
+		await initDB();
+		await createNewCardList();
+		await deleteCardList();
+		expect(store.savedCardLists.length).toBe(0);
+		expect(store.currentCardListIndex).toBeNaN();
+		expect(store.currentCardList).toBeNull();
+	});
+});
+
+// ==================== DB content stats ====================
+
+describe('DB content stats', () => {
+	afterEach(async () => {
+		closeDB();
+		store.dbMode = 'none';
+		await new Promise<void>((resolve, reject) => {
+			const req = indexedDB.deleteDatabase('LMdecktools');
+			req.onsuccess = () => resolve();
+			req.onerror = () => reject(req.error);
+		});
+	});
+
+	it('connecting to an empty database does not create a list', async () => {
+		await peekDB();
+		await initDB();
+		expect(store.savedCardLists.length).toBe(0);
+		expect(store.currentCardListIndex).toBeNaN();
+	});
+
+	it('counts cards across every list, not just the current one', async () => {
+		await initDB();
+
+		await createNewCardList();
+		await saveCardList('Deck A', [{ id: 'a', name: 'Card A', LM_quantity: 2 }]);
+
+		await createNewCardList();
+		await saveCardList('Deck B', [
+			{ id: 'b', name: 'Card B', LM_quantity: 3 },
+			{ id: 'c', name: 'Card C', LM_quantity: 1 }
+		]);
+
+		// store.totalCards / store.totalListCards are $derived and cannot be read
+		// reliably outside a reactive owner (see CLAUDE.md), so assert on the
+		// pure helpers those deriveds delegate to.
+		const lists = store.savedCardLists;
+		expect(lists.length).toBe(2);
+		expect(countCards(lists[1].cards)).toBe(4); // current list only
+		expect(countCardsInLists(lists)).toBe(6); // all lists
 	});
 });

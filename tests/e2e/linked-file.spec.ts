@@ -34,6 +34,8 @@ test.describe('Linked File — File System Access API', () => {
 
 		// Create new DB first
 		await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
+		// Confirm the destructive create-new action
+		await page.getByRole('button', { name: 'Delete and Create New' }).click();
 
 		// Re-open modal
 		await openDBModal(page);
