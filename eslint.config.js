@@ -10,6 +10,9 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 
 export default ts.config(
 	includeIgnoreFile(gitignorePath),
+	// The design-system skill ships React reference components; they are vendored
+	// documentation, not app source, and must not be linted as such.
+	{ ignores: ['.claude/**', 'docs/**'] },
 	js.configs.recommended,
 	...ts.configs.recommended,
 	...svelte.configs.recommended,
