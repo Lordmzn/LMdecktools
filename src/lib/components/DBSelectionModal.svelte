@@ -22,7 +22,7 @@
 		importCardsToCollection,
 		importCardsToNewList
 	} from '$lib/store.svelte';
-	import { parseImportInput, detectSourceType } from '$lib/import-parser';
+	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
 	import { fetchDeckFromUrl } from '$lib/import-url';
 
@@ -407,6 +407,7 @@
 			<div class="flex gap-1 border-b border-orange-500/[0.08] bg-slate-900 px-4 py-2">
 				<button
 					onclick={() => toggleSection('localdb')}
+					aria-expanded={activeSection === 'localdb'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
 						{activeSection === 'localdb'
 						? 'bg-orange-500/10 text-orange-400'
@@ -428,6 +429,7 @@
 						exportBackupSuccess = false;
 					}}
 					disabled={store.dbMode !== 'active'}
+					aria-expanded={activeSection === 'link'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
 						{activeSection === 'link'
 						? 'bg-orange-500/10 text-orange-400'
@@ -446,6 +448,7 @@
 				</button>
 				<button
 					onclick={() => toggleSection('cache')}
+					aria-expanded={activeSection === 'cache'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
 						{activeSection === 'cache'
 						? 'bg-orange-500/10 text-orange-400'
@@ -467,6 +470,7 @@
 						resetExtImport();
 					}}
 					disabled={store.dbMode !== 'active'}
+					aria-expanded={activeSection === 'import'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
 						{activeSection === 'import'
 						? 'bg-orange-500/10 text-orange-400'
@@ -486,6 +490,7 @@
 				<button
 					onclick={() => toggleSection('export')}
 					disabled={store.dbMode !== 'active'}
+					aria-expanded={activeSection === 'export'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
 						{activeSection === 'export'
 						? 'bg-orange-500/10 text-orange-400'
@@ -1201,7 +1206,7 @@
 								</div>
 								{#if extImportPreview.warnings.length > 0}
 									<div class="mt-2 space-y-1">
-										{#each extImportPreview.warnings as warning}
+										{#each extImportPreview.warnings as warning, i (i)}
 											<p class="text-xs text-amber-400">{warning}</p>
 										{/each}
 									</div>
@@ -1242,7 +1247,7 @@
 												: ''} not found on Scryfall
 										</summary>
 										<ul class="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-xs text-slate-500">
-											{#each extImportSummary.notFound as name}
+											{#each extImportSummary.notFound as name, i (i)}
 												<li>{name}</li>
 											{/each}
 										</ul>

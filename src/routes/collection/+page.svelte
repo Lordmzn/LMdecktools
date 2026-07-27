@@ -47,8 +47,8 @@
 
 	// Reset visible count when filter/sort changes
 	$effect(() => {
-		filterText;
-		sortBy;
+		// Read both so the effect re-runs on either change
+		const _deps = [filterText, sortBy];
 		visibleCount = PAGE_SIZE;
 	});
 
