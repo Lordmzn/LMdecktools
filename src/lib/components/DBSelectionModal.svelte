@@ -1105,7 +1105,7 @@
 										}}
 										class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
 											{extImportMode === opt.value
-											? 'bg-orange-500 text-slate-100'
+											? 'bg-orange-500 text-slate-950'
 											: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 									>
 										{opt.label}
@@ -1122,7 +1122,7 @@
 									onclick={() => (extImportTarget = 'list')}
 									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
 										{extImportTarget === 'list'
-										? 'bg-orange-500 text-slate-100'
+										? 'bg-orange-500 text-slate-950'
 										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
 									New List
@@ -1131,7 +1131,7 @@
 									onclick={() => (extImportTarget = 'collection')}
 									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
 										{extImportTarget === 'collection'
-										? 'bg-orange-500 text-slate-100'
+										? 'bg-orange-500 text-slate-950'
 										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
 									Collection

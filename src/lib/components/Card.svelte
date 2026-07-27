@@ -35,7 +35,7 @@
 		<!-- Owned Badge -->
 		{#if showOwned && ownedQuantity > 0}
 			<div
-				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-slate-100 shadow-lg"
+				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-slate-950 shadow-lg"
 			>
 				Own: {ownedQuantity}
 			</div>

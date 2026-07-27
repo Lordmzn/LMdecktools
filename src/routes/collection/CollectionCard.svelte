@@ -51,7 +51,7 @@
 
 		<!-- Quantity Badge -->
 		<div
-			class="absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 font-mono text-xs font-bold text-white shadow-[0_2px_12px_rgba(249,115,22,0.4)]"
+			class="absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 font-mono text-xs font-bold text-slate-950 shadow-[0_2px_12px_rgba(249,115,22,0.4)]"
 		>
 			{card.quantity_owned}×
 		</div>
@@ -60,7 +60,7 @@
 		{#if isDFC}
 			<button
 				onclick={() => (flipped = !flipped)}
-				class="absolute top-2 left-2 rounded-full bg-slate-900/85 p-1.5 text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-orange-500 hover:text-white"
+				class="absolute top-2 left-2 rounded-full bg-slate-900/85 p-1.5 text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-orange-500 hover:text-slate-950"
 				title="Flip card"
 			>
 				<svg

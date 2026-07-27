@@ -238,7 +238,8 @@ body::after {
 
 	.btn-primary {
 		background: var(--color-orange-500);
-		color: #fff;
+		/* Dark label on the accent: white is only 2.9:1 on orange-500, this is 7.0:1 */
+		color: var(--color-slate-950);
 		box-shadow: var(--shadow-accent);
 	}
 
@@ -312,7 +313,7 @@ body::after {
 	.seg-active {
 		background-color: var(--color-orange-500);
 		border-color: var(--color-orange-500);
-		color: #fff;
+		color: var(--color-slate-950);
 	}
 
 	.seg:disabled {

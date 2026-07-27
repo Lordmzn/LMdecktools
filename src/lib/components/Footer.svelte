@@ -31,7 +31,7 @@
 						<rect x="40" y="48" width="26" height="38" rx="3" fill="#0a0c10" stroke-width="1.5" />
 					</g>
 				</svg>
-				<p class="font-mono text-[0.62rem] tracking-wider text-slate-500 uppercase">
+				<p class="font-mono text-[0.62rem] tracking-wider text-slate-400 uppercase">
 					&copy; 2025–{new Date().getFullYear()} Lord M'zn · Local-first · Built for the community
 				</p>
 			</div>

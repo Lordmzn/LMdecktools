@@ -719,7 +719,7 @@
 		height: 20px;
 		border-radius: 50%;
 		background: var(--color-orange-500);
-		color: #fff;
+		color: var(--color-slate-950);
 		font-family: var(--font-mono);
 		font-size: 0.55rem;
 		font-weight: 700;

@@ -195,7 +195,7 @@
 				<button
 					onclick={() => (activeTab = 'onlyA')}
 					class="flex-1 rounded-l-lg px-3 py-2 transition {activeTab === 'onlyA'
-						? 'bg-amber-500 text-white'
+						? 'bg-amber-500 text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
 					Only A ({result.onlyInA.length})
@@ -203,7 +203,7 @@
 				<button
 					onclick={() => (activeTab = 'both')}
 					class="flex-1 border-x border-slate-700 px-3 py-2 transition {activeTab === 'both'
-						? 'bg-green-500 text-white'
+						? 'bg-green-500 text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
 					Both ({result.inBoth.length})
@@ -211,7 +211,7 @@
 				<button
 					onclick={() => (activeTab = 'onlyB')}
 					class="flex-1 rounded-r-lg px-3 py-2 transition {activeTab === 'onlyB'
-						? 'bg-blue-500 text-white'
+						? 'bg-blue-500 text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
 					Only B ({result.onlyInB.length})
