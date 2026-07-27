@@ -49,8 +49,7 @@
 	--radius-card: 16px;
 	--radius-compact: 20px;
 
-	--shadow-card-hover:
-		0 12px 40px rgba(0, 0, 0, 0.25), 0 0 60px rgba(249, 115, 22, 0.05);
+	--shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.25), 0 0 60px rgba(249, 115, 22, 0.05);
 	--shadow-accent: 0 2px 16px rgba(249, 115, 22, 0.3), 0 0 0 1px rgba(249, 115, 22, 0.1);
 	--shadow-accent-hover: 0 6px 28px rgba(249, 115, 22, 0.4);
 

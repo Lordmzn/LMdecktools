@@ -43,7 +43,9 @@
 	let extImportRunning = $state(false);
 	let extImportProgress = $state({ current: 0, total: 0 });
 	let extImportPreview = $state<ParseResult | null>(null);
-	let extImportSummary = $state<{ success: number; failed: number; notFound: string[] } | null>(null);
+	let extImportSummary = $state<{ success: number; failed: number; notFound: string[] } | null>(
+		null
+	);
 	let extImportErr = $state<string | null>(null);
 	let extImportFetching = $state(false);
 
@@ -375,7 +377,9 @@
 				<button
 					onclick={() => toggleSection('localdb')}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'localdb' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
+						{activeSection === 'localdb'
+						? 'bg-neutral-700 text-orange-400'
+						: 'text-neutral-400 hover:text-neutral-200'}"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path
@@ -388,10 +392,15 @@
 					In-browser DB
 				</button>
 				<button
-					onclick={() => { toggleSection('link'); exportBackupSuccess = false; }}
+					onclick={() => {
+						toggleSection('link');
+						exportBackupSuccess = false;
+					}}
 					disabled={store.dbMode !== 'active'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'link' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						{activeSection === 'link'
+						? 'bg-neutral-700 text-orange-400'
+						: 'text-neutral-400 hover:text-neutral-200'}
 						disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -407,7 +416,9 @@
 				<button
 					onclick={() => toggleSection('cache')}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'cache' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
+						{activeSection === 'cache'
+						? 'bg-neutral-700 text-orange-400'
+						: 'text-neutral-400 hover:text-neutral-200'}"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path
@@ -420,10 +431,15 @@
 					Cache
 				</button>
 				<button
-					onclick={() => { toggleSection('import'); resetExtImport(); }}
+					onclick={() => {
+						toggleSection('import');
+						resetExtImport();
+					}}
 					disabled={store.dbMode !== 'active'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'import' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						{activeSection === 'import'
+						? 'bg-neutral-700 text-orange-400'
+						: 'text-neutral-400 hover:text-neutral-200'}
 						disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -440,7 +456,9 @@
 					onclick={() => toggleSection('export')}
 					disabled={store.dbMode !== 'active'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'export' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						{activeSection === 'export'
+						? 'bg-neutral-700 text-orange-400'
+						: 'text-neutral-400 hover:text-neutral-200'}
 						disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -513,9 +531,7 @@
 
 					<!-- DB info when active -->
 					{#if store.dbMode === 'active'}
-						<div
-							class="rounded-xl border-2 border-green-800 p-5"
-						>
+						<div class="rounded-xl border-2 border-green-800 p-5">
 							<div class="flex items-start gap-4">
 								<div
 									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
@@ -535,9 +551,7 @@
 									</svg>
 								</div>
 								<div class="flex-1">
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
-										Local database active
-									</h3>
+									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Local database active</h3>
 									<div class="space-y-2 text-sm text-neutral-400">
 										{@render dbContentStats()}
 									</div>
@@ -595,7 +609,9 @@
 						</p>
 
 						<div>
-							<label class="mb-2 block text-sm font-semibold text-neutral-300">Include Fields:</label>
+							<label class="mb-2 block text-sm font-semibold text-neutral-300"
+								>Include Fields:</label
+							>
 							<div class="grid grid-cols-2 gap-2 text-sm text-neutral-300 sm:grid-cols-4">
 								{#each csvFieldOptions as option (option.value)}
 									<label class="flex cursor-pointer items-center gap-2">
@@ -791,8 +807,11 @@
 											Click Reconnect to re-grant access.
 										</p>
 										{#if store.linkedFilePermissionDenied}
-											<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
-												Permission was denied. Reload the page to try again, or grant access in your browser settings.
+											<p
+												class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+											>
+												Permission was denied. Reload the page to try again, or grant access in your
+												browser settings.
 											</p>
 										{/if}
 										<div class="flex gap-2">
@@ -811,13 +830,13 @@
 											</button>
 										</div>
 									{:else if store.linkedFileStatus === 'not-found'}
-										<h3 class="mb-2 text-lg font-semibold text-neutral-100">Linked file not found</h3>
+										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+											Linked file not found
+										</h3>
 										<p class="mb-3 text-sm text-neutral-400">
 											File not found — "{store.linkedFileName}" could not be located.
 										</p>
-										<p class="mb-4 text-sm text-green-400">
-											Your data is safe in the browser.
-										</p>
+										<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
 										<button
 											onclick={() => unlinkFile()}
 											class="rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
@@ -837,9 +856,7 @@
 											Failed to write to "{store.linkedFileName}". The file may be locked or
 											inaccessible.
 										</p>
-										<p class="mb-4 text-sm text-green-400">
-											Your data is safe in the browser.
-										</p>
+										<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
 										<div class="flex gap-2">
 											<button
 												onclick={() => retryWrite()}
@@ -937,7 +954,8 @@
 								<div class="flex-1">
 									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Restore from file</h3>
 									<p class="mb-4 text-sm text-neutral-400">
-										Restore your database from a previously downloaded copy. This replaces all current data.
+										Restore your database from a previously downloaded copy. This replaces all
+										current data.
 									</p>
 									<input
 										type="file"
@@ -957,7 +975,9 @@
 											<div
 												class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
 											>
-												Restored {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+												Restored {importResult.imported} list{importResult.imported !== 1
+													? 's'
+													: ''} successfully.
 											</div>
 										{:else}
 											<div
@@ -1075,9 +1095,14 @@
 							<div class="flex gap-1">
 								{#each [{ value: 'file', label: 'File' }, { value: 'text', label: 'Paste' }, { value: 'url', label: 'URL' }] as opt (opt.value)}
 									<button
-										onclick={() => { extImportMode = opt.value as ImportMode; resetExtImport(); }}
+										onclick={() => {
+											extImportMode = opt.value as ImportMode;
+											resetExtImport();
+										}}
 										class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-											{extImportMode === opt.value ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+											{extImportMode === opt.value
+											? 'bg-orange-500 text-neutral-100'
+											: 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
 									>
 										{opt.label}
 									</button>
@@ -1092,14 +1117,18 @@
 								<button
 									onclick={() => (extImportTarget = 'list')}
 									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-										{extImportTarget === 'list' ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+										{extImportTarget === 'list'
+										? 'bg-orange-500 text-neutral-100'
+										: 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
 								>
 									New List
 								</button>
 								<button
 									onclick={() => (extImportTarget = 'collection')}
 									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-										{extImportTarget === 'collection' ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+										{extImportTarget === 'collection'
+										? 'bg-orange-500 text-neutral-100'
+										: 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
 								>
 									Collection
 								</button>
@@ -1146,7 +1175,8 @@
 									</button>
 								</div>
 								<p class="mt-2 text-xs text-neutral-500">
-									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file import as fallback.
+									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file
+									import as fallback.
 								</p>
 							{/if}
 						</div>
@@ -1155,7 +1185,11 @@
 						{#if extImportPreview}
 							<div class="rounded-lg border border-neutral-700 bg-neutral-800/50 p-3">
 								<div class="flex items-center gap-2 text-sm text-neutral-300">
-									<span class="font-medium">{extImportPreview.cards.length} card{extImportPreview.cards.length !== 1 ? 's' : ''} parsed</span>
+									<span class="font-medium"
+										>{extImportPreview.cards.length} card{extImportPreview.cards.length !== 1
+											? 's'
+											: ''} parsed</span
+									>
 									{#if extImportPreview.listName}
 										<span class="text-neutral-500">—</span>
 										<span class="text-neutral-400">"{extImportPreview.listName}"</span>
@@ -1180,14 +1214,28 @@
 
 						<!-- Results -->
 						{#if extImportSummary}
-							<div class="rounded-lg border {extImportSummary.failed === 0 ? 'border-green-800 bg-green-950' : 'border-amber-800 bg-amber-950'} p-3">
-								<p class="text-sm {extImportSummary.failed === 0 ? 'text-green-400' : 'text-amber-400'}">
-									Imported {extImportSummary.success} card{extImportSummary.success !== 1 ? 's' : ''}{extImportSummary.failed > 0 ? `, ${extImportSummary.failed} failed` : ' successfully'}.
+							<div
+								class="rounded-lg border {extImportSummary.failed === 0
+									? 'border-green-800 bg-green-950'
+									: 'border-amber-800 bg-amber-950'} p-3"
+							>
+								<p
+									class="text-sm {extImportSummary.failed === 0
+										? 'text-green-400'
+										: 'text-amber-400'}"
+								>
+									Imported {extImportSummary.success} card{extImportSummary.success !== 1
+										? 's'
+										: ''}{extImportSummary.failed > 0
+										? `, ${extImportSummary.failed} failed`
+										: ' successfully'}.
 								</p>
 								{#if extImportSummary.notFound.length > 0}
 									<details class="mt-2">
 										<summary class="cursor-pointer text-xs text-neutral-400">
-											{extImportSummary.notFound.length} card{extImportSummary.notFound.length !== 1 ? 's' : ''} not found on Scryfall
+											{extImportSummary.notFound.length} card{extImportSummary.notFound.length !== 1
+												? 's'
+												: ''} not found on Scryfall
 										</summary>
 										<ul class="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-xs text-neutral-500">
 											{#each extImportSummary.notFound as name}
@@ -1203,7 +1251,9 @@
 						{#if !extImportSummary}
 							<button
 								onclick={handleExtImportRun}
-								disabled={extImportRunning || !extImportPreview || extImportPreview.cards.length === 0}
+								disabled={extImportRunning ||
+									!extImportPreview ||
+									extImportPreview.cards.length === 0}
 								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
 							>
 								{#if extImportRunning}
@@ -1213,7 +1263,14 @@
 										fill="none"
 										viewBox="0 0 24 24"
 									>
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										/>
 										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
 									</svg>
 									{#if extImportProgress.total > 0}
@@ -1256,11 +1313,13 @@
 		>
 			<h3 class="mb-3 text-lg font-bold text-neutral-100">Create new database?</h3>
 			<p class="mb-3 text-sm text-neutral-400">
-				This will <strong class="text-red-400">permanently delete</strong> all your current data — card lists, collection, and settings.
+				This will <strong class="text-red-400">permanently delete</strong> all your current data — card
+				lists, collection, and settings.
 			</p>
 			{#if store.linkedFileStatus !== 'none'}
 				<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
-					Your linked file "{store.linkedFileName}" will be unlinked. The file itself won't be deleted, but it will no longer sync with the app.
+					Your linked file "{store.linkedFileName}" will be unlinked. The file itself won't be
+					deleted, but it will no longer sync with the app.
 				</p>
 			{/if}
 			<p class="mb-5 text-sm text-neutral-500">

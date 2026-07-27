@@ -244,7 +244,6 @@
 					</svg>
 					Add Cards
 				</button>
-
 			</div>
 		</div>
 

@@ -51,7 +51,9 @@
 	<div class="mb-6 grid grid-cols-1 gap-6 md:grid-cols-3">
 		<!-- Feature 1 -->
 		<div class="panel rounded-xl p-6">
-			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10">
+			<div
+				class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10"
+			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="24"
@@ -75,7 +77,9 @@
 
 		<!-- Feature 2 -->
 		<div class="panel rounded-xl p-6">
-			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10">
+			<div
+				class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10"
+			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="24"
@@ -98,7 +102,9 @@
 
 		<!-- Feature 3 -->
 		<div class="panel rounded-xl p-6">
-			<div class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10">
+			<div
+				class="mb-4 flex h-12 w-12 items-center justify-center rounded-lg border border-orange-500/30 bg-orange-500/10"
+			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="24"

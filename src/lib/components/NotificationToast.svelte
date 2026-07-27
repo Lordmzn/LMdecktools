@@ -4,7 +4,9 @@
 
 {#if show}
 	<div class="animate-slide-in fixed top-4 right-4 z-[9999]">
-		<div class="flex items-center gap-2 rounded-lg bg-orange-700 px-6 py-3 text-neutral-100 shadow-lg">
+		<div
+			class="flex items-center gap-2 rounded-lg bg-orange-700 px-6 py-3 text-neutral-100 shadow-lg"
+		>
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="20"
