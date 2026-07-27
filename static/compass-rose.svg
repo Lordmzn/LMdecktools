@@ -1,0 +1,32 @@
+<svg width="400" height="400" viewBox="0 0 400 400" fill="none" xmlns="http://www.w3.org/2000/svg">
+<circle cx="200" cy="200" r="195" stroke="#f97316" stroke-width="0.8" opacity="0.15"></circle>
+<circle cx="200" cy="200" r="185" stroke="#f97316" stroke-width="0.3" opacity="0.08"></circle>
+<circle cx="200" cy="200" r="150" stroke="#ea580c" stroke-width="0.5" opacity="0.1"></circle>
+<circle cx="200" cy="200" r="100" stroke="#ea580c" stroke-width="0.4" opacity="0.07"></circle>
+<circle cx="200" cy="200" r="50" stroke="#c2410c" stroke-width="0.3" opacity="0.06"></circle>
+<line x1="200" y1="4" x2="200" y2="396" stroke="#f97316" stroke-width="0.6" opacity="0.12"></line>
+<line x1="4" y1="200" x2="396" y2="200" stroke="#f97316" stroke-width="0.6" opacity="0.12"></line>
+<line x1="48" y1="48" x2="352" y2="352" stroke="#ea580c" stroke-width="0.4" opacity="0.07"></line>
+<line x1="352" y1="48" x2="48" y2="352" stroke="#ea580c" stroke-width="0.4" opacity="0.07"></line>
+<line x1="124" y1="18" x2="276" y2="382" stroke="#c2410c" stroke-width="0.2" opacity="0.04"></line>
+<line x1="276" y1="18" x2="124" y2="382" stroke="#c2410c" stroke-width="0.2" opacity="0.04"></line>
+<line x1="18" y1="124" x2="382" y2="276" stroke="#c2410c" stroke-width="0.2" opacity="0.04"></line>
+<line x1="18" y1="276" x2="382" y2="124" stroke="#c2410c" stroke-width="0.2" opacity="0.04"></line>
+<polygon points="200,6 214,120 200,80 186,120" fill="#f97316" opacity="0.2"></polygon>
+<polygon points="200,6 206,100 200,75 194,100" fill="#fb923c" opacity="0.12"></polygon>
+<polygon points="200,394 214,280 200,320 186,280" fill="#ea580c" opacity="0.08"></polygon>
+<polygon points="394,200 280,186 320,200 280,214" fill="#ea580c" opacity="0.08"></polygon>
+<polygon points="6,200 120,186 80,200 120,214" fill="#ea580c" opacity="0.08"></polygon>
+<polygon points="345,55 260,160 280,140 300,160" fill="#c2410c" opacity="0.04"></polygon>
+<polygon points="55,55 140,160 120,140 100,160" fill="#c2410c" opacity="0.04"></polygon>
+<polygon points="345,345 260,240 280,260 300,240" fill="#c2410c" opacity="0.04"></polygon>
+<polygon points="55,345 140,240 120,260 100,240" fill="#c2410c" opacity="0.04"></polygon>
+<g stroke="#f97316" stroke-width="0.8" opacity="0.15">
+<line x1="200" y1="4" x2="200" y2="18"></line>
+<line x1="200" y1="382" x2="200" y2="396"></line>
+<line x1="4" y1="200" x2="18" y2="200"></line>
+<line x1="382" y1="200" x2="396" y2="200"></line>
+</g>
+<circle cx="200" cy="200" r="4" fill="#f97316" opacity="0.1"></circle>
+<circle cx="200" cy="200" r="1.5" fill="#fb923c" opacity="0.2"></circle>
+</svg>
