@@ -51,7 +51,9 @@ Live Scryfall API calls (`api.scryfall.com/cards/search` and `/cards/named`). No
 
 ### Routing
 
-SvelteKit file-based routing. Current routes: `/` (home), `/collection`. The `/decks` route is linked in nav but not yet created.
+SvelteKit file-based routing. Current routes: `/` (home), `/collection`, `/card-lists`, `/card-lists/compare`.
+
+`src/routes/+layout.ts` sets `prerender = true` (every route is prerendered to real HTML — this is not an SPA-fallback setup) and `trailingSlash = 'always'`. The trailing slash makes the static adapter emit `collection/index.html` instead of `collection.html`, so any plain static host serves every route without rewrite rules. Don't remove it without adding host-side rewrites — `/collection` 404s on a dumb file server otherwise.
 
 ### i18n
 

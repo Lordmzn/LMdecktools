@@ -41,7 +41,7 @@
 				</a>
 			</p>
 			<p class="pt-20 font-sans text-sm antialiased">
-				<a href="http://wengu.tartarie.com/wg/wengu.php? l=Yijing&no=48" target="_blank">䷯</a> One draws
+				<a href="http://wengu.tartarie.com/wg/wengu.php?l=Yijing&no=48" target="_blank">䷯</a> One draws
 				from the well without hindrance.
 			</p>
 		</div>
