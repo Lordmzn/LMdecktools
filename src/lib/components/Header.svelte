@@ -8,22 +8,22 @@
 </script>
 
 <DBSelectionModal bind:show={showStartupModal} />
-<header class="px-4 pt-4">
-	<div
-		class="mx-auto flex max-w-screen-xl items-center justify-between rounded-2xl border border-neutral-500/30 bg-neutral-800/40 px-4 py-2 backdrop-blur-md"
-	>
+<header
+	class="sticky top-0 z-40 border-b border-orange-500/[0.08] bg-slate-950/80 backdrop-blur-xl backdrop-saturate-150"
+>
+	<div class="flex h-[60px] items-center justify-between px-4 sm:px-8">
 		<!-- Logo + Tab Navigation -->
 		<HeaderNav />
 
 		<!-- DB Status Button -->
 		<button
 			onclick={() => (showStartupModal = !showStartupModal)}
-			class="relative inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium text-neutral-100 transition-all duration-200 {store.dbMode ===
+			class="relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-[0.82rem] font-semibold tracking-tight transition-all duration-200 {store.dbMode ===
 			'active'
-				? 'bg-orange-500 hover:bg-orange-600'
+				? 'bg-orange-500 text-slate-950 shadow-[0_2px_16px_rgba(249,115,22,0.3)] hover:bg-orange-600'
 				: store.dbMode === 'peek'
-					? 'bg-amber-600 hover:bg-amber-700'
-					: 'bg-neutral-700 hover:bg-neutral-600'}"
+					? 'bg-amber-600 text-white hover:bg-amber-700'
+					: 'border border-orange-500/20 text-orange-300 hover:border-orange-500/40 hover:bg-orange-500/[0.06]'}"
 			title="Gestione Database"
 		>
 			{#if store.linkedFileStatus === 'active'}

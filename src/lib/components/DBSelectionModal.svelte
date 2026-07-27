@@ -43,7 +43,9 @@
 	let extImportRunning = $state(false);
 	let extImportProgress = $state({ current: 0, total: 0 });
 	let extImportPreview = $state<ParseResult | null>(null);
-	let extImportSummary = $state<{ success: number; failed: number; notFound: string[] } | null>(null);
+	let extImportSummary = $state<{ success: number; failed: number; notFound: string[] } | null>(
+		null
+	);
 	let extImportErr = $state<string | null>(null);
 	let extImportFetching = $state(false);
 
@@ -363,19 +365,52 @@
 			class:scale-95={!show}
 		>
 			<!-- Header -->
-			<div class="bg-gradient-to-r from-orange-900 to-orange-500 px-6 py-4">
-				<h2 class="flex items-center gap-2 text-2xl font-bold text-neutral-100">
-					⚔️ Welcome to LM Deck Tools 🏴‍☠️
-				</h2>
-				<p class="mt-1 text-sm text-orange-100">Choose how to start your MTG collection</p>
+			<div
+				class="flex items-center gap-4 border-b border-orange-500/[0.12] bg-gradient-to-br from-orange-500/[0.12] to-transparent px-6 py-5"
+			>
+				<!-- Jolly Roger — replaces the two stray emoji the design system flagged -->
+				<svg
+					class="h-10 w-10 shrink-0 text-orange-400"
+					viewBox="0 0 100 100"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+					stroke-linecap="round"
+					stroke-linejoin="round"
+					aria-hidden="true"
+				>
+					<g opacity="0.6">
+						<path
+							d="M50 2C32 2 20 15 20 30c0 10 5 18 12 23v7h36v-7c7-5 12-13 12-23C80 15 68 2 50 2z"
+						/>
+						<circle cx="39" cy="28" r="5.5" fill="currentColor" />
+						<circle cx="61" cy="28" r="5.5" fill="currentColor" />
+						<path d="M50 40v3" />
+						<path d="M36 49h28" />
+					</g>
+					<g transform="rotate(-20, 50, 88)">
+						<rect x="32" y="48" width="28" height="40" rx="3" fill="#0f1218" stroke-width="2" />
+					</g>
+					<g transform="rotate(20, 50, 88)">
+						<rect x="40" y="48" width="28" height="40" rx="3" fill="#0f1218" stroke-width="2" />
+					</g>
+				</svg>
+				<div>
+					<h2 class="text-2xl font-extrabold tracking-tight text-white">
+						Welcome to LM Deck Tools
+					</h2>
+					<p class="mt-0.5 text-sm text-slate-400">Choose how to start your MTG collection</p>
+				</div>
 			</div>
 
 			<!-- Toolbar -->
-			<div class="flex gap-1 border-b border-neutral-800 bg-neutral-900 px-4 py-2">
+			<div class="flex gap-1 border-b border-orange-500/[0.08] bg-slate-900 px-4 py-2">
 				<button
 					onclick={() => toggleSection('localdb')}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'localdb' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
+						{activeSection === 'localdb'
+						? 'bg-orange-500/10 text-orange-400'
+						: 'text-slate-400 hover:text-orange-300'}"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path
@@ -388,10 +423,15 @@
 					In-browser DB
 				</button>
 				<button
-					onclick={() => { toggleSection('link'); exportBackupSuccess = false; }}
+					onclick={() => {
+						toggleSection('link');
+						exportBackupSuccess = false;
+					}}
 					disabled={store.dbMode !== 'active'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'link' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						{activeSection === 'link'
+						? 'bg-orange-500/10 text-orange-400'
+						: 'text-slate-400 hover:text-orange-300'}
 						disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -407,7 +447,9 @@
 				<button
 					onclick={() => toggleSection('cache')}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'cache' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}"
+						{activeSection === 'cache'
+						? 'bg-orange-500/10 text-orange-400'
+						: 'text-slate-400 hover:text-orange-300'}"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 						<path
@@ -420,10 +462,15 @@
 					Cache
 				</button>
 				<button
-					onclick={() => { toggleSection('import'); resetExtImport(); }}
+					onclick={() => {
+						toggleSection('import');
+						resetExtImport();
+					}}
 					disabled={store.dbMode !== 'active'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'import' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						{activeSection === 'import'
+						? 'bg-orange-500/10 text-orange-400'
+						: 'text-slate-400 hover:text-orange-300'}
 						disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -440,7 +487,9 @@
 					onclick={() => toggleSection('export')}
 					disabled={store.dbMode !== 'active'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'export' ? 'bg-neutral-700 text-orange-400' : 'text-neutral-400 hover:text-neutral-200'}
+						{activeSection === 'export'
+						? 'bg-orange-500/10 text-orange-400'
+						: 'text-slate-400 hover:text-orange-300'}
 						disabled:cursor-not-allowed disabled:opacity-40"
 				>
 					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -462,14 +511,14 @@
 					<!-- Connect to existing local DB (only if DB exists but not active) -->
 					{#if localDBexists === true && store.dbMode !== 'active'}
 						<div
-							class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+							class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 						>
 							<div class="flex items-start gap-4">
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
 								>
 									<svg
-										class="h-6 w-6 text-green-400"
+										class="h-6 w-6 text-orange-400"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -483,14 +532,14 @@
 									</svg>
 								</div>
 								<div class="flex-1">
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">
 										{#if localDBexists === null}
 											Searching for local database
 										{:else}
 											Local database found
 										{/if}
 									</h3>
-									<div class="mb-4 space-y-2 text-sm text-neutral-400">
+									<div class="mb-4 space-y-2 text-sm text-slate-400">
 										{@render dbContentStats()}
 									</div>
 									{#if store.dbMode === 'peek'}
@@ -500,10 +549,7 @@
 											Previewing in read-only mode. Click "Connect" to enable editing.
 										</div>
 									{/if}
-									<button
-										onclick={handleLoadLocal}
-										class="w-full rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700"
-									>
+									<button onclick={handleLoadLocal} class="btn btn-subtle w-full">
 										Connect to local DB
 									</button>
 								</div>
@@ -513,15 +559,13 @@
 
 					<!-- DB info when active -->
 					{#if store.dbMode === 'active'}
-						<div
-							class="rounded-xl border-2 border-green-800 p-5"
-						>
+						<div class="rounded-xl border-2 border-green-800 p-5">
 							<div class="flex items-start gap-4">
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
 								>
 									<svg
-										class="h-6 w-6 text-green-400"
+										class="h-6 w-6 text-orange-400"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -535,10 +579,8 @@
 									</svg>
 								</div>
 								<div class="flex-1">
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">
-										Local database active
-									</h3>
-									<div class="space-y-2 text-sm text-neutral-400">
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">Local database active</h3>
+									<div class="space-y-2 text-sm text-slate-400">
 										{@render dbContentStats()}
 									</div>
 								</div>
@@ -547,18 +589,18 @@
 					{/if}
 
 					<!-- Separator -->
-					<div class="my-4 border-t border-neutral-800"></div>
+					<div class="my-4 border-t border-orange-500/[0.08]"></div>
 
 					<!-- Create New sub-section -->
 					<div
-						class="mt-4 rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+						class="mt-4 rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 					>
 						<div class="flex items-start gap-4">
 							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-purple-900"
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
 							>
 								<svg
-									class="h-6 w-6 text-purple-400"
+									class="h-6 w-6 text-orange-400"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
@@ -572,13 +614,13 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Start from scratch</h3>
-								<p class="mb-4 text-sm text-neutral-400">
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">Start from scratch</h3>
+								<p class="mb-4 text-sm text-slate-400">
 									Create a new empty database. All existing data will be cleared.
 								</p>
 								<button
 									onclick={() => (showCreateNewConfirm = true)}
-									class="w-full rounded-lg bg-purple-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-purple-700"
+									class="btn btn-primary w-full"
 								>
 									Create New Database
 								</button>
@@ -590,13 +632,13 @@
 				<!-- Export Section (CSV collection export) -->
 				{#if activeSection === 'export'}
 					<div class="space-y-4">
-						<p class="text-sm text-neutral-400">
+						<p class="text-sm text-slate-400">
 							Export your collection as CSV to share with other tools and services.
 						</p>
 
 						<div>
-							<label class="mb-2 block text-sm font-semibold text-neutral-300">Include Fields:</label>
-							<div class="grid grid-cols-2 gap-2 text-sm text-neutral-300 sm:grid-cols-4">
+							<label class="mb-2 block text-sm font-semibold text-slate-300">Include Fields:</label>
+							<div class="grid grid-cols-2 gap-2 text-sm text-slate-300 sm:grid-cols-4">
 								{#each csvFieldOptions as option (option.value)}
 									<label class="flex cursor-pointer items-center gap-2">
 										<input
@@ -614,7 +656,7 @@
 						<textarea
 							value={csvText}
 							readonly
-							class="h-64 w-full rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm text-neutral-300"
+							class="h-64 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-300"
 							placeholder="Select fields to generate preview..."
 						></textarea>
 
@@ -622,14 +664,14 @@
 							<button
 								onclick={handleCsvDownload}
 								disabled={!csvText}
-								class="flex-1 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500 sm:flex-none"
+								class="btn btn-primary flex-1 disabled:cursor-not-allowed sm:flex-none"
 							>
 								Download File
 							</button>
 							<button
 								onclick={handleCsvCopy}
 								disabled={!csvText}
-								class="rounded-lg bg-neutral-700 px-4 py-2 text-neutral-200 transition hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+								class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								Copy to Clipboard
 							</button>
@@ -642,7 +684,7 @@
 					{#if fsAccessSupported}
 						<!-- Auto-save link controls -->
 						<div
-							class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+							class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 						>
 							<div class="flex items-start gap-4">
 								{#if store.linkedFileStatus === 'active'}
@@ -707,10 +749,10 @@
 									</div>
 								{:else}
 									<div
-										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-blue-900"
+										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
 									>
 										<svg
-											class="h-6 w-6 text-blue-400"
+											class="h-6 w-6 text-orange-400"
 											fill="none"
 											stroke="currentColor"
 											viewBox="0 0 24 24"
@@ -726,10 +768,10 @@
 								{/if}
 								<div class="flex-1">
 									{#if store.linkedFileStatus === 'none'}
-										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										<h3 class="mb-2 text-lg font-semibold text-slate-100">
 											Link a File (Bring Your Own Cloud)
 										</h3>
-										<p class="mb-3 text-sm text-neutral-400">
+										<p class="mb-3 text-sm text-slate-400">
 											Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
 											iCloud, OneDrive) for cross-device sync with zero server involvement.
 										</p>
@@ -737,95 +779,82 @@
 											<button
 												onclick={() => linkFile()}
 												disabled={store.dbMode !== 'active'}
-												class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 											>
 												New File...
 											</button>
 											<button
 												onclick={() => linkExistingFile()}
 												disabled={store.dbMode !== 'active'}
-												class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 											>
 												Existing File...
 											</button>
 										</div>
 									{:else if store.linkedFileStatus === 'active'}
-										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										<h3 class="mb-2 text-lg font-semibold text-slate-100">
 											Linked: {store.linkedFileName}
 										</h3>
 										{#if lastSavedText}
-											<p class="mb-3 text-sm text-neutral-400">
+											<p class="mb-3 text-sm text-slate-400">
 												{lastSavedText}
 											</p>
 										{/if}
-										<p class="mb-4 text-sm text-neutral-400">
+										<p class="mb-4 text-sm text-slate-400">
 											Changes are automatically saved to this file.
 										</p>
 										<div class="flex gap-2">
 											<button
 												onclick={() => saveNow()}
 												disabled={store.linkedFileWriting}
-												class="flex-1 rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 											>
 												{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
 											</button>
-											<button
-												onclick={() => changeFile()}
-												class="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-blue-700"
-											>
+											<button onclick={() => changeFile()} class="btn btn-subtle flex-1">
 												Change File...
 											</button>
-											<button
-												onclick={() => unlinkFile()}
-												class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-											>
+											<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
 												Unlink
 											</button>
 										</div>
 									{:else if store.linkedFileStatus === 'reconnect'}
-										<h3 class="mb-2 text-lg font-semibold text-neutral-100">
+										<h3 class="mb-2 text-lg font-semibold text-slate-100">
 											File link needs reconnection
 										</h3>
-										<p class="mb-4 text-sm text-neutral-400">
+										<p class="mb-4 text-sm text-slate-400">
 											The browser needs your permission to access "{store.linkedFileName}" again.
 											Click Reconnect to re-grant access.
 										</p>
 										{#if store.linkedFilePermissionDenied}
-											<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
-												Permission was denied. Reload the page to try again, or grant access in your browser settings.
+											<p
+												class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+											>
+												Permission was denied. Reload the page to try again, or grant access in your
+												browser settings.
 											</p>
 										{/if}
 										<div class="flex gap-2">
 											<button
 												onclick={() => reconnectFile()}
 												disabled={store.linkedFilePermissionDenied}
-												class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 											>
 												Reconnect
 											</button>
-											<button
-												onclick={() => unlinkFile()}
-												class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-											>
+											<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
 												Unlink
 											</button>
 										</div>
 									{:else if store.linkedFileStatus === 'not-found'}
-										<h3 class="mb-2 text-lg font-semibold text-neutral-100">Linked file not found</h3>
-										<p class="mb-3 text-sm text-neutral-400">
+										<h3 class="mb-2 text-lg font-semibold text-slate-100">Linked file not found</h3>
+										<p class="mb-3 text-sm text-slate-400">
 											File not found — "{store.linkedFileName}" could not be located.
 										</p>
-										<p class="mb-4 text-sm text-green-400">
-											Your data is safe in the browser.
-										</p>
-										<button
-											onclick={() => unlinkFile()}
-											class="rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-										>
-											Unlink
-										</button>
+										<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
+										<button onclick={() => unlinkFile()} class="btn btn-quiet"> Unlink </button>
 									{:else if store.linkedFileStatus === 'write-error'}
-										<h3 class="mb-2 text-lg font-semibold text-neutral-100">File write error</h3>
+										<h3 class="mb-2 text-lg font-semibold text-slate-100">File write error</h3>
 										{#if store.linkedFileError}
 											<p
 												class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
@@ -833,24 +862,16 @@
 												{store.linkedFileError}
 											</p>
 										{/if}
-										<p class="mb-3 text-sm text-neutral-400">
+										<p class="mb-3 text-sm text-slate-400">
 											Failed to write to "{store.linkedFileName}". The file may be locked or
 											inaccessible.
 										</p>
-										<p class="mb-4 text-sm text-green-400">
-											Your data is safe in the browser.
-										</p>
+										<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
 										<div class="flex gap-2">
-											<button
-												onclick={() => retryWrite()}
-												class="flex-1 rounded-lg bg-amber-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-amber-700"
-											>
+											<button onclick={() => retryWrite()} class="btn btn-subtle flex-1">
 												Retry
 											</button>
-											<button
-												onclick={() => unlinkFile()}
-												class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600"
-											>
+											<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
 												Unlink
 											</button>
 										</div>
@@ -860,19 +881,19 @@
 						</div>
 
 						<!-- Separator -->
-						<div class="my-4 border-t border-neutral-800"></div>
+						<div class="my-4 border-t border-orange-500/[0.08]"></div>
 					{/if}
 
 					<!-- Download copy (all browsers) -->
 					<div
-						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+						class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 					>
 						<div class="flex items-start gap-4">
 							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
 							>
 								<svg
-									class="h-6 w-6 text-green-400"
+									class="h-6 w-6 text-orange-400"
 									fill="none"
 									stroke="currentColor"
 									viewBox="0 0 24 24"
@@ -886,8 +907,8 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Download copy</h3>
-								<p class="mb-4 text-sm text-neutral-400">
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">Download copy</h3>
+								<p class="mb-4 text-sm text-slate-400">
 									Download a full copy of your database (collection + all card lists).
 								</p>
 								{#if exportBackupSuccess}
@@ -900,7 +921,7 @@
 								<button
 									onclick={handleExportBackup}
 									disabled={isExportingBackup}
-									class="flex w-full items-center justify-center gap-2 rounded-lg bg-green-600 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-green-700 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+									class="btn btn-subtle flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
 								>
 									{isExportingBackup ? 'Preparing…' : 'Download .yjs file'}
 								</button>
@@ -910,15 +931,15 @@
 
 					{#if !fsAccessSupported}
 						<!-- Separator -->
-						<div class="my-4 border-t border-neutral-800"></div>
+						<div class="my-4 border-t border-orange-500/[0.08]"></div>
 
 						<!-- Restore from file (Firefox fallback) -->
 						<div
-							class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+							class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 						>
 							<div class="flex items-start gap-4">
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-800"
 								>
 									<svg
 										class="h-6 w-6 text-orange-400"
@@ -935,9 +956,10 @@
 									</svg>
 								</div>
 								<div class="flex-1">
-									<h3 class="mb-2 text-lg font-semibold text-neutral-100">Restore from file</h3>
-									<p class="mb-4 text-sm text-neutral-400">
-										Restore your database from a previously downloaded copy. This replaces all current data.
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">Restore from file</h3>
+									<p class="mb-4 text-sm text-slate-400">
+										Restore your database from a previously downloaded copy. This replaces all
+										current data.
 									</p>
 									<input
 										type="file"
@@ -945,10 +967,10 @@
 										bind:this={fileInput}
 										onchange={handleFileSelect}
 										disabled={isLoadingFile}
-										class="mb-3 block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+										class="mb-3 block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
 									/>
 									{#if selectedFile && !importResult && !importError}
-										<p class="mb-3 text-xs text-neutral-400">
+										<p class="mb-3 text-xs text-slate-400">
 											Selected file: {selectedFile.name}
 										</p>
 									{/if}
@@ -957,7 +979,9 @@
 											<div
 												class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
 											>
-												Restored {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+												Restored {importResult.imported} list{importResult.imported !== 1
+													? 's'
+													: ''} successfully.
 											</div>
 										{:else}
 											<div
@@ -977,7 +1001,7 @@
 									<button
 										onclick={handleLoadFile}
 										disabled={!selectedFile || isLoadingFile || importResult !== null}
-										class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+										class="btn btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
 									>
 										{#if isLoadingFile}
 											<svg
@@ -1009,7 +1033,7 @@
 							</div>
 						</div>
 
-						<p class="mt-4 text-xs text-neutral-500">
+						<p class="mt-4 text-xs text-slate-500">
 							Auto-save to a linked file requires Chrome 86+, Edge 86+, or Safari 15.2+.
 						</p>
 					{/if}
@@ -1018,11 +1042,11 @@
 				<!-- Image Cache Section -->
 				{#if activeSection === 'cache'}
 					<div
-						class="rounded-xl border-2 border-neutral-800 p-5 transition-colors hover:border-neutral-700"
+						class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 					>
 						<div class="flex items-start gap-4">
 							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-neutral-800"
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-800"
 							>
 								<svg
 									class="h-6 w-6 text-orange-400"
@@ -1039,11 +1063,11 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-neutral-100">Image Cache</h3>
-								<p class="mb-3 text-sm text-neutral-400">
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">Image Cache</h3>
+								<p class="mb-3 text-sm text-slate-400">
 									Card images are cached locally for faster loading.
 								</p>
-								<div class="mb-4 space-y-2 text-sm text-neutral-400">
+								<div class="mb-4 space-y-2 text-sm text-slate-400">
 									<div class="flex justify-between">
 										<span class="font-medium">Cached images:</span>
 										<span class="font-mono">{imageCacheCount}</span>
@@ -1057,7 +1081,7 @@
 										isClearingCache = false;
 									}}
 									disabled={isClearingCache || imageCacheCount === 0}
-									class="w-full rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 shadow-sm transition-colors duration-200 hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+									class="btn btn-quiet w-full disabled:cursor-not-allowed disabled:opacity-50"
 								>
 									{isClearingCache ? 'Clearing…' : 'Clear Image Cache'}
 								</button>
@@ -1071,13 +1095,18 @@
 					<div class="space-y-4">
 						<!-- Source mode selector -->
 						<div>
-							<label class="mb-2 block text-sm font-medium text-neutral-400">Source</label>
+							<label class="mb-2 block text-sm font-medium text-slate-400">Source</label>
 							<div class="flex gap-1">
 								{#each [{ value: 'file', label: 'File' }, { value: 'text', label: 'Paste' }, { value: 'url', label: 'URL' }] as opt (opt.value)}
 									<button
-										onclick={() => { extImportMode = opt.value as ImportMode; resetExtImport(); }}
+										onclick={() => {
+											extImportMode = opt.value as ImportMode;
+											resetExtImport();
+										}}
 										class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-											{extImportMode === opt.value ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+											{extImportMode === opt.value
+											? 'bg-orange-500 text-slate-950'
+											: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 									>
 										{opt.label}
 									</button>
@@ -1087,19 +1116,23 @@
 
 						<!-- Target selector -->
 						<div>
-							<label class="mb-2 block text-sm font-medium text-neutral-400">Import into</label>
+							<label class="mb-2 block text-sm font-medium text-slate-400">Import into</label>
 							<div class="flex gap-1">
 								<button
 									onclick={() => (extImportTarget = 'list')}
 									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-										{extImportTarget === 'list' ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+										{extImportTarget === 'list'
+										? 'bg-orange-500 text-slate-950'
+										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
 									New List
 								</button>
 								<button
 									onclick={() => (extImportTarget = 'collection')}
 									class="flex-1 rounded-lg px-3 py-2 text-sm font-medium transition-colors
-										{extImportTarget === 'collection' ? 'bg-orange-500 text-neutral-100' : 'bg-neutral-800 text-neutral-400 hover:text-neutral-200'}"
+										{extImportTarget === 'collection'
+										? 'bg-orange-500 text-slate-950'
+										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
 									Collection
 								</button>
@@ -1115,10 +1148,10 @@
 									bind:this={extImportFileInput}
 									onchange={handleExtImportFileSelect}
 									disabled={extImportRunning}
-									class="block w-full text-sm text-neutral-400 file:mr-4 file:rounded-lg file:border-0 file:bg-neutral-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+									class="block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
 								/>
 								{#if extImportSelectedFile}
-									<p class="mt-2 text-xs text-neutral-500">{extImportSelectedFile.name}</p>
+									<p class="mt-2 text-xs text-slate-500">{extImportSelectedFile.name}</p>
 								{/if}
 							{:else if extImportMode === 'text'}
 								<textarea
@@ -1126,7 +1159,7 @@
 									oninput={handleExtImportTextChange}
 									disabled={extImportRunning}
 									placeholder="4 Lightning Bolt&#10;2 Counterspell&#10;&#10;Or paste CSV data..."
-									class="h-36 w-full rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
+									class="h-36 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-100 placeholder-slate-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
 								></textarea>
 							{:else if extImportMode === 'url'}
 								<div class="flex gap-2">
@@ -1135,30 +1168,35 @@
 										bind:value={extImportUrl}
 										disabled={extImportRunning || extImportFetching}
 										placeholder="https://moxfield.com/decks/... or archidekt.com/decks/..."
-										class="flex-1 rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
+										class="field flex-1 disabled:opacity-50"
 									/>
 									<button
 										onclick={handleExtImportUrlFetch}
 										disabled={!extImportUrl.trim() || extImportFetching || extImportRunning}
-										class="rounded-lg bg-neutral-700 px-4 py-2 text-sm font-medium text-neutral-300 transition hover:bg-neutral-600 disabled:cursor-not-allowed disabled:opacity-50"
+										class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 									>
 										{extImportFetching ? 'Fetching…' : 'Fetch'}
 									</button>
 								</div>
-								<p class="mt-2 text-xs text-neutral-500">
-									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file import as fallback.
+								<p class="mt-2 text-xs text-slate-500">
+									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file
+									import as fallback.
 								</p>
 							{/if}
 						</div>
 
 						<!-- Preview -->
 						{#if extImportPreview}
-							<div class="rounded-lg border border-neutral-700 bg-neutral-800/50 p-3">
-								<div class="flex items-center gap-2 text-sm text-neutral-300">
-									<span class="font-medium">{extImportPreview.cards.length} card{extImportPreview.cards.length !== 1 ? 's' : ''} parsed</span>
+							<div class="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+								<div class="flex items-center gap-2 text-sm text-slate-300">
+									<span class="font-medium"
+										>{extImportPreview.cards.length} card{extImportPreview.cards.length !== 1
+											? 's'
+											: ''} parsed</span
+									>
 									{#if extImportPreview.listName}
-										<span class="text-neutral-500">—</span>
-										<span class="text-neutral-400">"{extImportPreview.listName}"</span>
+										<span class="text-slate-500">—</span>
+										<span class="text-slate-400">"{extImportPreview.listName}"</span>
 									{/if}
 								</div>
 								{#if extImportPreview.warnings.length > 0}
@@ -1180,16 +1218,30 @@
 
 						<!-- Results -->
 						{#if extImportSummary}
-							<div class="rounded-lg border {extImportSummary.failed === 0 ? 'border-green-800 bg-green-950' : 'border-amber-800 bg-amber-950'} p-3">
-								<p class="text-sm {extImportSummary.failed === 0 ? 'text-green-400' : 'text-amber-400'}">
-									Imported {extImportSummary.success} card{extImportSummary.success !== 1 ? 's' : ''}{extImportSummary.failed > 0 ? `, ${extImportSummary.failed} failed` : ' successfully'}.
+							<div
+								class="rounded-lg border {extImportSummary.failed === 0
+									? 'border-green-800 bg-green-950'
+									: 'border-amber-800 bg-amber-950'} p-3"
+							>
+								<p
+									class="text-sm {extImportSummary.failed === 0
+										? 'text-green-400'
+										: 'text-amber-400'}"
+								>
+									Imported {extImportSummary.success} card{extImportSummary.success !== 1
+										? 's'
+										: ''}{extImportSummary.failed > 0
+										? `, ${extImportSummary.failed} failed`
+										: ' successfully'}.
 								</p>
 								{#if extImportSummary.notFound.length > 0}
 									<details class="mt-2">
-										<summary class="cursor-pointer text-xs text-neutral-400">
-											{extImportSummary.notFound.length} card{extImportSummary.notFound.length !== 1 ? 's' : ''} not found on Scryfall
+										<summary class="cursor-pointer text-xs text-slate-400">
+											{extImportSummary.notFound.length} card{extImportSummary.notFound.length !== 1
+												? 's'
+												: ''} not found on Scryfall
 										</summary>
-										<ul class="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-xs text-neutral-500">
+										<ul class="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-xs text-slate-500">
 											{#each extImportSummary.notFound as name}
 												<li>{name}</li>
 											{/each}
@@ -1203,8 +1255,10 @@
 						{#if !extImportSummary}
 							<button
 								onclick={handleExtImportRun}
-								disabled={extImportRunning || !extImportPreview || extImportPreview.cards.length === 0}
-								class="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 font-medium text-neutral-100 shadow-sm transition-colors duration-200 hover:bg-orange-600 disabled:cursor-not-allowed disabled:bg-neutral-700 disabled:text-neutral-500"
+								disabled={extImportRunning ||
+									!extImportPreview ||
+									extImportPreview.cards.length === 0}
+								class="btn btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
 							>
 								{#if extImportRunning}
 									<svg
@@ -1213,7 +1267,14 @@
 										fill="none"
 										viewBox="0 0 24 24"
 									>
-										<circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
+										<circle
+											class="opacity-25"
+											cx="12"
+											cy="12"
+											r="10"
+											stroke="currentColor"
+											stroke-width="4"
+										/>
 										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
 									</svg>
 									{#if extImportProgress.total > 0}
@@ -1230,8 +1291,8 @@
 				{/if}
 
 				<!-- Info Note (always visible) -->
-				<div class="mt-6 rounded-lg border border-neutral-800 bg-neutral-800/50 p-4">
-					<p class="text-xs text-neutral-400">
+				<div class="mt-6 rounded-lg border border-slate-800 bg-slate-800/50 p-4">
+					<p class="text-xs text-slate-400">
 						<strong>Note:</strong> You can always export or import your data later using the application
 						controls.
 					</p>
@@ -1254,29 +1315,25 @@
 			class="panel mx-4 w-full max-w-md rounded-xl p-6 shadow-2xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h3 class="mb-3 text-lg font-bold text-neutral-100">Create new database?</h3>
-			<p class="mb-3 text-sm text-neutral-400">
-				This will <strong class="text-red-400">permanently delete</strong> all your current data — card lists, collection, and settings.
+			<h3 class="mb-3 text-lg font-bold text-slate-100">Create new database?</h3>
+			<p class="mb-3 text-sm text-slate-400">
+				This will <strong class="text-red-400">permanently delete</strong> all your current data — card
+				lists, collection, and settings.
 			</p>
 			{#if store.linkedFileStatus !== 'none'}
 				<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
-					Your linked file "{store.linkedFileName}" will be unlinked. The file itself won't be deleted, but it will no longer sync with the app.
+					Your linked file "{store.linkedFileName}" will be unlinked. The file itself won't be
+					deleted, but it will no longer sync with the app.
 				</p>
 			{/if}
-			<p class="mb-5 text-sm text-neutral-500">
+			<p class="mb-5 text-sm text-slate-500">
 				This action cannot be undone. Make sure you have a backup if needed.
 			</p>
 			<div class="flex gap-3">
-				<button
-					onclick={() => (showCreateNewConfirm = false)}
-					class="flex-1 rounded-lg bg-neutral-700 px-4 py-2 font-medium text-neutral-300 transition hover:bg-neutral-600"
-				>
+				<button onclick={() => (showCreateNewConfirm = false)} class="btn btn-quiet flex-1">
 					Cancel
 				</button>
-				<button
-					onclick={handleCreateNew}
-					class="flex-1 rounded-lg bg-red-600 px-4 py-2 font-medium text-neutral-100 transition hover:bg-red-700"
-				>
+				<button onclick={handleCreateNew} class="btn btn-danger flex-1">
 					Delete and Create New
 				</button>
 			</div>

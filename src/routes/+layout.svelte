@@ -35,7 +35,8 @@
 </script>
 
 <ParaglideJS {i18n}>
-	<div class="flex min-h-screen flex-col text-neutral-100">
+	<!-- z-2 lifts all content above the fixed film-grain layer painted on body::after -->
+	<div class="relative z-[2] flex min-h-screen flex-col text-slate-100">
 		<Header />
 
 		<main class="flex-1">

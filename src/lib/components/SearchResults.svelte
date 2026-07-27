@@ -16,7 +16,7 @@
 			{/each}
 		</div>
 	{:else}
-		<div class="py-12 text-center text-neutral-400">
+		<div class="py-12 text-center text-slate-400">
 			<svg
 				xmlns="http://www.w3.org/2000/svg"
 				width="48"

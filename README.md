@@ -114,12 +114,12 @@ messages/
 
 ## Routes
 
-| Path                  | Description                          |
-| --------------------- | ------------------------------------ |
-| `/`                   | Home / landing page                  |
-| `/collection`         | Collection management                |
-| `/card-lists`         | Card list manager                    |
-| `/card-lists/compare` | Side-by-side card list comparison    |
+| Path                  | Description                       |
+| --------------------- | --------------------------------- |
+| `/`                   | Home / landing page               |
+| `/collection`         | Collection management             |
+| `/card-lists`         | Card list manager                 |
+| `/card-lists/compare` | Side-by-side card list comparison |
 
 ## Built With
 

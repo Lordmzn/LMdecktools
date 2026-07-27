@@ -53,8 +53,10 @@ test.describe('Database Initialization', () => {
 	test('home page renders correctly', async ({ page }) => {
 		await page.goto('/');
 
-		await expect(page.getByRole('heading', { name: /Welcome to LM Deck Tools/i })).toBeVisible();
+		await expect(page.getByRole('heading', { name: /Chart Your Own Course/i })).toBeVisible();
 		await expect(page.getByText('Manage Card Lists')).toBeVisible();
 		await expect(page.getByText('Manage Collection')).toBeVisible();
+		// The Compact — the manifesto that carries the local-first promise
+		await expect(page.getByText('Your data never leaves your device.')).toBeVisible();
 	});
 });

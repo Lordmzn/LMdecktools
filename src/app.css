@@ -1,8 +1,83 @@
+/* Self-hosted webfonts — no third-party requests, works offline.
+   Outfit for everything, Space Mono for eyebrows/labels/numerics. */
+@import '@fontsource-variable/outfit/index.css';
+@import '@fontsource/space-mono/400.css';
+@import '@fontsource/space-mono/700.css';
+
 @import 'tailwindcss';
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
-/* ── Glossy panel — semi-transparent dark surface with orange gradient border ── */
+/* ── Design tokens ────────────────────────────────────────────────────────────
+   Mirrors .claude/skills/LM Deck Tools Design System/tokens/*.css.
+   The slate scale is the design system's own — deliberately NOT Tailwind's
+   stock slate, which is bluer and lighter at the dark end. */
+@theme {
+	--font-sans: 'Outfit Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+	--font-display: 'Outfit Variable', -apple-system, BlinkMacSystemFont, sans-serif;
+	--font-mono: 'Space Mono', ui-monospace, monospace;
+
+	--color-slate-50: #f4f5f7;
+	--color-slate-100: #e4e6eb;
+	--color-slate-200: #cbcfd8;
+	--color-slate-300: #b0b4c0;
+	--color-slate-400: #8b90a0;
+	--color-slate-500: #636878;
+	--color-slate-600: #454a58;
+	--color-slate-700: #272b36;
+	--color-slate-800: #1a1d26;
+	--color-slate-900: #0f1218;
+	--color-slate-950: #0a0c10;
+
+	/* Semantic surfaces */
+	--color-surface: #0f1218;
+	--color-surface-raised: #1a1d26;
+
+	--radius-card: 16px;
+	--radius-compact: 20px;
+
+	--shadow-card-hover: 0 12px 40px rgba(0, 0, 0, 0.25), 0 0 60px rgba(249, 115, 22, 0.05);
+	--shadow-accent: 0 2px 16px rgba(249, 115, 22, 0.3), 0 0 0 1px rgba(249, 115, 22, 0.1);
+	--shadow-accent-hover: 0 6px 28px rgba(249, 115, 22, 0.4);
+
+	--animate-compass-spin: compassSpin 200s linear infinite;
+	--animate-pulse-dot: pulseDot 2s ease-in-out infinite;
+}
+
+:root {
+	/* Hairline borders carry the brand colour at low opacity rather than
+	   a solid neutral grey. */
+	--border-subtle: rgba(249, 115, 22, 0.08);
+	--border-default: rgba(249, 115, 22, 0.15);
+	--border-strong: rgba(249, 115, 22, 0.3);
+}
+
+/* ── Page base ─────────────────────────────────────────────────────────────── */
+html {
+	background-color: #0a0c10;
+	color: #b0b4c0;
+	-webkit-font-smoothing: antialiased;
+}
+
+body {
+	min-height: 100vh;
+	overflow-x: hidden;
+}
+
+/* Film grain — sits above the background, below all content (which the layout
+   raises to z-index 2). Never intercepts pointer events. */
+body::after {
+	content: '';
+	position: fixed;
+	inset: 0;
+	background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+	pointer-events: none;
+	z-index: 1;
+}
+
+/* ── Glossy panel — semi-transparent dark surface with orange gradient border ──
+   Kept verbatim: per the design system this stays the surface for dialogs and
+   page shells; the landing has no modal to prefer instead. */
 .panel {
 	position: relative;
 	isolation: isolate;
@@ -42,30 +117,308 @@
 	pointer-events: none;
 }
 
-html {
-	background-color: #0a0a0a; /* neutral-950 */
-	background-image:
-		/* teal — top-right */
-		radial-gradient(
-			ellipse 700px 700px at calc(100% + 80px) -80px,
-			rgba(20, 184, 166, 0.18) 0%,
-			rgba(20, 184, 166, 0.06) 45%,
-			transparent 70%
-		),
-		/* purple — bottom-left */
-			radial-gradient(
-				ellipse 600px 600px at -80px calc(100% + 80px),
-				rgba(124, 58, 237, 0.16) 0%,
-				rgba(124, 58, 237, 0.05) 45%,
-				transparent 70%
-			),
-		/* orange — center-right */
-			radial-gradient(
-				ellipse 500px 500px at 78% 42%,
-				rgba(249, 115, 22, 0.12) 0%,
-				rgba(249, 115, 22, 0.04) 45%,
-				transparent 70%
-			);
-	background-attachment: fixed;
-	color: #f5f5f5; /* neutral-100 */
+/* ── Component classes ─────────────────────────────────────────────────────── */
+@layer components {
+	/* Eyebrow / tag label — mono, uppercase, letter-spaced. A typographic
+	   device, not a change of copy voice. */
+	.eyebrow {
+		font-family: var(--font-mono);
+		font-size: 0.62rem;
+		letter-spacing: 0.18em;
+		text-transform: uppercase;
+		color: var(--color-orange-600);
+	}
+
+	/* Rope divider — the bespoke section rule used instead of <hr>. */
+	.rope-divider {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 1.5rem;
+		height: 20px;
+	}
+
+	.rope-line {
+		flex: 1;
+		height: 2px;
+		opacity: 0.2;
+		background: repeating-linear-gradient(
+			90deg,
+			var(--color-orange-600) 0px,
+			var(--color-orange-600) 8px,
+			transparent 8px,
+			transparent 12px,
+			var(--color-orange-700) 12px,
+			var(--color-orange-700) 20px,
+			transparent 20px,
+			transparent 24px
+		);
+	}
+
+	.rope-knot {
+		flex-shrink: 0;
+		width: 8px;
+		height: 8px;
+		border: 2px solid var(--color-orange-500);
+		border-radius: 50%;
+		opacity: 0.25;
+	}
+
+	/* Surface card — dark, hairline border, no shadow at rest. Shadow, brighter
+	   border and a 4px lift appear only on hover. */
+	.surface-card {
+		position: relative;
+		background: var(--color-surface);
+		border: 1px solid var(--border-subtle);
+		border-radius: var(--radius-card);
+		transition:
+			border-color 0.3s ease,
+			transform 0.3s ease,
+			box-shadow 0.3s ease;
+	}
+
+	.surface-card-hover:hover {
+		border-color: rgba(249, 115, 22, 0.2);
+		transform: translateY(-4px);
+		box-shadow: var(--shadow-card-hover);
+	}
+
+	/* Corner bracket accent — grows on hover. Landing/feature cards only. */
+	.corner-bracket::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		right: 0;
+		width: 60px;
+		height: 60px;
+		border-top: 2px solid var(--border-subtle);
+		border-right: 2px solid var(--border-subtle);
+		border-radius: 0 var(--radius-card) 0 0;
+		transition: all 0.3s ease;
+	}
+
+	.corner-bracket:hover::before {
+		width: 80px;
+		height: 80px;
+		border-color: rgba(249, 115, 22, 0.2);
+	}
+
+	/* Buttons — two variants carry the app: solid primary and outlined ghost,
+	   plus a low-emphasis subtle for inline actions. */
+	.btn {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 0.5rem;
+		padding: 0.6rem 1.2rem;
+		border-radius: 8px;
+		font-weight: 600;
+		font-size: 0.88rem;
+		letter-spacing: -0.01em;
+		cursor: pointer;
+		border: 1px solid transparent;
+		transition: all 0.25s ease;
+	}
+
+	.btn:disabled {
+		opacity: 0.45;
+		cursor: not-allowed;
+	}
+
+	.btn-lg {
+		padding: 0.75rem 1.6rem;
+		font-size: 0.95rem;
+	}
+
+	.btn-sm {
+		padding: 0.4rem 0.85rem;
+		font-size: 0.8rem;
+	}
+
+	.btn-primary {
+		background: var(--color-orange-500);
+		/* Dark label on the accent: white is only 2.9:1 on orange-500, this is 7.0:1 */
+		color: var(--color-slate-950);
+		box-shadow: var(--shadow-accent);
+	}
+
+	.btn-primary:hover:not(:disabled) {
+		background: var(--color-orange-600);
+		transform: translateY(-1px);
+		box-shadow: var(--shadow-accent-hover);
+	}
+
+	.btn-ghost {
+		background: transparent;
+		color: var(--color-orange-300);
+		border-color: rgba(249, 115, 22, 0.2);
+	}
+
+	.btn-ghost:hover:not(:disabled) {
+		background: rgba(249, 115, 22, 0.06);
+		border-color: var(--border-strong);
+		transform: translateY(-1px);
+	}
+
+	.btn-subtle {
+		background: rgba(249, 115, 22, 0.1);
+		color: var(--color-orange-300);
+		border-color: var(--border-subtle);
+	}
+
+	.btn-subtle:hover:not(:disabled) {
+		background: rgba(249, 115, 22, 0.16);
+		color: var(--color-orange-200);
+	}
+
+	.btn-quiet {
+		background: var(--color-surface-raised);
+		color: var(--color-slate-300);
+		border-color: rgba(255, 255, 255, 0.06);
+	}
+
+	.btn-quiet:hover:not(:disabled) {
+		background: var(--color-slate-700);
+		color: var(--color-slate-100);
+	}
+
+	.btn-danger {
+		background: transparent;
+		color: #f87171;
+		border-color: rgba(239, 68, 68, 0.3);
+	}
+
+	.btn-danger:hover:not(:disabled) {
+		background: rgba(239, 68, 68, 0.12);
+		border-color: rgba(239, 68, 68, 0.5);
+	}
+
+	/* Segmented control — mutually exclusive options sharing one pill. */
+	.seg {
+		border: 1px solid var(--border-strong);
+		background-color: var(--color-surface-raised);
+		color: var(--color-slate-300);
+		padding: 0.25rem 0.75rem;
+		font-size: 0.82rem;
+		font-weight: 500;
+		transition: all 0.2s ease;
+	}
+
+	.seg:hover:not(:disabled):not(.seg-active) {
+		background-color: var(--color-slate-700);
+		color: var(--color-slate-100);
+	}
+
+	.seg-active {
+		background-color: var(--color-orange-500);
+		border-color: var(--color-orange-500);
+		color: var(--color-slate-950);
+	}
+
+	.seg:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.seg-l {
+		border-radius: 8px 0 0 8px;
+	}
+
+	.seg-r {
+		border-radius: 0 8px 8px 0;
+		margin-left: -1px;
+	}
+
+	/* Form fields — one treatment for every input, select and textarea.
+	   background-color, not background: the shorthand would wipe the chevron
+	   background-image @tailwindcss/forms puts on <select>. */
+	.field {
+		background-color: var(--color-surface-raised);
+		border: 1px solid rgba(255, 255, 255, 0.07);
+		border-radius: 8px;
+		padding: 0.5rem 0.75rem;
+		color: var(--color-slate-100);
+		font-size: 0.88rem;
+		transition:
+			border-color 0.2s ease,
+			box-shadow 0.2s ease;
+	}
+
+	.field::placeholder {
+		color: var(--color-slate-500);
+	}
+
+	/* Room for the chevron the forms plugin draws */
+	select.field {
+		padding-right: 2.25rem;
+	}
+
+	.field:focus {
+		outline: none;
+		border-color: var(--color-orange-500);
+		box-shadow: 0 0 0 3px rgba(249, 115, 22, 0.15);
+	}
+
+	.field:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+}
+
+/* ── Focus visibility ──────────────────────────────────────────────────────── */
+:where(a, button, input, select, textarea, [tabindex]):focus-visible {
+	outline: 2px solid var(--color-orange-400);
+	outline-offset: 2px;
+	border-radius: 6px;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+	from {
+		opacity: 0;
+		transform: translateY(24px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes compassSpin {
+	to {
+		transform: rotate(360deg);
+	}
+}
+
+@keyframes pulseDot {
+	0%,
+	100% {
+		opacity: 0.4;
+	}
+	50% {
+		opacity: 1;
+	}
+}
+
+.fade-up {
+	animation: fadeUp 0.7s ease both;
+}
+
+/* Everything slow and one-directional — no bounce, no spring. */
+@media (prefers-reduced-motion: reduce) {
+	*,
+	*::before,
+	*::after {
+		animation-duration: 0.001ms !important;
+		animation-iteration-count: 1 !important;
+		transition-duration: 0.001ms !important;
+		scroll-behavior: auto !important;
+	}
+
+	.fade-up {
+		animation: none;
+		opacity: 1;
+		transform: none;
+	}
 }

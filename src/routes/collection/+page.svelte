@@ -159,11 +159,11 @@
 			class="panel max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-xl shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<div class="flex items-center justify-between border-b border-neutral-800 p-6">
-				<h2 class="text-2xl font-bold text-neutral-100">Add Cards to Collection</h2>
+			<div class="flex items-center justify-between border-b border-orange-500/[0.08] p-6">
+				<h2 class="text-2xl font-bold tracking-tight text-slate-50">Add Cards to Collection</h2>
 				<button
 					onclick={() => (showSearchModal = false)}
-					class="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-neutral-100"
+					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
 					title="Close"
 				>
 					<svg
@@ -192,12 +192,13 @@
 
 <div class="mx-auto max-w-7xl p-4">
 	<!-- Header + Collection Grid -->
-	<div class="panel rounded-xl p-6">
+	<div class="surface-card p-6">
 		<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
 			<div>
-				<h1 class="text-3xl font-bold text-neutral-100">My Collection</h1>
+				<div class="eyebrow mb-1">The Hold</div>
+				<h1 class="text-3xl font-extrabold tracking-tight text-white">My Collection</h1>
 				{#if store.dbLoaded}
-					<p class="mt-1 text-neutral-400">
+					<p class="mt-1 text-sm text-slate-400">
 						{store.totalOwnedCards} cards ({store.uniqueOwnedCards} unique)
 					</p>
 				{/if}
@@ -210,15 +211,11 @@
 					disabled={!store.dbLoaded}
 					bind:value={filterText}
 					placeholder="Filter cards..."
-					class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+					class="field"
 				/>
 
 				<!-- Sort -->
-				<select
-					bind:value={sortBy}
-					disabled={!store.dbLoaded}
-					class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
-				>
+				<select bind:value={sortBy} disabled={!store.dbLoaded} class="field">
 					<option value="name">Sort by Name</option>
 					<option value="quantity">Sort by Quantity</option>
 					<option value="set">Sort by Set</option>
@@ -227,8 +224,7 @@
 				<button
 					onclick={() => (showSearchModal = true)}
 					disabled={store.dbMode === 'none'}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600"
-					class:disabled={store.dbMode === 'none'}
+					class="btn btn-primary"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -244,7 +240,6 @@
 					</svg>
 					Add Cards
 				</button>
-
 			</div>
 		</div>
 
@@ -261,17 +256,17 @@
 			</div>
 			{#if hasMore}
 				<div bind:this={sentinelEl} class="flex justify-center py-8">
-					<p class="text-sm text-neutral-500">
+					<p class="font-mono text-xs tracking-wider text-slate-400 uppercase">
 						Showing {visibleCount} of {filteredCollection.length} cards...
 					</p>
 				</div>
 			{/if}
 		{:else if filterText !== ''}
-			<div class="py-12 text-center text-neutral-400">
+			<div class="py-12 text-center text-slate-400">
 				<p>No cards match your filter</p>
 			</div>
 		{:else}
-			<div class="py-12 text-center text-neutral-400">
+			<div class="py-12 text-center text-slate-400">
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
 					width="48"
@@ -286,21 +281,13 @@
 					<path d="M3 9h18" />
 				</svg>
 				{#if store.dbLoaded}
-					<p>No cards in collection yet</p>
-					<p class="mt-2 text-sm">Click "Add Cards" to get started</p>
+					<p>Your hold is empty</p>
+					<p class="mt-2 text-sm text-slate-400">Click "Add Cards" to start logging what you own</p>
 				{:else}
 					<p>No database selected</p>
-					<p class="mt-2 text-sm">Click "Choose DB" to get started</p>
+					<p class="mt-2 text-sm text-slate-400">Click "Choose DB" to get started</p>
 				{/if}
 			</div>
 		{/if}
 	</div>
 </div>
-
-<style>
-	.disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-		background-color: #404040;
-	}
-</style>

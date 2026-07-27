@@ -279,11 +279,11 @@
 			class="panel max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-xl shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<div class="flex items-center justify-between border-b border-neutral-800 p-6">
-				<h2 class="text-2xl font-bold text-neutral-100">Add Cards to List</h2>
+			<div class="flex items-center justify-between border-b border-orange-500/[0.08] p-6">
+				<h2 class="text-2xl font-bold text-slate-100">Add Cards to List</h2>
 				<button
 					onclick={() => (showAddCardsModal = false)}
-					class="rounded-lg p-2 text-neutral-400 transition hover:bg-neutral-800 hover:text-neutral-100"
+					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
 					title="Close"
 				>
 					<svg
@@ -326,26 +326,26 @@
 			class="panel w-full max-w-lg rounded-xl p-6 shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h2 class="mb-4 text-xl font-bold text-neutral-100">Import List</h2>
-			<p class="mb-3 text-sm text-neutral-400">Paste a card list in standard format:</p>
+			<h2 class="mb-4 text-xl font-bold text-slate-100">Import List</h2>
+			<p class="mb-3 text-sm text-slate-400">Paste a card list in standard format:</p>
 			<textarea
 				bind:value={importText}
 				disabled={isImporting}
 				placeholder="# List Name&#10;4 Lightning Bolt&#10;2 Mountain"
-				class="h-48 w-full rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
+				class="field h-48 w-full font-mono disabled:opacity-50"
 			></textarea>
 			<div class="mt-4 flex justify-end gap-2">
 				<button
 					onclick={() => (showImportModal = false)}
 					disabled={isImporting}
-					class="rounded-lg border border-neutral-700 px-4 py-2 text-neutral-300 transition hover:bg-neutral-800 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					Cancel
 				</button>
 				<button
 					onclick={handleImport}
 					disabled={isImporting}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-75"
+					class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-75"
 				>
 					{#if isImporting}
 						<svg
@@ -388,23 +388,15 @@
 			onclick={(e) => e.stopPropagation()}
 		>
 			<h2 class="mb-3 text-xl font-bold text-red-400">Delete List</h2>
-			<p class="mb-1 text-neutral-300">
+			<p class="mb-1 text-slate-300">
 				Are you sure you want to delete <strong>{store.currentCardList?.name}</strong>?
 			</p>
-			<p class="mb-6 text-sm text-neutral-400">This action cannot be undone.</p>
+			<p class="mb-6 text-sm text-slate-400">This action cannot be undone.</p>
 			<div class="flex justify-end gap-2">
-				<button
-					onclick={() => (showDeleteConfirmModal = false)}
-					class="rounded-lg border border-neutral-700 px-4 py-2 text-neutral-300 transition hover:bg-neutral-800"
-				>
+				<button onclick={() => (showDeleteConfirmModal = false)} class="btn btn-quiet">
 					Cancel
 				</button>
-				<button
-					onclick={handleDeleteList}
-					class="rounded-lg bg-red-600 px-4 py-2 text-neutral-100 transition hover:bg-red-700"
-				>
-					Delete
-				</button>
+				<button onclick={handleDeleteList} class="btn btn-danger"> Delete </button>
 			</div>
 		</div>
 	</div>
@@ -423,23 +415,18 @@
 			class="panel w-full max-w-lg rounded-xl p-6 shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h2 class="mb-4 text-xl font-bold text-neutral-100">Export List</h2>
+			<h2 class="mb-4 text-xl font-bold text-slate-100">Export List</h2>
 			<pre
 				data-testid="export-text"
-				class="h-48 w-full overflow-auto rounded-lg border border-neutral-700 bg-neutral-800 p-3 font-mono text-sm whitespace-pre-wrap text-neutral-300">{exportText}</pre>
+				class="h-48 w-full overflow-auto rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm whitespace-pre-wrap text-slate-300">{exportText}</pre>
 			<div class="mt-4 flex justify-end gap-2">
 				<button
 					onclick={() => navigator.clipboard.writeText(exportText).then(() => notify('Copied!'))}
-					class="rounded-lg border border-neutral-700 px-4 py-2 text-neutral-300 transition hover:bg-neutral-800"
+					class="btn btn-quiet"
 				>
 					Copy
 				</button>
-				<button
-					onclick={() => (showExportModal = false)}
-					class="rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600"
-				>
-					Close
-				</button>
+				<button onclick={() => (showExportModal = false)} class="btn btn-primary"> Close </button>
 			</div>
 		</div>
 	</div>
@@ -447,15 +434,15 @@
 
 <div class="mx-auto max-w-7xl p-4">
 	<!-- Header -->
-	<div class="panel mb-6 rounded-xl p-6">
+	<div class="surface-card mb-6 p-6">
 		<!-- Row 1: Lists label + dropdown + New List button -->
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-4">
 			<div class="flex items-center gap-3">
-				<span class="text-lg font-semibold text-neutral-400">Lists</span>
+				<span class="text-lg font-semibold text-slate-400">Lists</span>
 				<select
 					onchange={(e) => handleSwitchList(parseInt((e.currentTarget as HTMLSelectElement).value))}
 					disabled={!store.dbLoaded || store.savedCardLists.length === 0}
-					class="min-w-[200px] rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:cursor-not-allowed disabled:opacity-50"
+					class="field min-w-[200px] disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					{#if store.savedCardLists.length === 0}
 						<option value={-1}>No lists</option>
@@ -468,7 +455,7 @@
 				<button
 					onclick={() => (showDeleteConfirmModal = true)}
 					disabled={store.dbMode === 'none' || !store.currentCardList}
-					class="flex items-center gap-2 rounded-lg bg-red-600 px-3 py-2 text-neutral-100 transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-danger disabled:cursor-not-allowed disabled:opacity-50"
 					title="Delete this list"
 				>
 					<svg
@@ -490,8 +477,7 @@
 			<div class="flex items-center gap-2">
 				<a
 					href="/card-lists/compare"
-					class="flex items-center gap-2 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 {store
-						.savedCardLists.length < 2
+					class="btn btn-quiet {store.savedCardLists.length < 2
 						? 'pointer-events-none opacity-50'
 						: ''}"
 					aria-disabled={store.savedCardLists.length < 2}
@@ -515,7 +501,7 @@
 				<button
 					onclick={handleCreateList}
 					disabled={store.dbMode === 'none'}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -536,12 +522,13 @@
 	</div>
 
 	<!-- Card Panel -->
-	<div class="panel rounded-xl p-6">
+	<div class="surface-card p-6">
 		<!-- List name + card count | Filter + Sort + Action buttons -->
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-4">
 			<div>
+				<div class="eyebrow mb-0.5">Current chart</div>
 				<h2
-					class="text-xl font-bold text-neutral-100 outline-none {store.currentCardList &&
+					class="text-xl font-extrabold tracking-tight text-white outline-none {store.currentCardList &&
 					!store.isReadOnly
 						? 'cursor-text'
 						: ''}"
@@ -569,7 +556,7 @@
 				>
 					{store.currentCardList?.name || 'No list selected'}
 				</h2>
-				<p class="mt-1 text-sm text-neutral-400">
+				<p class="mt-1 text-sm text-slate-400">
 					{#if store.dbLoaded}
 						{store.totalCards} cards ({store.uniqueCards} unique)
 					{:else}
@@ -583,13 +570,9 @@
 					disabled={!store.dbLoaded}
 					bind:value={filterText}
 					placeholder="Filter cards..."
-					class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 placeholder-neutral-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
+					class="field disabled:opacity-50"
 				/>
-				<select
-					bind:value={sortBy}
-					disabled={!store.dbLoaded}
-					class="rounded-lg border border-neutral-700 bg-neutral-800 px-3 py-2 text-sm text-neutral-100 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
-				>
+				<select bind:value={sortBy} disabled={!store.dbLoaded} class="field disabled:opacity-50">
 					<option value="name">Sort by Name</option>
 					<option value="quantity">Sort by Quantity</option>
 					<option value="set">Sort by Set</option>
@@ -597,7 +580,7 @@
 				<button
 					onclick={handleAddAllToCollection}
 					disabled={store.isReadOnly || store.listCards.length === 0}
-					class="flex items-center gap-2 rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 					title="Add all list cards to your collection"
 				>
 					<svg
@@ -617,7 +600,7 @@
 				<button
 					onclick={() => (showAddCardsModal = true)}
 					disabled={store.dbMode === 'none'}
-					class="flex items-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -636,14 +619,14 @@
 				<button
 					onclick={() => (showImportModal = true)}
 					disabled={store.dbMode === 'none'}
-					class="rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					Import
 				</button>
 				<button
 					onclick={handleExport}
 					disabled={!store.dbLoaded || store.listCards.length === 0}
-					class="rounded-lg bg-neutral-800 px-4 py-2 text-neutral-300 transition hover:bg-neutral-700 disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 				>
 					Export
 				</button>
@@ -654,50 +637,50 @@
 		{#if store.currentCardList}
 			<div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
 				<div class="flex items-center gap-2">
-					<span class="font-medium text-neutral-400">Card Matching:</span>
-					<button
-						onclick={() => handleCardMatchingChange('generic')}
-						disabled={store.dbMode === 'none'}
-						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
-							.currentCardList.cardMatching === 'generic'
-							? 'bg-orange-500 text-neutral-100'
-							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
-					>
-						Generic
-					</button>
-					<button
-						onclick={() => handleCardMatchingChange('specific')}
-						disabled={store.dbMode === 'none'}
-						class="-ml-px rounded-r-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
-							.currentCardList.cardMatching === 'specific'
-							? 'bg-orange-500 text-neutral-100'
-							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
-					>
-						Specific
-					</button>
+					<span class="font-medium text-slate-400">Card Matching:</span>
+					<div class="inline-flex">
+						<button
+							onclick={() => handleCardMatchingChange('generic')}
+							disabled={store.dbMode === 'none'}
+							class="seg seg-l {store.currentCardList.cardMatching === 'generic'
+								? 'seg-active'
+								: ''}"
+						>
+							Generic
+						</button>
+						<button
+							onclick={() => handleCardMatchingChange('specific')}
+							disabled={store.dbMode === 'none'}
+							class="seg seg-r {store.currentCardList.cardMatching === 'specific'
+								? 'seg-active'
+								: ''}"
+						>
+							Specific
+						</button>
+					</div>
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="font-medium text-neutral-400">Language:</span>
-					<button
-						onclick={() => handleLanguageMatchingChange('any')}
-						disabled={store.dbMode === 'none'}
-						class="rounded-l-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
-							.currentCardList.languageMatching === 'any'
-							? 'bg-orange-500 text-neutral-100'
-							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
-					>
-						Any
-					</button>
-					<button
-						onclick={() => handleLanguageMatchingChange('strict')}
-						disabled={store.dbMode === 'none'}
-						class="-ml-px rounded-r-lg border border-neutral-700 px-3 py-1 transition disabled:cursor-not-allowed disabled:opacity-50 {store
-							.currentCardList.languageMatching === 'strict'
-							? 'bg-orange-500 text-neutral-100'
-							: 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}"
-					>
-						Strict
-					</button>
+					<span class="font-medium text-slate-400">Language:</span>
+					<div class="inline-flex">
+						<button
+							onclick={() => handleLanguageMatchingChange('any')}
+							disabled={store.dbMode === 'none'}
+							class="seg seg-l {store.currentCardList.languageMatching === 'any'
+								? 'seg-active'
+								: ''}"
+						>
+							Any
+						</button>
+						<button
+							onclick={() => handleLanguageMatchingChange('strict')}
+							disabled={store.dbMode === 'none'}
+							class="seg seg-r {store.currentCardList.languageMatching === 'strict'
+								? 'seg-active'
+								: ''}"
+						>
+							Strict
+						</button>
+					</div>
 				</div>
 				{#if store.listCards.length > 0}
 					{#if ownershipCheck.owned}
@@ -723,7 +706,7 @@
 		<!-- Card Grid -->
 		<div class="list-cards" data-testid="list-cards">
 			{#if store.listCards.length === 0}
-				<div class="py-12 text-center text-neutral-400">
+				<div class="py-12 text-center text-slate-400">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						width="48"
@@ -741,7 +724,7 @@
 					<p class="mt-2 text-sm">Click "Add Cards" to get started</p>
 				</div>
 			{:else if filteredListCards.length === 0}
-				<div class="py-12 text-center text-neutral-400">
+				<div class="py-12 text-center text-slate-400">
 					<p>No cards match your filter</p>
 				</div>
 			{:else}
@@ -760,7 +743,7 @@
 				</div>
 				{#if hasMore}
 					<div bind:this={sentinelEl} class="flex justify-center py-8">
-						<p class="text-sm text-neutral-500">
+						<p class="text-sm text-slate-500">
 							Showing {visibleCount} of {filteredListCards.length} cards...
 						</p>
 					</div>
