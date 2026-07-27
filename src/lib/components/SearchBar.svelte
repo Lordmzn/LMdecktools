@@ -19,19 +19,27 @@
 
 <div>
 	<div class="flex items-center gap-3">
-		<div class="text-2xl">🔎</div>
+		<svg
+			class="h-5 w-5 shrink-0 text-orange-400"
+			viewBox="0 0 24 24"
+			fill="none"
+			stroke="currentColor"
+			stroke-width="2"
+			stroke-linecap="round"
+			stroke-linejoin="round"
+			aria-hidden="true"
+		>
+			<circle cx="11" cy="11" r="8" />
+			<path d="m21 21-4.3-4.3" />
+		</svg>
 		<input
 			bind:value={searchInput}
 			type="text"
 			placeholder="Search for cards..."
 			onkeydown={handleKeydown}
-			class="flex-1 rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-slate-100 placeholder-slate-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20"
+			class="field flex-1"
 		/>
-		<button
-			onclick={handleSearch}
-			class="rounded-lg bg-orange-500 px-6 py-2 text-slate-100 transition hover:bg-orange-600 disabled:opacity-50"
-			disabled={isSearching}
-		>
+		<button onclick={handleSearch} class="btn btn-primary" disabled={isSearching}>
 			{isSearching ? 'Searching...' : 'Search'}
 		</button>
 		<label
