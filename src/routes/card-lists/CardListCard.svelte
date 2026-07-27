@@ -40,18 +40,18 @@
 			<button
 				onclick={() => onDecrement(card)}
 				{disabled}
-				class="rounded-l-full py-0.5 pr-0.5 pl-2 text-sm font-bold text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded-l-full py-0.5 pr-0.5 pl-2 text-sm font-bold text-slate-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
 				title={card.LM_quantity <= 1 ? 'Remove from list' : 'Decrease quantity'}
 			>
 				−
 			</button>
-			<span class="min-w-[1.5rem] py-0.5 text-center text-sm font-bold text-neutral-100">
+			<span class="min-w-[1.5rem] py-0.5 text-center text-sm font-bold text-slate-100">
 				{card.LM_quantity}×
 			</span>
 			<button
 				onclick={() => onIncrement(card)}
 				{disabled}
-				class="rounded-r-full py-0.5 pr-2 pl-0.5 text-sm font-bold text-neutral-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded-r-full py-0.5 pr-2 pl-0.5 text-sm font-bold text-slate-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
 				title="Increase quantity"
 			>
 				+
@@ -62,7 +62,7 @@
 		{#if isDFC}
 			<button
 				onclick={() => (flipped = !flipped)}
-				class="absolute top-2 left-2 rounded-full bg-neutral-800/80 p-1.5 text-neutral-100 shadow-lg transition hover:bg-neutral-700"
+				class="absolute top-2 left-2 rounded-full bg-slate-800/80 p-1.5 text-slate-100 shadow-lg transition hover:bg-slate-700"
 				title="Flip card"
 			>
 				<svg
@@ -91,7 +91,7 @@
 			<button
 				onclick={() => onAddToCollection(card)}
 				{disabled}
-				class="rounded-lg bg-green-600 p-2 font-semibold text-neutral-100 shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded-lg bg-green-600 p-2 font-semibold text-slate-100 shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
 				title="Add to collection"
 			>
 				<svg
@@ -110,7 +110,7 @@
 			<button
 				onclick={() => onRemove(card)}
 				{disabled}
-				class="rounded-lg bg-red-500 p-2 font-semibold text-neutral-100 shadow-lg transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+				class="rounded-lg bg-red-500 p-2 font-semibold text-slate-100 shadow-lg transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
 				title="Remove from list"
 			>
 				<svg

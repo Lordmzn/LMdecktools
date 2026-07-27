@@ -35,7 +35,7 @@
 		<!-- Owned Badge -->
 		{#if showOwned && ownedQuantity > 0}
 			<div
-				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-neutral-100 shadow-lg"
+				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-slate-100 shadow-lg"
 			>
 				Own: {ownedQuantity}
 			</div>
@@ -45,7 +45,7 @@
 		{#if isDFC}
 			<button
 				onclick={() => (flipped = !flipped)}
-				class="absolute top-2 left-2 rounded-full bg-neutral-800/80 p-1.5 text-neutral-100 shadow-lg transition hover:bg-neutral-700"
+				class="absolute top-2 left-2 rounded-full bg-slate-800/80 p-1.5 text-slate-100 shadow-lg transition hover:bg-slate-700"
 				title="Flip card"
 			>
 				<svg
@@ -74,7 +74,7 @@
 			<button
 				data-testid="card-add-btn"
 				onclick={handleAdd}
-				class="flex translate-y-4 transform items-center gap-2 rounded-lg bg-neutral-100 px-4 py-2 font-semibold text-neutral-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-white {isAdding
+				class="flex translate-y-4 transform items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 font-semibold text-slate-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-white {isAdding
 					? 'scale-110'
 					: ''}"
 			>
@@ -100,7 +100,7 @@
 	</div>
 
 	<!-- Card Name Below -->
-	<div class="mt-2 w-full px-2 text-sm font-medium text-neutral-300">
+	<div class="mt-2 w-full px-2 text-sm font-medium text-slate-300">
 		{card.name}
 	</div>
 </div>

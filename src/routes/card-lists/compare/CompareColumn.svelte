@@ -51,13 +51,13 @@
 <div class="flex flex-col rounded-xl border {colorClasses.border} {colorClasses.bg} p-4">
 	<h3 class="mb-3 text-sm font-semibold tracking-wide uppercase {colorClasses.text}">
 		{title}
-		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-neutral-100">
+		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-slate-100">
 			{cards.length}
 		</span>
 	</h3>
 
 	{#if cards.length === 0}
-		<p class="py-6 text-center text-sm text-neutral-500">No cards</p>
+		<p class="py-6 text-center text-sm text-slate-500">No cards</p>
 	{:else}
 		<div class="space-y-2">
 			{#each cards as { card, quantityA, quantityB } (card.id + card.name)}
@@ -93,18 +93,18 @@
 					{/if}
 
 					<!-- Name -->
-					<span class="min-w-0 flex-1 truncate text-sm text-neutral-200">{card.name}</span>
+					<span class="min-w-0 flex-1 truncate text-sm text-slate-200">{card.name}</span>
 
 					<!-- Quantity badge(s) -->
 					{#if showBothQuantities}
-						<span class="text-xs text-neutral-400">
+						<span class="text-xs text-slate-400">
 							<span class="text-amber-400">{quantityA}</span>
 							/
 							<span class="text-blue-400">{quantityB}</span>
 						</span>
 					{:else}
 						<span
-							class="rounded-full {colorClasses.badge} min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-bold text-neutral-100"
+							class="rounded-full {colorClasses.badge} min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-bold text-slate-100"
 						>
 							{quantityA || quantityB}
 						</span>

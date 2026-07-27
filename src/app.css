@@ -306,9 +306,47 @@ body::after {
 		border-color: rgba(239, 68, 68, 0.5);
 	}
 
-	/* Form fields — one treatment for every input, select and textarea. */
+	/* Segmented control — mutually exclusive options sharing one pill. */
+	.seg {
+		border: 1px solid var(--border-strong);
+		background-color: var(--color-surface-raised);
+		color: var(--color-slate-300);
+		padding: 0.25rem 0.75rem;
+		font-size: 0.82rem;
+		font-weight: 500;
+		transition: all 0.2s ease;
+	}
+
+	.seg:hover:not(:disabled):not(.seg-active) {
+		background-color: var(--color-slate-700);
+		color: var(--color-slate-100);
+	}
+
+	.seg-active {
+		background-color: var(--color-orange-500);
+		border-color: var(--color-orange-500);
+		color: #fff;
+	}
+
+	.seg:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
+
+	.seg-l {
+		border-radius: 8px 0 0 8px;
+	}
+
+	.seg-r {
+		border-radius: 0 8px 8px 0;
+		margin-left: -1px;
+	}
+
+	/* Form fields — one treatment for every input, select and textarea.
+	   background-color, not background: the shorthand would wipe the chevron
+	   background-image @tailwindcss/forms puts on <select>. */
 	.field {
-		background: var(--color-surface-raised);
+		background-color: var(--color-surface-raised);
 		border: 1px solid rgba(255, 255, 255, 0.07);
 		border-radius: 8px;
 		padding: 0.5rem 0.75rem;
@@ -321,6 +359,11 @@ body::after {
 
 	.field::placeholder {
 		color: var(--color-slate-500);
+	}
+
+	/* Room for the chevron the forms plugin draws */
+	select.field {
+		padding-right: 2.25rem;
 	}
 
 	.field:focus {

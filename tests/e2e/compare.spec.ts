@@ -127,30 +127,30 @@ test.describe('Compare page toggles', () => {
 		const genericBtn = page.getByRole('button', { name: 'Generic' });
 		const specificBtn = page.getByRole('button', { name: 'Specific' });
 
-		await expect(genericBtn).toHaveClass(/bg-orange-500/);
-		await expect(specificBtn).not.toHaveClass(/bg-orange-500/);
+		await expect(genericBtn).toHaveClass(/seg-active/);
+		await expect(specificBtn).not.toHaveClass(/seg-active/);
 
 		// Click "Specific"
 		await specificBtn.click();
-		await expect(specificBtn).toHaveClass(/bg-orange-500/);
-		await expect(genericBtn).not.toHaveClass(/bg-orange-500/);
+		await expect(specificBtn).toHaveClass(/seg-active/);
+		await expect(genericBtn).not.toHaveClass(/seg-active/);
 
 		// Click "Generic" again
 		await genericBtn.click();
-		await expect(genericBtn).toHaveClass(/bg-orange-500/);
-		await expect(specificBtn).not.toHaveClass(/bg-orange-500/);
+		await expect(genericBtn).toHaveClass(/seg-active/);
+		await expect(specificBtn).not.toHaveClass(/seg-active/);
 	});
 
 	test('language matching toggle updates visually', async ({ page }) => {
 		const anyBtn = page.getByRole('button', { name: 'Any' });
 		const strictBtn = page.getByRole('button', { name: 'Strict' });
 
-		await expect(anyBtn).toHaveClass(/bg-orange-500/);
-		await expect(strictBtn).not.toHaveClass(/bg-orange-500/);
+		await expect(anyBtn).toHaveClass(/seg-active/);
+		await expect(strictBtn).not.toHaveClass(/seg-active/);
 
 		await strictBtn.click();
-		await expect(strictBtn).toHaveClass(/bg-orange-500/);
-		await expect(anyBtn).not.toHaveClass(/bg-orange-500/);
+		await expect(strictBtn).toHaveClass(/seg-active/);
+		await expect(anyBtn).not.toHaveClass(/seg-active/);
 	});
 
 	test('switching from generic to specific changes comparison result', async ({ page }) => {
