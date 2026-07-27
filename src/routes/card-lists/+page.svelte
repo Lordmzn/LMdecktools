@@ -83,7 +83,7 @@
 	async function handleIncrementQuantity(card: any) {
 		try {
 			await addCardToList(card);
-		} catch (error) {
+		} catch {
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
 		}
 	}
@@ -91,7 +91,7 @@
 	async function handleDecrementQuantity(card: any) {
 		try {
 			await removeCardFromList(card);
-		} catch (error) {
+		} catch {
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
 		}
 	}
@@ -155,7 +155,7 @@
 			} else {
 				notify(`Added ${added}, failed ${failed}`, 'error');
 			}
-		} catch (e) {
+		} catch {
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add cards to collection', 'error');
 		}
 	}
@@ -164,7 +164,7 @@
 		try {
 			await addToCollection(card, card.LM_quantity);
 			notify(`Added ${card.name} to collection`);
-		} catch (e) {
+		} catch {
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card to collection', 'error');
 		}
 	}
@@ -205,6 +205,8 @@
 	let missingCount = $derived(ownershipCheck.cards.filter((r) => !r.owned).length);
 
 	let dedupedCards = $derived.by(() => {
+		// Local scratch map, discarded when the derivation returns — no reactivity needed
+		// eslint-disable-next-line svelte/prefer-svelte-reactivity
 		const seen = new Map<string, { card: any; owned: boolean }>();
 		for (const entry of ownershipCheck.cards) {
 			const existing = seen.get(entry.card.id);
@@ -243,8 +245,8 @@
 
 	// Reset visible count when filter/sort changes
 	$effect(() => {
-		filterText;
-		sortBy;
+		// Read both so the effect re-runs on either change
+		const _deps = [filterText, sortBy];
 		visibleCount = PAGE_SIZE;
 	});
 

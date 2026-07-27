@@ -97,7 +97,7 @@
 
 					<!-- Quantity badge(s) -->
 					{#if showBothQuantities}
-						<span class="text-xs text-slate-400">
+						<span class="text-xs text-slate-400" title="{nameA} / {nameB}">
 							<span class="text-amber-400">{quantityA}</span>
 							/
 							<span class="text-blue-400">{quantityB}</span>

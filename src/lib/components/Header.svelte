@@ -25,6 +25,7 @@
 					? 'bg-amber-600 text-white hover:bg-amber-700'
 					: 'border border-orange-500/20 text-orange-300 hover:border-orange-500/40 hover:bg-orange-500/[0.06]'}"
 			title="Gestione Database"
+			data-testid="db-modal-toggle"
 		>
 			{#if store.linkedFileStatus === 'active'}
 				<span class="absolute -top-1 -right-1 flex h-3 w-3">

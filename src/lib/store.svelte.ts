@@ -652,6 +652,7 @@ async function fetchCardsByName(
 	onProgress?: (fetched: number, total: number) => void
 ): Promise<{ found: Map<string, any>; notFound: string[] }> {
 	// Deduplicate names (case-insensitive)
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const seen = new Set<string>();
 	const uniqueNames: string[] = [];
 	for (const name of names) {
@@ -662,6 +663,7 @@ async function fetchCardsByName(
 		}
 	}
 
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const found = new Map<string, any>();
 	const notFound: string[] = [];
 	const totalBatches = Math.ceil(uniqueNames.length / SCRYFALL_BATCH_SIZE);
@@ -711,6 +713,7 @@ async function fetchCardsByIds(
 	onProgress?: (fetched: number, total: number) => void
 ): Promise<{ found: Map<string, any>; notFound: string[] }> {
 	const uniqueIds = [...new Set(ids)];
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const found = new Map<string, any>();
 	const notFound: string[] = [];
 	const totalBatches = Math.ceil(uniqueIds.length / SCRYFALL_BATCH_SIZE);
@@ -889,6 +892,7 @@ export async function importCollectionFromText(
 	}
 
 	// 2. Batch-fetch all unique card names
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const uniqueNames = [...new Set(parsed.map((p) => p.name.toLowerCase()))].map(
 		(lower) => parsed.find((p) => p.name.toLowerCase() === lower)!.name
 	);
@@ -940,7 +944,9 @@ async function fetchParsedCards(
 		onProgress?.(completedBatches, totalBatches);
 	};
 
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const byId = new Map<string, any>();
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const byName = new Map<string, any>();
 	const notFound: string[] = [];
 
@@ -1309,12 +1315,14 @@ export async function importListFromText(
 	}
 
 	// 2. Batch-fetch all unique card names
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const uniqueNames = [...new Set(parsed.map((p) => p.name.toLowerCase()))].map(
 		(lower) => parsed.find((p) => p.name.toLowerCase() === lower)!.name
 	);
 	const { found } = await fetchCardsByName(uniqueNames, onProgress);
 
 	// 3. Build card list from results, merging duplicates by card id
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
 	const cardMap = new Map<string, any>();
 	for (const entry of parsed) {
 		const card = found.get(entry.name.toLowerCase());

@@ -33,8 +33,15 @@ async function openDBModal(page: import('@playwright/test').Page) {
 
 // ==================== [planned] Database Import from File ====================
 
+// These two specs drive an "Import from File" section that the tabbed-modal
+// redesign removed. They are not simply out of date: restoring a backup now
+// lives under "Restore from file", which renders only when the File System
+// Access API is absent (Firefox) and only inside the export section, which
+// needs an active database. On Chromium with no DB there is no file input in
+// the DOM at all, so there is nothing to rewrite them against yet.
+// Re-enable once #42 settles where restore belongs. See also #35.
 test.describe('Database Import', () => {
-	test('importing a .json file loads deck data', async ({ page }) => {
+	test.fixme('importing a .json file loads deck data', async ({ page }) => {
 		await page.goto('/');
 		await page.evaluate(() => {
 			return new Promise<void>((resolve) => {
@@ -83,7 +90,7 @@ test.describe('Database Import', () => {
 		await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 	});
 
-	test('importing a .yjs file loads deck data', async ({ page }) => {
+	test.fixme('importing a .yjs file loads deck data', async ({ page }) => {
 		await page.goto('/');
 		await page.evaluate(() => {
 			return new Promise<void>((resolve) => {
