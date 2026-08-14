@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { exportCollectionToText } from '../store.svelte';
+import { exportCollectionToText, exportCollectionToCSV } from '../store.svelte';
 import {
 	openDatabase,
 	saveCardList,
@@ -8,12 +8,13 @@ import {
 	type CardList
 } from '../db';
 
-// Mock the store's collection for exportCollectionToText
-// The function reads from `store.collection` internally, so we mock the module
+// Mock the store's collection for the export functions
+// They read `store.collection` internally (a rune), so we mock the module and
+// delegate to the real formatters in export-format.ts — no re-implementation here.
 vi.mock('../store.svelte', async (importOriginal) => {
 	const mod = await importOriginal<typeof import('../store.svelte')>();
+	const { formatCollectionAsCSV, formatCollectionAsText } = await import('../export-format');
 
-	// Create a minimal mock store with collection data
 	const mockCollection = [
 		{
 			id: 'id-bolt',
@@ -35,37 +36,10 @@ vi.mock('../store.svelte', async (importOriginal) => {
 		}
 	];
 
-	// Re-implement exportCollectionToText with the mock data
-	// (the original reads from store.collection which uses $state)
-	function exportCollectionToText(fields: string[]): string {
-		const cards = mockCollection;
-		const fieldMap: Record<string, (c: any) => any> = {
-			Count: (c) => c.quantity_owned,
-			Name: (c) => c.name,
-			Edition: (c) => c.set?.toUpperCase(),
-			'Collector Number': (c) => c.collector_number,
-			Foil: (c) => (c.is_foil ? '(Foil)' : ''),
-			Language: (c) => c.lang,
-			'Scryfall ID': (c) => c.id
-		};
-
-		let collectionText = `# My Collection\n\n`;
-		cards
-			.sort((a, b) => a.name.localeCompare(b.name))
-			.forEach((card) => {
-				const lineParts = fields.map((fieldKey) => {
-					const getValue = fieldMap[fieldKey];
-					return getValue ? getValue(card) : '';
-				});
-				const line = lineParts.join(' ');
-				collectionText += `${line}\n`;
-			});
-		return collectionText;
-	}
-
 	return {
 		...mod,
-		exportCollectionToText
+		exportCollectionToText: (fields: string[]) => formatCollectionAsText(mockCollection, fields),
+		exportCollectionToCSV: (fields: string[]) => formatCollectionAsCSV(mockCollection, fields)
 	};
 });
 
@@ -110,6 +84,29 @@ describe('exportCollectionToText', () => {
 		const lines = result.split('\n');
 		// "# My Collection", "", "", "", ""
 		expect(lines.length).toBe(5);
+	});
+});
+
+describe('exportCollectionToCSV', () => {
+	it('exports the collection as CSV with a header row', () => {
+		const result = exportCollectionToCSV(['Count', 'Name', 'Edition']);
+
+		expect(result.split('\r\n')).toEqual([
+			'Count,Name,Edition',
+			'2,Counterspell,M25',
+			'4,Lightning Bolt,LEA',
+			''
+		]);
+	});
+
+	it('produces a file the app can re-import', async () => {
+		const { parseImportInput } = await import('../import-parser');
+		const result = parseImportInput(exportCollectionToCSV(['Count', 'Name', 'Edition']));
+
+		expect(result.cards).toEqual([
+			{ quantity: 2, name: 'Counterspell', setCode: 'M25' },
+			{ quantity: 4, name: 'Lightning Bolt', setCode: 'LEA' }
+		]);
 	});
 });
 

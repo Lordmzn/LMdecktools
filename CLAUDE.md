@@ -51,6 +51,12 @@ Live Scryfall API calls (`api.scryfall.com/cards/search`, `/cards/named`, and `/
 
 Deck **import** additionally contacts third-party deck sites on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api` and `api2.moxfield.com`. The Moxfield endpoint is an unofficial API that is CORS-blocked in practice and is slated for removal (#49). Any new external host must be disclosed in `docs/project-vision.md` §5.4 — the privacy claim depends on that list being exhaustive.
 
+### Collection Export
+
+`src/lib/export-format.ts` holds both collection export formats as pure functions over a card array (`formatCollectionAsCSV`, `formatCollectionAsText`); `exportCollectionToCSV` / `exportCollectionToText` in `store.svelte.ts` are thin wrappers that pass `store.collection`. Keep the formatting logic in the pure module — it is the only part testable without a rune owner.
+
+CSV is RFC 4180 (header row, comma-delimited, CRLF, quotes doubled) and its column names are deliberately the ones `import-parser.ts` resolves via `QUANTITY_ALIASES` / `NAME_ALIASES` / `SET_ALIASES` / `COLLECTOR_ALIASES` / `ID_ALIASES`, so an export re-imports without an importer change (#50) — `export-format.test.ts` asserts that round-trip. The Text format is the space-separated `4 Lightning Bolt` form with a `# My Collection` header, which only `parsePlainText()` accepts; never emit it under a `.csv` extension.
+
 ### Routing
 
 SvelteKit file-based routing. Current routes: `/` (home), `/collection`, `/card-lists`, `/card-lists/compare`.
