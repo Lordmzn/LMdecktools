@@ -113,26 +113,10 @@ export function importCardListsFromYjs(data: Uint8Array): CardList[] {
 	return yDocToCardLists(ydoc);
 }
 
-/**
- * Merge two sets of card lists using Yjs CRDT
- * This automatically handles conflicts and combines changes
- */
-export function mergeCardLists(localLists: CardList[], remoteLists: CardList[]): CardList[] {
-	// Create local doc
-	const localDoc = cardListsToYDoc(localLists);
-
-	// Create remote doc
-	const remoteDoc = cardListsToYDoc(remoteLists);
-
-	// Get updates from remote
-	const remoteUpdate = Y.encodeStateAsUpdate(remoteDoc);
-
-	// Apply remote updates to local (this is where Yjs magic happens)
-	Y.applyUpdate(localDoc, remoteUpdate);
-
-	// Convert back to card list array
-	return yDocToCardLists(localDoc);
-}
+// `mergeCardLists()` used to live here: it built two independent Y.Docs and
+// applied one's update to the other. Documents with no shared history are not
+// CRDT peers, so a list present on both sides resolved to one side's cards and
+// dropped the other's. Merging goes through `src/lib/merge.ts` instead (#46).
 
 /**
  * Merge card quantities when the same card appears in both lists
