@@ -5,7 +5,6 @@ import {
 	yDocToCardLists,
 	exportCardListsAsYjs,
 	importCardListsFromYjs,
-	mergeCardLists,
 	mergeListCardQuantities,
 	calculateDiff,
 	exportWithMetadata,
@@ -87,25 +86,7 @@ describe('Yjs Integration', () => {
 		});
 	});
 
-	describe('mergeCardLists', () => {
-		it('combines two non-overlapping list sets', () => {
-			const local = [makeCardList({ name: 'List A' })];
-			const remote = [makeCardList({ name: 'List B' })];
-
-			const merged = mergeCardLists(local, remote);
-			const names = merged.map((d) => d.name).sort();
-			expect(names).toEqual(['List A', 'List B']);
-		});
-
-		it('merges overlapping lists by name (last-write-wins for same keys)', () => {
-			const local = [makeCardList({ name: 'Shared List', updated_at: 1000 })];
-			const remote = [makeCardList({ name: 'Shared List', updated_at: 2000 })];
-
-			const merged = mergeCardLists(local, remote);
-			expect(merged).toHaveLength(1);
-			expect(merged[0].name).toBe('Shared List');
-		});
-	});
+	// Merging two snapshots is not a Yjs operation — see merge.test.ts (#46).
 
 	describe('mergeListCardQuantities', () => {
 		it('adds quantities for same card in same list', () => {

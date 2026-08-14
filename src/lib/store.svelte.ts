@@ -20,7 +20,8 @@ import {
 	type LanguageMatching
 } from './db';
 
-import { exportWithMetadata, importWithMetadata, mergeCardLists } from './yjs-integration';
+import { exportWithMetadata, importWithMetadata } from './yjs-integration';
+import { mergeCardListSets, mergeCollections } from './merge';
 import {
 	isFileSystemAccessSupported,
 	pickAndLinkNewFile,
@@ -362,6 +363,39 @@ export async function linkFile(): Promise<void> {
 	startPolling(handle, handleExternalChange);
 }
 
+/**
+ * Merge a snapshot read from the linked file into the local database, then
+ * reload the store.
+ *
+ * Additive only: the database is never cleared and no record is deleted, so a
+ * card that exists only locally always survives the merge (#46). Only the
+ * records the merge actually touches are written back.
+ */
+async function mergeSnapshotIntoDB(
+	_db: IDBDatabase,
+	remoteLists: CardList[],
+	remoteCollection: CollectionCard[]
+): Promise<void> {
+	// Read local state from the DB rather than the store: it is authoritative
+	// and free of Svelte proxies, which IndexedDB cannot serialize.
+	const [localLists, localCollection] = await Promise.all([
+		loadAllCardLists(_db),
+		dbLoadCollection(_db)
+	]);
+
+	const lists = mergeCardListSets(localLists, remoteLists);
+	for (const list of lists.changed) {
+		await dbSaveCardList(_db, list);
+	}
+
+	const collection = mergeCollections(localCollection, remoteCollection);
+	for (const card of collection.changed) {
+		await saveCollectionCard(_db, card);
+	}
+
+	await Promise.all([loadCardLists(), loadCollection()]);
+}
+
 export async function linkExistingFile(): Promise<void> {
 	const _db = await ensureDB();
 
@@ -376,29 +410,7 @@ export async function linkExistingFile(): Promise<void> {
 		const fileData = await readFileData(handle);
 		const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
 
-		// Merge card lists
-		const localLists = $state.snapshot(store.savedCardLists) as CardList[];
-		const mergedLists = mergeCardLists(localLists, remoteLists);
-
-		await clearDatabase(_db);
-		for (const list of mergedLists) {
-			await dbSaveCardList(_db, { ...list, id: undefined });
-		}
-
-		// Merge collection
-		for (const remoteCard of remoteCollection) {
-			const existing = await getCollectionCard(_db, remoteCard.id);
-			if (existing) {
-				await saveCollectionCard(_db, {
-					...remoteCard,
-					quantity_owned: Math.max(existing.quantity_owned, remoteCard.quantity_owned)
-				});
-			} else {
-				await saveCollectionCard(_db, remoteCard);
-			}
-		}
-
-		await Promise.all([loadCardLists(), loadCollection()]);
+		await mergeSnapshotIntoDB(_db, remoteLists, remoteCollection);
 	} catch {
 		// File may be empty — that's fine, we'll write to it on next save
 	}
@@ -475,31 +487,7 @@ export async function mergeFromFile(): Promise<void> {
 	const fileData = await readFileData(linkedHandle);
 	const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
 
-	// Merge card lists via Yjs CRDT
-	const localLists = $state.snapshot(store.savedCardLists) as CardList[];
-	const mergedLists = mergeCardLists(localLists, remoteLists);
-
-	// Save merged lists to IDB
-	await clearDatabase(db);
-	for (const list of mergedLists) {
-		await dbSaveCardList(db, { ...list, id: undefined });
-	}
-
-	// Merge collection: for each remote card, add or combine quantities
-	for (const remoteCard of remoteCollection) {
-		const existing = await getCollectionCard(db, remoteCard.id);
-		if (existing) {
-			await saveCollectionCard(db, {
-				...remoteCard,
-				quantity_owned: Math.max(existing.quantity_owned, remoteCard.quantity_owned)
-			});
-		} else {
-			await saveCollectionCard(db, remoteCard);
-		}
-	}
-
-	// Reload store
-	await Promise.all([loadCardLists(), loadCollection()]);
+	await mergeSnapshotIntoDB(db, remoteLists, remoteCollection);
 
 	// Write merged result back to file. Reloading the store above fires autosaves,
 	// so this must go through the same queue rather than racing them.
