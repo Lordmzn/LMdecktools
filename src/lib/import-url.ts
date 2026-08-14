@@ -5,55 +5,21 @@ export interface FetchedDeck {
 	cards: ParsedCard[];
 }
 
-function extractMoxfieldId(url: string): string {
-	const match = url.match(/moxfield\.com\/decks\/([A-Za-z0-9_-]+)/);
-	if (!match) throw new Error('Could not extract deck ID from Moxfield URL');
-	return match[1];
-}
+/** The only third-party host a URL import contacts. Disclosed in the UI before the fetch. */
+export const URL_IMPORT_HOST = 'archidekt.com';
+
+/**
+ * Moxfield has no public API: `api2.moxfield.com` blocks unauthorised cross-origin
+ * use, so the fetch never succeeded from the browser. Their own file export does
+ * work, and `import-parser.ts` already reads it. See #49.
+ */
+export const MOXFIELD_URL_MESSAGE =
+	'Moxfield deck URLs cannot be imported: Moxfield has no public API. In Moxfield, use "Export" to download the deck as a text file, then import it from the File tab (or paste it into the Text tab).';
 
 function extractArchidektId(url: string): string {
 	const match = url.match(/archidekt\.com\/decks\/(\d+)/);
 	if (!match) throw new Error('Could not extract deck ID from Archidekt URL');
 	return match[1];
-}
-
-export async function fetchMoxfieldDeck(url: string): Promise<FetchedDeck> {
-	const deckId = extractMoxfieldId(url);
-	let res: Response;
-	try {
-		res = await fetch(`https://api2.moxfield.com/v3/decks/all/${deckId}`);
-	} catch {
-		throw new Error(
-			'Could not reach Moxfield API (likely blocked by CORS). Try exporting the deck as a text file from Moxfield and importing the file instead.'
-		);
-	}
-
-	if (!res.ok) {
-		throw new Error(`Moxfield API returned ${res.status}. Check that the deck is public.`);
-	}
-
-	const data = await res.json();
-	const deckName = data.name || 'Moxfield Deck';
-	const cards: ParsedCard[] = [];
-
-	// Moxfield puts cards in boards: mainboard, sideboard, commanders, etc.
-	const boards = ['mainboard', 'sideboard', 'commanders', 'companions', 'maybeboard'];
-	for (const board of boards) {
-		const boardData = data.boards?.[board]?.cards;
-		if (!boardData) continue;
-		for (const [, entry] of Object.entries(boardData) as [string, any][]) {
-			if (entry.quantity && entry.card?.name) {
-				cards.push({
-					quantity: entry.quantity,
-					name: entry.card.name,
-					setCode: entry.card.set,
-					collectorNumber: entry.card.cn
-				});
-			}
-		}
-	}
-
-	return { name: deckName, cards };
 }
 
 export async function fetchArchidektDeck(url: string): Promise<FetchedDeck> {
@@ -90,11 +56,13 @@ export async function fetchArchidektDeck(url: string): Promise<FetchedDeck> {
 }
 
 export async function fetchDeckFromUrl(url: string): Promise<FetchedDeck> {
-	if (/moxfield\.com\/decks\//i.test(url)) {
-		return fetchMoxfieldDeck(url);
+	if (/moxfield\.com\//i.test(url)) {
+		throw new Error(MOXFIELD_URL_MESSAGE);
 	}
 	if (/archidekt\.com\/decks\//i.test(url)) {
 		return fetchArchidektDeck(url);
 	}
-	throw new Error('Unsupported URL. Currently supported: Moxfield and Archidekt deck URLs.');
+	throw new Error(
+		'Unsupported URL. Only Archidekt deck URLs can be imported. Any other deck site: export the deck as a text file and use the File or Text tab.'
+	);
 }

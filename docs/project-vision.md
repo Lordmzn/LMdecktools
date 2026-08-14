@@ -109,3 +109,18 @@ Long-term viability requires staying clearly within WotC's Fan Content Policy.
 - **Non-Commercial Framing.** Offering the core tool for free keeps the project in the "fan content" category. Monetization via affiliates, donations, and passive ads is generally compatible with this status — direct paywalls on content are not.
 - **Utility Over Assets.** Use the Scryfall API for all card data and imagery rather than hosting card art locally. This avoids the risk of IP claims related to reproducing branded visual assets at scale, and removes any need to maintain a card database.
 - **No Unauthorized Set Data.** Do not scrape or redistribute WotC-owned data (rulings, set contents, legality lists) outside of what Scryfall's API already provides under its own terms of service.
+- **No Unofficial Third-Party APIs.** Only endpoints that are publicly documented and permit cross-origin use by third parties. Moxfield's `api2.moxfield.com` is neither, and the deck-URL import path no longer calls it (#49); deck migration from Moxfield stays supported through their own file export, which needs no API at all.
+
+### 5.5 External Endpoints
+
+Absolute Privacy is a claim about *where data goes*, so the set of hosts this app can contact must be short, deliberate, and written down. It is:
+
+| Host | When | What is sent |
+| --- | --- | --- |
+| `api.scryfall.com` | Card search, batch lookup by name/ID | The search text or card names/IDs being resolved |
+| `cards.scryfall.io` | Card images (first load only; cached thereafter) | The image URL |
+| `archidekt.com/api` | Only when the user pastes an Archidekt deck URL and confirms the import | The deck ID in that URL |
+
+Collection contents, card lists, and the linked file are never transmitted to any of them — a card name leaves the device only because resolving it is the whole point of the request. No analytics, no error reporting, no fonts or scripts from a CDN: the build is fully self-hosted and static.
+
+Adding a host to this table is a deliberate decision, not an implementation detail. Anything that would fetch in the background, rather than in direct response to a user action, does not belong here at all.

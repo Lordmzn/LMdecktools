@@ -24,7 +24,7 @@
 	} from '$lib/store.svelte';
 	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
-	import { fetchDeckFromUrl } from '$lib/import-url';
+	import { fetchDeckFromUrl, URL_IMPORT_HOST } from '$lib/import-url';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
@@ -1172,7 +1172,7 @@
 										type="url"
 										bind:value={extImportUrl}
 										disabled={extImportRunning || extImportFetching}
-										placeholder="https://moxfield.com/decks/... or archidekt.com/decks/..."
+										placeholder="https://archidekt.com/decks/..."
 										class="field flex-1 disabled:opacity-50"
 									/>
 									<button
@@ -1184,8 +1184,10 @@
 									</button>
 								</div>
 								<p class="mt-2 text-xs text-slate-500">
-									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file
-									import as fallback.
+									Supported: Archidekt (public decks). Fetching sends a request to <span
+										class="text-slate-400">{URL_IMPORT_HOST}</span
+									> carrying the deck ID; no other data leaves your device. Any other site: export the
+									deck as a file and use the File tab.
 								</p>
 							{/if}
 						</div>

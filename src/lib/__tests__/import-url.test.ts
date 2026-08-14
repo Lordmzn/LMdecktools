@@ -1,67 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { fetchMoxfieldDeck, fetchArchidektDeck, fetchDeckFromUrl } from '../import-url';
+import { fetchArchidektDeck, fetchDeckFromUrl } from '../import-url';
 
 beforeEach(() => {
 	vi.restoreAllMocks();
-});
-
-describe('fetchMoxfieldDeck', () => {
-	it('parses a Moxfield deck response', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-			new Response(
-				JSON.stringify({
-					name: 'Test Deck',
-					boards: {
-						mainboard: {
-							cards: {
-								'abc-123': {
-									quantity: 4,
-									card: { name: 'Lightning Bolt', set: 'M11', cn: '150' }
-								},
-								'def-456': {
-									quantity: 2,
-									card: { name: 'Counterspell', set: 'MH2', cn: '267' }
-								}
-							}
-						},
-						sideboard: {
-							cards: {
-								'ghi-789': {
-									quantity: 1,
-									card: { name: 'Negate', set: 'M20', cn: '69' }
-								}
-							}
-						}
-					}
-				}),
-				{ status: 200 }
-			)
-		);
-
-		const result = await fetchMoxfieldDeck('https://moxfield.com/decks/abc123');
-		expect(result.name).toBe('Test Deck');
-		expect(result.cards).toHaveLength(3);
-		expect(result.cards[0]).toEqual({
-			quantity: 4,
-			name: 'Lightning Bolt',
-			setCode: 'M11',
-			collectorNumber: '150'
-		});
-	});
-
-	it('throws on 404', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('', { status: 404 }));
-		await expect(fetchMoxfieldDeck('https://moxfield.com/decks/abc')).rejects.toThrow('404');
-	});
-
-	it('throws user-friendly message on network/CORS error', async () => {
-		vi.spyOn(globalThis, 'fetch').mockRejectedValue(new TypeError('Failed to fetch'));
-		await expect(fetchMoxfieldDeck('https://moxfield.com/decks/abc')).rejects.toThrow('CORS');
-	});
-
-	it('throws on invalid URL', async () => {
-		await expect(fetchMoxfieldDeck('https://example.com')).rejects.toThrow('deck ID');
-	});
 });
 
 describe('fetchArchidektDeck', () => {
@@ -116,23 +57,30 @@ describe('fetchArchidektDeck', () => {
 });
 
 describe('fetchDeckFromUrl', () => {
-	it('dispatches to Moxfield', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-			new Response(JSON.stringify({ name: 'M', boards: {} }), { status: 200 })
+	it('never contacts Moxfield, and points at their file export instead', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch');
+		await expect(fetchDeckFromUrl('https://moxfield.com/decks/xyz')).rejects.toThrow(
+			/no public API/i
 		);
-		const result = await fetchDeckFromUrl('https://moxfield.com/decks/xyz');
-		expect(result.name).toBe('M');
+		await expect(fetchDeckFromUrl('https://www.moxfield.com/decks/xyz')).rejects.toThrow(
+			/File tab/i
+		);
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 
-	it('dispatches to Archidekt', async () => {
-		vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-			new Response(JSON.stringify({ name: 'A', cards: [] }), { status: 200 })
-		);
+	it('dispatches to Archidekt, and to no other host', async () => {
+		const fetchSpy = vi
+			.spyOn(globalThis, 'fetch')
+			.mockResolvedValue(new Response(JSON.stringify({ name: 'A', cards: [] }), { status: 200 }));
 		const result = await fetchDeckFromUrl('https://archidekt.com/decks/999');
 		expect(result.name).toBe('A');
+		expect(fetchSpy).toHaveBeenCalledTimes(1);
+		expect(String(fetchSpy.mock.calls[0][0])).toBe('https://archidekt.com/api/decks/999/');
 	});
 
 	it('throws on unsupported URL', async () => {
+		const fetchSpy = vi.spyOn(globalThis, 'fetch');
 		await expect(fetchDeckFromUrl('https://example.com/decks/1')).rejects.toThrow('Unsupported');
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 });

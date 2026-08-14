@@ -207,9 +207,15 @@ describe('parseImportInput', () => {
 	});
 
 	it('returns warning for URL input', () => {
-		const result = parseImportInput('https://moxfield.com/decks/abc');
+		const result = parseImportInput('https://archidekt.com/decks/123');
 		expect(result.cards).toHaveLength(0);
 		expect(result.warnings[0]).toContain('URL');
+	});
+
+	it('points a pasted Moxfield URL at the file export', () => {
+		const result = parseImportInput('https://moxfield.com/decks/abc');
+		expect(result.cards).toHaveLength(0);
+		expect(result.warnings[0]).toMatch(/export the deck as a text file/i);
 	});
 
 	it('returns warning for empty input', () => {
