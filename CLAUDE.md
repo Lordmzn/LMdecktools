@@ -71,6 +71,12 @@ The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall ima
 
 **These are snapshots, not a CRDT.** Every save builds a _fresh_ `Y.Doc` with fresh client IDs, so the file carries no history, no client identity, and no tombstones. Applying one snapshot doc's update to another is therefore not a merge — a key present on both sides resolves to one side's value, dropping the other's. That is why merging goes through `src/lib/merge.ts` instead (#46): an explicit union of lists by name and cards by `id`, quantities resolved to `max()`, local IndexedDB ids preserved, nothing ever cleared or deleted. Deletions consequently never propagate; real CRDT semantics require a persistent `Y.Doc` as the source of truth (#47), which is also the unstated prerequisite for the P2P sync roadmap item (#11).
 
+### Restore Validation
+
+Restoring from a file is destructive — `importDatabase(db, data, merge=false)` calls `clearDatabase()`. Every file therefore goes through `src/lib/import-guard.ts` first (#52), which parses without touching IndexedDB and throws `ImportValidationError` for: a file naming another `app`, a `version` outside `SUPPORTED_VERSIONS`, a file with neither `app` metadata nor a recognisable shape (`cardLists` / `decks` / `collection`), a payload whose `total_lists` / `total_cards` disagree with what decoded, and — destructive path only — a payload with zero lists _and_ zero collection cards. `exportWithMetadata()` writes those declared counts; files from before #52 omit them and are accepted without the check.
+
+Anything that reads a restore file must go through `parseImportFile()` / `assertRestorable()` rather than trusting `JSON.parse`. `inspectImportFile()` runs the same validation for the UI so the DB modal can show `app · version · exported_at · counts` and keep the Restore button disabled until a file passes.
+
 ## Testing
 
 ### Structure

@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 // Helper: create a fresh DB
-async function _setupWithDB(page: import('@playwright/test').Page) {
+async function setupWithDB(page: import('@playwright/test').Page) {
 	await page.goto('/');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
@@ -30,6 +30,107 @@ async function openDBModal(page: import('@playwright/test').Page) {
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Import from File')).toBeVisible({ timeout: 5000 });
 }
+
+// ==================== Restore from file (#52) ====================
+
+// "Restore from file" renders only where the File System Access API is absent
+// (Firefox). Chromium has it, so we remove it before the app loads to reach the
+// same code path the Firefox fallback uses.
+async function setupFirefoxLikeWithDB(page: import('@playwright/test').Page) {
+	await page.addInitScript(() => {
+		// @ts-expect-error — emulating a browser without the File System Access API
+		delete window.showSaveFilePicker;
+	});
+	await setupWithDB(page);
+	await openRestorePanel(page);
+}
+
+async function openRestorePanel(page: import('@playwright/test').Page) {
+	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
+	await page.getByRole('button', { name: 'Link File', exact: true }).click();
+	await expect(page.getByRole('heading', { name: 'Restore from file' })).toBeVisible();
+}
+
+const restoreButton = (page: import('@playwright/test').Page) =>
+	page.getByRole('button', { name: /^Restore/ });
+
+test.describe('Restore from file validation', () => {
+	test('an unrelated .json file is refused and leaves the database untouched', async ({ page }) => {
+		await setupFirefoxLikeWithDB(page);
+
+		await page.locator('input[type="file"][accept=".yjs,.json"]').setInputFiles({
+			name: 'shopping-list.json',
+			mimeType: 'application/json',
+			buffer: Buffer.from(JSON.stringify({ tasks: ['buy milk'], done: false }))
+		});
+
+		await expect(page.getByText(/not an LM Deck Tools export/)).toBeVisible();
+		await expect(restoreButton(page)).toBeDisabled();
+
+		// Nothing was written: the DB is still the empty one we created
+		const listCount = await page.evaluate(async () => {
+			const db = await new Promise<IDBDatabase>((resolve, reject) => {
+				const req = indexedDB.open('LMdecktools');
+				req.onsuccess = () => resolve(req.result);
+				req.onerror = () => reject(req.error);
+			});
+			const count = await new Promise<number>((resolve) => {
+				const req = db.transaction('card_lists').objectStore('card_lists').count();
+				req.onsuccess = () => resolve(req.result);
+			});
+			db.close();
+			return count;
+		});
+		expect(listCount).toBe(0);
+	});
+
+	test('an export from another app is refused by name', async ({ page }) => {
+		await setupFirefoxLikeWithDB(page);
+
+		await page.locator('input[type="file"][accept=".yjs,.json"]').setInputFiles({
+			name: 'moxfield-backup.json',
+			mimeType: 'application/json',
+			buffer: Buffer.from(JSON.stringify({ app: 'Moxfield', cardLists: [{ name: 'Theirs' }] }))
+		});
+
+		await expect(page.getByText(/exported by "Moxfield"/)).toBeVisible();
+		await expect(restoreButton(page)).toBeDisabled();
+	});
+
+	test('a genuine export shows what it holds and restores', async ({ page }) => {
+		await setupFirefoxLikeWithDB(page);
+
+		await page.locator('input[type="file"][accept=".yjs,.json"]').setInputFiles({
+			name: 'lm-backup.json',
+			mimeType: 'application/json',
+			buffer: Buffer.from(
+				JSON.stringify({
+					app: 'LM Deck Tools',
+					version: '1.0',
+					exported_at: 1_755_000_000_000,
+					cardLists: [
+						{
+							name: 'Restored Deck',
+							cards: [{ id: 'c1', name: 'Lightning Bolt', LM_quantity: 4 }],
+							cardMatching: 'generic',
+							languageMatching: 'any',
+							created_at: 1_755_000_000_000,
+							updated_at: 1_755_000_000_000
+						}
+					],
+					collection: []
+				})
+			)
+		});
+
+		await expect(page.getByTestId('restore-preview')).toContainText('LM Deck Tools v1.0');
+		await expect(page.getByTestId('restore-preview')).toContainText('1 list, 0 collection cards');
+
+		await restoreButton(page).click();
+		await expect(page.getByText(/Restored 1 list successfully/)).toBeVisible();
+	});
+});
 
 // ==================== [planned] Database Import from File ====================
 

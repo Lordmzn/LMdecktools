@@ -1,0 +1,196 @@
+/**
+ * Restore-file validation (#52).
+ *
+ * `importDatabase()` used to clear the database on the strength of a successful
+ * `JSON.parse`, so picking any unrelated `.json` file wiped the collection and
+ * every card list and imported nothing. Everything here runs *before* the first
+ * write: parse the file, prove it is an LM Deck Tools export of a version we
+ * understand, and refuse anything else with an error that names the problem.
+ */
+
+import type { CardList, CollectionCard } from './db';
+import { importWithMetadata } from './yjs-integration';
+
+export const APP_NAME = 'LM Deck Tools';
+
+/** Export format versions this build can read. `exportWithMetadata()` writes the last one. */
+export const SUPPORTED_VERSIONS = ['1.0'];
+
+export interface ImportPayload {
+	format: 'json' | 'yjs';
+	cardLists: CardList[];
+	collection: CollectionCard[];
+	/** Metadata as found in the file. Null where the file does not carry the field. */
+	app: string | null;
+	version: string | null;
+	exportedAt: number | null;
+	/** Counts the file claims for itself, used as a truncation check. Absent in pre-#52 exports. */
+	declaredLists: number | null;
+	declaredCards: number | null;
+}
+
+/** Thrown for any file we refuse to import. The message is shown to the user verbatim. */
+export class ImportValidationError extends Error {
+	constructor(message: string) {
+		super(message);
+		this.name = 'ImportValidationError';
+	}
+}
+
+function asString(value: unknown): string | null {
+	return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function asNumber(value: unknown): number | null {
+	return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function asArray(value: unknown): unknown[] | null {
+	return Array.isArray(value) ? value : null;
+}
+
+/**
+ * Reject a file that names another application, or a version this build predates.
+ * A file with no `app` field is a legacy export and is judged by its shape instead.
+ */
+function checkIdentity(app: string | null, version: string | null, hasKnownShape: boolean): void {
+	if (app !== null && app !== APP_NAME) {
+		throw new ImportValidationError(
+			`This file was exported by "${app}", not ${APP_NAME}. Nothing was changed.`
+		);
+	}
+
+	if (app === null && !hasKnownShape) {
+		throw new ImportValidationError(
+			`This is not an ${APP_NAME} export — it contains no card lists or collection. Nothing was changed.`
+		);
+	}
+
+	if (version !== null && !SUPPORTED_VERSIONS.includes(version)) {
+		throw new ImportValidationError(
+			`This file is export format version ${version}; this app reads ${SUPPORTED_VERSIONS.join(', ')}. Update the app before restoring. Nothing was changed.`
+		);
+	}
+}
+
+/** A file that declares more content than it carries is truncated — do not restore from it. */
+function checkDeclaredCounts(payload: ImportPayload): void {
+	const { declaredLists, declaredCards, cardLists, collection } = payload;
+
+	if (declaredLists !== null && declaredLists !== cardLists.length) {
+		throw new ImportValidationError(
+			`This file looks incomplete: it declares ${declaredLists} card list${declaredLists === 1 ? '' : 's'} but contains ${cardLists.length}. Nothing was changed.`
+		);
+	}
+
+	if (declaredCards !== null && declaredCards !== collection.length) {
+		throw new ImportValidationError(
+			`This file looks incomplete: it declares ${declaredCards} collection card${declaredCards === 1 ? '' : 's'} but contains ${collection.length}. Nothing was changed.`
+		);
+	}
+}
+
+function parseJSONPayload(raw: unknown): ImportPayload {
+	if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+		throw new ImportValidationError(
+			`This is not an ${APP_NAME} export — it contains no card lists or collection. Nothing was changed.`
+		);
+	}
+
+	const source = raw as Record<string, unknown>;
+	// `decks` is the v2 store name, still readable
+	const lists = asArray(source.cardLists) ?? asArray(source.decks);
+	const collection = asArray(source.collection);
+
+	const app = asString(source.app);
+	const version = asString(source.version);
+	checkIdentity(app, version, lists !== null || collection !== null);
+
+	return {
+		format: 'json',
+		cardLists: (lists ?? []) as CardList[],
+		collection: (collection ?? []) as CollectionCard[],
+		app,
+		version,
+		exportedAt: asNumber(source.exported_at),
+		declaredLists: asNumber(source.total_lists),
+		declaredCards: asNumber(source.total_cards)
+	};
+}
+
+function parseYjsPayload(data: Uint8Array): ImportPayload {
+	let decoded: ReturnType<typeof importWithMetadata>;
+	try {
+		decoded = importWithMetadata(data);
+	} catch {
+		throw new ImportValidationError(
+			'Unrecognised file format. Please choose a .yjs or .json file exported from this app. Nothing was changed.'
+		);
+	}
+
+	const { cardLists, collection, metadata } = decoded;
+	const app = asString(metadata.app);
+	const version = asString(metadata.version);
+	// A foreign binary that happens to decode yields empty maps and no app name
+	checkIdentity(app, version, cardLists.length > 0 || collection.length > 0);
+
+	return {
+		format: 'yjs',
+		cardLists,
+		collection,
+		app,
+		version,
+		exportedAt: asNumber(metadata.exported_at),
+		declaredLists: asNumber(metadata.total_lists),
+		declaredCards: asNumber(metadata.total_cards)
+	};
+}
+
+/**
+ * Parse a restore file and prove it is ours, without touching the database.
+ * Throws {@link ImportValidationError} with a user-facing message for anything else.
+ */
+export function parseImportFile(data: Uint8Array): ImportPayload {
+	let json: unknown;
+	try {
+		json = JSON.parse(new TextDecoder().decode(data));
+	} catch {
+		return checkedPayload(parseYjsPayload(data));
+	}
+
+	return checkedPayload(parseJSONPayload(json));
+}
+
+function checkedPayload(payload: ImportPayload): ImportPayload {
+	checkDeclaredCounts(payload);
+	return payload;
+}
+
+/**
+ * Guard the destructive restore path: a payload with nothing in it is the wrong
+ * file or a corrupt one, and clearing the database over it loses everything for
+ * no gain. Erasing on purpose is what *Create New Database* is for.
+ */
+export function assertRestorable(payload: ImportPayload): void {
+	if (payload.cardLists.length === 0 && payload.collection.length === 0) {
+		throw new ImportValidationError(
+			'This file contains no card lists and no collection cards, so restoring from it would erase your data and put nothing back. Nothing was changed — use "Create New Database" if you meant to start over.'
+		);
+	}
+}
+
+/** One-line summary of what the user is about to restore, for the confirmation UI. */
+export function describeImport(payload: ImportPayload): string {
+	const lists = `${payload.cardLists.length} list${payload.cardLists.length === 1 ? '' : 's'}`;
+	const cards = `${payload.collection.length} collection card${payload.collection.length === 1 ? '' : 's'}`;
+
+	const parts = [
+		`${payload.app ?? 'Legacy export'}${payload.version ? ` v${payload.version}` : ''}`
+	];
+	if (payload.exportedAt !== null) {
+		parts.push(new Date(payload.exportedAt).toLocaleString());
+	}
+	parts.push(`${lists}, ${cards}`);
+
+	return parts.join(' · ');
+}
