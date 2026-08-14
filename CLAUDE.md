@@ -63,7 +63,7 @@ Paraglide configured with hooks in `hooks.server.ts` (handle) and `hooks.ts` (re
 
 ### Image Cache
 
-The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management is exposed in the DB Selection Modal: today `getImageCacheStats()` reports only the number of cached entries; byte-size reporting (`StorageManager.estimate()` or summing blob sizes) is still open (#51). Clearing goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
 
 ### Yjs Integration
 
