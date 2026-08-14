@@ -43,11 +43,13 @@ A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-base
 
 ### Storage Layer
 
-Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Database `LMdecktools` v2 with three object stores: `decks` (autoIncrement), `collection` (keyed by Scryfall card ID), `metadata` (timestamps).
+Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Database `LMdecktools` v3 with three object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle).
 
 ### Card Data
 
-Live Scryfall API calls (`api.scryfall.com/cards/search` and `/cards/named`). No local card database.
+Live Scryfall API calls (`api.scryfall.com/cards/search`, `/cards/named`, and `/cards/collection` for batch lookups). No local card database.
+
+Deck **import** additionally contacts third-party deck sites on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api` and `api2.moxfield.com`. The Moxfield endpoint is an unofficial API that is CORS-blocked in practice and is slated for removal (#49). Any new external host must be disclosed in `docs/project-vision.md` §5.4 — the privacy claim depends on that list being exhaustive.
 
 ### Routing
 
@@ -61,11 +63,13 @@ Paraglide configured with hooks in `hooks.server.ts` (handle) and `hooks.ts` (re
 
 ### Image Cache
 
-The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management (size reporting via `StorageManager.estimate()` or by iterating cache keys, and clearing via `cache.delete()`) is exposed in the DB Selection Modal. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management is exposed in the DB Selection Modal: today `getImageCacheStats()` reports only the number of cached entries; byte-size reporting (`StorageManager.estimate()` or summing blob sizes) is still open (#51). Clearing goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
 
 ### Yjs Integration
 
-`src/lib/yjs-integration.ts` has CRDT-based export/import/merge utilities. Currently experimental — export uses Yjs binary format but import only handles JSON (Yjs import path is commented out).
+`src/lib/yjs-integration.ts` holds the export/import/merge utilities. Both directions are live: `exportWithMetadata()` writes the Yjs binary format, `importWithMetadata()` reads it, and `importDatabase()` sniffs JSON vs Yjs.
+
+**These are snapshots, not a CRDT.** Every save builds a _fresh_ `Y.Doc` with fresh client IDs, so the file carries no history, no client identity, and no tombstones. Applying one snapshot doc's update to another is therefore not a merge — a key present on both sides resolves to one side's value, dropping the other's. That is why merging goes through `src/lib/merge.ts` instead (#46): an explicit union of lists by name and cards by `id`, quantities resolved to `max()`, local IndexedDB ids preserved, nothing ever cleared or deleted. Deletions consequently never propagate; real CRDT semantics require a persistent `Y.Doc` as the source of truth (#47), which is also the unstated prerequisite for the P2P sync roadmap item (#11).
 
 ## Testing
 
