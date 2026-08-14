@@ -23,6 +23,7 @@ import {
 import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
+import { formatCollectionAsCSV, formatCollectionAsText } from './export-format';
 import {
 	isFileSystemAccessSupported,
 	pickAndLinkNewFile,
@@ -1040,41 +1041,19 @@ export async function importCardsToNewList(
 }
 
 /**
- * Export collection to text
+ * Export the collection as RFC 4180 CSV — a header row plus one row per card,
+ * using the column names `import-parser.ts` recognises so the file re-imports (#50).
  */
-export function exportCollectionToText(fields: string[]) {
-	const cards = store.collection;
+export function exportCollectionToCSV(fields: string[]): string {
+	return formatCollectionAsCSV(store.collection, fields);
+}
 
-	// 1. Define how checkbox values map to card properties
-	const fieldMap: Record<string, (c: any) => any> = {
-		Count: (c) => c.quantity_owned,
-		Name: (c) => c.name,
-		Edition: (c) => c.set?.toUpperCase(),
-		'Collector Number': (c) => c.collector_number,
-		Foil: (c) => (c.is_foil ? '(Foil)' : ''),
-		Language: (c) => c.lang,
-		'Scryfall ID': (c) => c.id // it's the scryfall_id
-	};
-
-	let collectionText = `# My Collection\n\n`;
-
-	cards
-		.sort((a, b) => a.name.localeCompare(b.name))
-		.forEach((card) => {
-			// 2. Loop through the selected fields and get value from map
-			const lineParts = fields.map((fieldKey) => {
-				const getValue = fieldMap[fieldKey];
-				// Execute the accessor function, or return empty string if not found
-				return getValue ? getValue(card) : '';
-			});
-
-			// 3. Join with spaces, filtering out empty values (e.g. non-foils)
-			const line = lineParts.join(' ');
-
-			collectionText += `${line}\n`;
-		});
-
-	return collectionText;
+/**
+ * Export the collection as space-separated text (`4 Lightning Bolt`) — the form
+ * `parsePlainText()` reads and that other MTG tools accept as pasted input.
+ */
+export function exportCollectionToText(fields: string[]): string {
+	return formatCollectionAsText(store.collection, fields);
 }
 
 // ==================== CARD LIST FUNCTIONS ====================

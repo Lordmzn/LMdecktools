@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
 	import { checkLocalDatabase } from '$lib/db';
-	import { getImageCacheStats, clearImageCache } from '$lib/image-cache';
+	import { getImageCacheStats, clearImageCache, formatBytes } from '$lib/image-cache';
 	import {
 		store,
 		initDB,
@@ -12,6 +12,7 @@
 		loadFromFile,
 		inspectImportFile,
 		exportCollectionToText,
+		exportCollectionToCSV,
 		isFileSystemAccessSupported,
 		linkFile,
 		linkExistingFile,
@@ -26,7 +27,7 @@
 	import { describeImport } from '$lib/import-guard';
 	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
-	import { fetchDeckFromUrl } from '$lib/import-url';
+	import { fetchDeckFromUrl, URL_IMPORT_HOST } from '$lib/import-url';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
@@ -85,6 +86,11 @@
 	/** What the selected restore file says it holds, or null when it failed validation. */
 	let importPreview = $state<string | null>(null);
 	let imageCacheCount = $state(0);
+	let imageCacheBytes = $state(0);
+	// e.g. "412 images · 86.4 MB" — the size is what the Clear button is judged against (#51)
+	let imageCacheSummary = $derived(
+		`${imageCacheCount} ${imageCacheCount === 1 ? 'image' : 'images'} · ${formatBytes(imageCacheBytes)}`
+	);
 	let isClearingCache = $state(false);
 	let showCreateNewConfirm = $state(false);
 
@@ -105,8 +111,10 @@
 	}
 
 	onMount(() => {
+		// Measured once, on modal open — sizing the cache hydrates every entry
 		getImageCacheStats().then((stats) => {
 			imageCacheCount = stats.count;
+			imageCacheBytes = stats.bytes;
 		});
 		clockInterval = setInterval(() => {
 			now = Date.now();
@@ -316,7 +324,14 @@
 		{ label: 'Scryfall ID', value: 'Scryfall ID' }
 	];
 	let csvSelectedFields = $state(['Count', 'Name', 'Edition']);
-	let csvText = $derived.by(() => exportCollectionToText(csvSelectedFields));
+	// CSV re-imports into this app and opens in a spreadsheet; text is what other MTG tools paste (#50)
+	type ExportFormat = 'csv' | 'text';
+	let exportFormat = $state<ExportFormat>('csv');
+	let csvText = $derived.by(() =>
+		exportFormat === 'csv'
+			? exportCollectionToCSV(csvSelectedFields)
+			: exportCollectionToText(csvSelectedFields)
+	);
 
 	function handleCsvCopy() {
 		navigator.clipboard.writeText(csvText);
@@ -324,11 +339,14 @@
 
 	function handleCsvDownload() {
 		if (!csvText) return;
-		const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+		const isCsv = exportFormat === 'csv';
+		const blob = new Blob([csvText], {
+			type: isCsv ? 'text/csv;charset=utf-8;' : 'text/plain;charset=utf-8;'
+		});
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = 'mtg_collection_export.csv';
+		link.download = isCsv ? 'mtg_collection_export.csv' : 'mtg_collection_export.txt';
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
@@ -653,8 +671,37 @@
 				{#if activeSection === 'export'}
 					<div class="space-y-4">
 						<p class="text-sm text-slate-400">
-							Export your collection as CSV to share with other tools and services.
+							Export your collection to share with other tools and services.
 						</p>
+
+						<div>
+							<label class="mb-2 block text-sm font-semibold text-slate-300">Format:</label>
+							<div class="flex gap-2">
+								<button
+									onclick={() => (exportFormat = 'csv')}
+									class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {exportFormat ===
+									'csv'
+										? 'bg-orange-500 text-white'
+										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
+								>
+									CSV
+								</button>
+								<button
+									onclick={() => (exportFormat = 'text')}
+									class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {exportFormat ===
+									'text'
+										? 'bg-orange-500 text-white'
+										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
+								>
+									Text
+								</button>
+							</div>
+							<p class="mt-2 text-xs text-slate-500">
+								{exportFormat === 'csv'
+									? 'One column per field, opens in a spreadsheet, and imports back into this app.'
+									: 'Space-separated lines (4 Lightning Bolt) for pasting into other MTG tools.'}
+							</p>
+						</div>
 
 						<div>
 							<label class="mb-2 block text-sm font-semibold text-slate-300">Include Fields:</label>
@@ -1098,7 +1145,9 @@
 								<div class="mb-4 space-y-2 text-sm text-slate-400">
 									<div class="flex justify-between">
 										<span class="font-medium">Cached images:</span>
-										<span class="font-mono">{imageCacheCount}</span>
+										<span class="font-mono" data-testid="image-cache-stats"
+											>{imageCacheSummary}</span
+										>
 									</div>
 								</div>
 								<button
@@ -1106,6 +1155,7 @@
 										isClearingCache = true;
 										await clearImageCache();
 										imageCacheCount = 0;
+										imageCacheBytes = 0;
 										isClearingCache = false;
 									}}
 									disabled={isClearingCache || imageCacheCount === 0}
@@ -1195,7 +1245,7 @@
 										type="url"
 										bind:value={extImportUrl}
 										disabled={extImportRunning || extImportFetching}
-										placeholder="https://moxfield.com/decks/... or archidekt.com/decks/..."
+										placeholder="https://archidekt.com/decks/..."
 										class="field flex-1 disabled:opacity-50"
 									/>
 									<button
@@ -1207,8 +1257,10 @@
 									</button>
 								</div>
 								<p class="mt-2 text-xs text-slate-500">
-									Supported: Moxfield, Archidekt (public decks). May be blocked by CORS — use file
-									import as fallback.
+									Supported: Archidekt (public decks). Fetching sends a request to <span
+										class="text-slate-400">{URL_IMPORT_HOST}</span
+									> carrying the deck ID; no other data leaves your device. Any other site: export the
+									deck as a file and use the File tab.
 								</p>
 							{/if}
 						</div>

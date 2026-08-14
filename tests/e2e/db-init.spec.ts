@@ -50,6 +50,17 @@ test.describe('Database Initialization', () => {
 		await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 	});
 
+	test('image cache reports a byte size alongside the image count', async ({ page }) => {
+		await page.goto('/');
+		await openDBModal(page);
+		await page.getByRole('button', { name: 'Cache', exact: true }).click();
+
+		// "how much disk is this costing me" — a count alone does not answer it (#51)
+		await expect(page.getByTestId('image-cache-stats')).toHaveText(
+			/^\d+ images? · [\d.]+ [kMG]?B$/
+		);
+	});
+
 	test('home page renders correctly', async ({ page }) => {
 		await page.goto('/');
 

@@ -49,7 +49,13 @@ Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wra
 
 Live Scryfall API calls (`api.scryfall.com/cards/search`, `/cards/named`, and `/cards/collection` for batch lookups). No local card database.
 
-Deck **import** additionally contacts third-party deck sites on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api` and `api2.moxfield.com`. The Moxfield endpoint is an unofficial API that is CORS-blocked in practice and is slated for removal (#49). Any new external host must be disclosed in `docs/project-vision.md` §5.4 — the privacy claim depends on that list being exhaustive.
+Deck **import** additionally contacts one third-party deck site on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api`, exported as `URL_IMPORT_HOST` so the UI can disclose it next to the URL field before the fetch. The Moxfield fetch (`api2.moxfield.com`) was removed in #49 — it is an unofficial API, CORS-blocked in practice, so a pasted Moxfield URL now returns `MOXFIELD_URL_MESSAGE` pointing at their file export instead. Any new external host must be disclosed in `docs/project-vision.md` §5.5 — the privacy claim depends on that list being exhaustive.
+
+### Collection Export
+
+`src/lib/export-format.ts` holds both collection export formats as pure functions over a card array (`formatCollectionAsCSV`, `formatCollectionAsText`); `exportCollectionToCSV` / `exportCollectionToText` in `store.svelte.ts` are thin wrappers that pass `store.collection`. Keep the formatting logic in the pure module — it is the only part testable without a rune owner.
+
+CSV is RFC 4180 (header row, comma-delimited, CRLF, quotes doubled) and its column names are deliberately the ones `import-parser.ts` resolves via `QUANTITY_ALIASES` / `NAME_ALIASES` / `SET_ALIASES` / `COLLECTOR_ALIASES` / `ID_ALIASES`, so an export re-imports without an importer change (#50) — `export-format.test.ts` asserts that round-trip. The Text format is the space-separated `4 Lightning Bolt` form with a `# My Collection` header, which only `parsePlainText()` accepts; never emit it under a `.csv` extension.
 
 ### Routing
 
@@ -63,7 +69,7 @@ Paraglide configured with hooks in `hooks.server.ts` (handle) and `hooks.ts` (re
 
 ### Image Cache
 
-The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management is exposed in the DB Selection Modal: today `getImageCacheStats()` reports only the number of cached entries; byte-size reporting (`StorageManager.estimate()` or summing blob sizes) is still open (#51). Clearing goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
 
 ### Yjs Integration
 
