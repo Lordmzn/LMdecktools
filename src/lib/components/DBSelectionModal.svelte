@@ -11,6 +11,7 @@
 		exportDB,
 		loadFromFile,
 		exportCollectionToText,
+		exportCollectionToCSV,
 		isFileSystemAccessSupported,
 		linkFile,
 		linkExistingFile,
@@ -301,7 +302,14 @@
 		{ label: 'Scryfall ID', value: 'Scryfall ID' }
 	];
 	let csvSelectedFields = $state(['Count', 'Name', 'Edition']);
-	let csvText = $derived.by(() => exportCollectionToText(csvSelectedFields));
+	// CSV re-imports into this app and opens in a spreadsheet; text is what other MTG tools paste (#50)
+	type ExportFormat = 'csv' | 'text';
+	let exportFormat = $state<ExportFormat>('csv');
+	let csvText = $derived.by(() =>
+		exportFormat === 'csv'
+			? exportCollectionToCSV(csvSelectedFields)
+			: exportCollectionToText(csvSelectedFields)
+	);
 
 	function handleCsvCopy() {
 		navigator.clipboard.writeText(csvText);
@@ -309,11 +317,14 @@
 
 	function handleCsvDownload() {
 		if (!csvText) return;
-		const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+		const isCsv = exportFormat === 'csv';
+		const blob = new Blob([csvText], {
+			type: isCsv ? 'text/csv;charset=utf-8;' : 'text/plain;charset=utf-8;'
+		});
 		const url = URL.createObjectURL(blob);
 		const link = document.createElement('a');
 		link.href = url;
-		link.download = 'mtg_collection_export.csv';
+		link.download = isCsv ? 'mtg_collection_export.csv' : 'mtg_collection_export.txt';
 		document.body.appendChild(link);
 		link.click();
 		document.body.removeChild(link);
@@ -638,8 +649,37 @@
 				{#if activeSection === 'export'}
 					<div class="space-y-4">
 						<p class="text-sm text-slate-400">
-							Export your collection as CSV to share with other tools and services.
+							Export your collection to share with other tools and services.
 						</p>
+
+						<div>
+							<label class="mb-2 block text-sm font-semibold text-slate-300">Format:</label>
+							<div class="flex gap-2">
+								<button
+									onclick={() => (exportFormat = 'csv')}
+									class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {exportFormat ===
+									'csv'
+										? 'bg-orange-500 text-white'
+										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
+								>
+									CSV
+								</button>
+								<button
+									onclick={() => (exportFormat = 'text')}
+									class="rounded-lg px-3 py-1.5 text-sm font-medium transition-colors {exportFormat ===
+									'text'
+										? 'bg-orange-500 text-white'
+										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
+								>
+									Text
+								</button>
+							</div>
+							<p class="mt-2 text-xs text-slate-500">
+								{exportFormat === 'csv'
+									? 'One column per field, opens in a spreadsheet, and imports back into this app.'
+									: 'Space-separated lines (4 Lightning Bolt) for pasting into other MTG tools.'}
+							</p>
+						</div>
 
 						<div>
 							<label class="mb-2 block text-sm font-semibold text-slate-300">Include Fields:</label>
