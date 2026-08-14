@@ -45,7 +45,7 @@ The planned and experimental features below continue to align with the core prin
 
 ### 4.1 Near-term
 
-- **[done] Database backup and restore:** The Link File tab in the DB modal lets users download a full `.yjs` copy and restore from one. This is the other half of the data ownership story, allowing users to safeguard and recover their data without needing a cloud sync.
+- **[done] Database backup and restore:** The Link File tab in the DB modal lets users download a full `.yjs` copy and restore from one. This is the other half of the data ownership story, allowing users to safeguard and recover their data without needing a cloud sync. Restoring is destructive, so the file is validated before anything is cleared: one that another app wrote, or that would erase the database and put nothing back, is refused with an error and no write (#52).
 - **[done] Compare two card lists:** This is a valuable feature that can be built entirely on the client-side, adding utility without compromising the core principles.
 - **[done] Cache card images with the browser Cache API:** After their first load, Scryfall card images are stored in the browser's native Cache storage (`caches.open()`) and served locally on every subsequent visit. This reduces Scryfall API traffic, speeds up the UI, and keeps images available across sessions — all without a service worker, a server, or any extra dependency. Cache size is reported in the DB modal and the user can clear it on demand. Fully aligned with Zero Cost, Zero Backend, and Absolute Privacy.
 
@@ -59,7 +59,9 @@ This approach aligns squarely with all three core principles:
 - **Absolute Privacy:** The file never leaves the user's machine unless they choose to copy or sync it manually.
 - **User-Controlled Data:** The user picks the file location. Placing that file inside a cloud-synced folder (Dropbox, iCloud Drive, OneDrive, Google Drive for Desktop) gives them cross-device access using infrastructure they already own and control — hence "Bring Your Own Cloud."
 
-The one UX constraint this feature imposes: browsers require a user gesture to grant write access, and the permission is not stored across sessions. The app will request permission once per session (on the first post-load write attempt, or when the user explicitly clicks "Reconnect to File"), and will display a clear status panel in the DB modal showing the link state, the filename and path, the time of last successful save, and any error conditions.
+The one UX constraint this feature imposes: browsers require a **user gesture** to grant write access, and the permission is not carried across sessions. Permission therefore cannot be re-acquired silently — not on load, and not on the first write. What the app does instead: on startup it queries the stored handle's permission state, and if the grant has lapsed it surfaces a "Reconnect" action in the DB modal; clicking it is the gesture that re-grants access, and the write that was pending is then retried. One prompt per session, always user-initiated.
+
+The DB modal shows a status panel with the link state, the **filename**, the time of the last successful save, and any error conditions. It deliberately does not show a filesystem path: the File System Access API exposes only `handle.name` to the page, by design — the browser never tells the app where the file lives. That opacity is a privacy feature, not a gap to close.
 
 Browser support caveat: the File System Access API is available in Chrome 86+, Edge 86+, and Safari 15.2+. Firefox does not support it as of mid-2025. The feature will degrade gracefully — users on unsupported browsers will not see the linking controls.
 
@@ -78,7 +80,9 @@ By deliberately choosing a focused, backend-less architecture, LM Deck Tools car
 The Zero Backend principle rules out any business model that depends on fixed infrastructure costs. All revenue streams must be passive and merit-based.
 
 **Affiliate Marketing**
-Integrate with the TCGplayer Affiliate Program by surfacing "Buy Missing Cards" links on deck lists and the missing-cards view. The app already knows which cards a user needs to complete a list; a contextual affiliate link turns that insight into commission revenue with zero extra friction. This is the same model used by Moxfield and other established competitors.
+Integrate with the TCGplayer Affiliate Program by surfacing "Buy Missing Cards" links on deck lists and on a missing-cards view (planned — the app computes per-card ownership today but does not yet consolidate the shortfall into one view). The app already knows which cards a user needs to complete a list; a contextual affiliate link turns that insight into commission revenue with zero extra friction. This is the same model used by Moxfield and other established competitors.
+
+The scope boundary that keeps this compatible with the core principles: **static deep links only.** A plain `<a href>` carrying an affiliate parameter, rendered from data the app already holds, marked `rel="sponsored noopener noreferrer"` and disclosed to the user. No third-party script, no tracking pixel, no iframe, and no price or availability lookups — nothing that issues a network request before the user chooses to click. Price data and true marketplace integration remain out of scope (see `user-stories.md` → Out of Scope → Card Prices & Market); an outbound link is not an integration.
 
 **Community Support (GitHub Sponsors / Ko-fi)**
 WotC's Fan Content Policy generally prohibits charging for access to fan tools that use their IP. A sponsorship model sidesteps this by letting users fund the developer's general work rather than paying for MTG-specific features. The chosen channels are [GitHub Sponsors](https://github.com/sponsors/Lordmzn) (primary — zero fees, developer-native) and [Ko-fi](https://ko-fi.com/lordmzn) (secondary — for supporters outside the GitHub ecosystem). The MTG project itself remains entirely free and open-source. This framing strengthens the community relationship and keeps the tool in the "hobby project" category from a legal standpoint.
@@ -92,7 +96,7 @@ The project's competitive moat is not feature parity with Moxfield or Archidekt 
 
 - **The Privacy Niche.** Target users who are wary of data tracking and high-value collectors who do not want their inventory exposed to third-party servers. The value proposition ("your collection never leaves your machine") is simple to communicate and difficult for cloud-based competitors to copy.
 - **UX-Driven Retention.** Complexity is a churn driver. Following established UX conventions — clean interfaces, familiar interaction patterns, progressive disclosure of advanced features — lowers the learning curve and keeps casual users engaged alongside power users.
-- **Data Portability as a Feature.** Actively market the `.yjs` export and CSV export as user empowerment, not just backup mechanisms. "Take your data anywhere, no lock-in" is a credible differentiator in a category where most apps hold data hostage.
+- **Data Portability as a Feature.** Actively market the `.yjs` export and the CSV / plain-text collection exports as user empowerment, not just backup mechanisms. "Take your data anywhere, no lock-in" is a credible differentiator in a category where most apps hold data hostage — and the claim is only credible while the exports round-trip through our own importer, which is why that round-trip is a tested guarantee rather than an assumption (#50).
 
 ### 5.3 User Acquisition: Organic and Community-Driven
 
