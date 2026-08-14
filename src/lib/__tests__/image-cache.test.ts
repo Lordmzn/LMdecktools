@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { getImageUrl, getImageCacheStats, clearImageCache } from '../image-cache';
+import { getImageUrl, getImageCacheStats, clearImageCache, formatBytes } from '../image-cache';
 
 function createMockCache() {
 	const store = new Map<string, Response>();
 	return {
-		match: vi.fn(async (url: string) => store.get(url) ?? undefined),
+		// Clone on read, as the real Cache API does — a Response body is single-use
+		match: vi.fn(async (url: string) => store.get(url)?.clone() ?? undefined),
 		put: vi.fn(async (url: string, response: Response) => {
 			store.set(url, response);
 		}),
@@ -84,6 +85,14 @@ describe('image-cache', () => {
 	});
 
 	describe('getImageCacheStats', () => {
+		// 'fake-image-data' — what the fetch stub returns for every image
+		const ENTRY_BYTES = 15;
+
+		// The size measurement is memoised for the session; drop it between tests
+		beforeEach(async () => {
+			await clearImageCache();
+		});
+
 		it('returns correct count of cached images', async () => {
 			// Populate cache via getImageUrl (which calls fetch + cache.put internally)
 			await getImageUrl('https://example.com/img1.jpg');
@@ -94,15 +103,85 @@ describe('image-cache', () => {
 			expect(stats.count).toBe(3);
 		});
 
+		it('sums the size of every cached response', async () => {
+			await getImageUrl('https://example.com/img1.jpg');
+			await getImageUrl('https://example.com/img2.jpg');
+
+			const stats = await getImageCacheStats();
+			expect(stats.bytes).toBe(2 * ENTRY_BYTES);
+		});
+
+		it('prefers Content-Length over hydrating the body', async () => {
+			mockCache._store.set(
+				'https://example.com/declared.jpg',
+				new Response(new Blob(['tiny']), { headers: { 'content-length': '204800' } })
+			);
+
+			const stats = await getImageCacheStats();
+			expect(stats.bytes).toBe(204800);
+		});
+
+		it('counts an unmeasurable entry as zero rather than failing', async () => {
+			// An opaque response exposes neither Content-Length nor a readable body
+			const opaque = {
+				headers: { get: () => null },
+				blob: async () => ({ size: 0 }),
+				clone() {
+					return this;
+				}
+			} as unknown as Response;
+			mockCache._store.set('https://example.com/opaque.jpg', opaque);
+			await getImageUrl('https://example.com/img1.jpg');
+
+			const stats = await getImageCacheStats();
+			expect(stats.count).toBe(2);
+			expect(stats.bytes).toBe(ENTRY_BYTES);
+		});
+
+		it('reuses the measurement while the entry count is unchanged', async () => {
+			await getImageUrl('https://example.com/img1.jpg');
+
+			const first = await getImageCacheStats();
+			mockCache.match.mockClear();
+			const second = await getImageCacheStats();
+
+			expect(second).toEqual(first);
+			// No response was hydrated the second time — only keys() was consulted
+			expect(mockCache.match).not.toHaveBeenCalled();
+		});
+
+		it('re-measures once the cache has grown', async () => {
+			await getImageUrl('https://example.com/img1.jpg');
+			expect((await getImageCacheStats()).bytes).toBe(ENTRY_BYTES);
+
+			await getImageUrl('https://example.com/img2.jpg');
+			expect((await getImageCacheStats()).bytes).toBe(2 * ENTRY_BYTES);
+		});
+
 		it('returns zero when cache is empty', async () => {
 			const stats = await getImageCacheStats();
-			expect(stats.count).toBe(0);
+			expect(stats).toEqual({ count: 0, bytes: 0 });
 		});
 
 		it('returns zero when caches API is unavailable', async () => {
 			vi.stubGlobal('caches', undefined);
 			const stats = await getImageCacheStats();
-			expect(stats.count).toBe(0);
+			expect(stats).toEqual({ count: 0, bytes: 0 });
+		});
+	});
+
+	describe('formatBytes', () => {
+		it('formats bytes, kB, MB and GB', () => {
+			expect(formatBytes(0)).toBe('0 B');
+			expect(formatBytes(512)).toBe('512 B');
+			expect(formatBytes(2048)).toBe('2.0 kB');
+			expect(formatBytes(86_400_000)).toBe('86.4 MB');
+			expect(formatBytes(3_200_000_000)).toBe('3.2 GB');
+		});
+
+		it('does not report a negative or non-finite size', () => {
+			expect(formatBytes(-1)).toBe('0 B');
+			expect(formatBytes(NaN)).toBe('0 B');
 		});
 	});
 

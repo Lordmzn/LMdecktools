@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
 	import { checkLocalDatabase } from '$lib/db';
-	import { getImageCacheStats, clearImageCache } from '$lib/image-cache';
+	import { getImageCacheStats, clearImageCache, formatBytes } from '$lib/image-cache';
 	import {
 		store,
 		initDB,
@@ -82,6 +82,11 @@
 	let importResult = $state<{ imported: number; merged: number; errors: number } | null>(null);
 	let importError = $state<string | null>(null);
 	let imageCacheCount = $state(0);
+	let imageCacheBytes = $state(0);
+	// e.g. "412 images · 86.4 MB" — the size is what the Clear button is judged against (#51)
+	let imageCacheSummary = $derived(
+		`${imageCacheCount} ${imageCacheCount === 1 ? 'image' : 'images'} · ${formatBytes(imageCacheBytes)}`
+	);
 	let isClearingCache = $state(false);
 	let showCreateNewConfirm = $state(false);
 
@@ -102,8 +107,10 @@
 	}
 
 	onMount(() => {
+		// Measured once, on modal open — sizing the cache hydrates every entry
 		getImageCacheStats().then((stats) => {
 			imageCacheCount = stats.count;
+			imageCacheBytes = stats.bytes;
 		});
 		clockInterval = setInterval(() => {
 			now = Date.now();
@@ -1115,7 +1122,9 @@
 								<div class="mb-4 space-y-2 text-sm text-slate-400">
 									<div class="flex justify-between">
 										<span class="font-medium">Cached images:</span>
-										<span class="font-mono">{imageCacheCount}</span>
+										<span class="font-mono" data-testid="image-cache-stats"
+											>{imageCacheSummary}</span
+										>
 									</div>
 								</div>
 								<button
@@ -1123,6 +1132,7 @@
 										isClearingCache = true;
 										await clearImageCache();
 										imageCacheCount = 0;
+										imageCacheBytes = 0;
 										isClearingCache = false;
 									}}
 									disabled={isClearingCache || imageCacheCount === 0}
