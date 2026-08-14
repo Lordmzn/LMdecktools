@@ -200,6 +200,14 @@ export function parseImportInput(text: string): ParseResult {
 		case 'text':
 			return parsePlainText(text);
 		case 'moxfield-url':
+			// Moxfield has no public API (#49) — their file export is the supported path
+			return {
+				listName: null,
+				cards: [],
+				warnings: [
+					'Moxfield URL detected — Moxfield deck URLs cannot be imported. Export the deck as a text file from Moxfield and import that instead.'
+				]
+			};
 		case 'archidekt-url':
 			// URL inputs are handled by the caller via import-url.ts
 			return { listName: null, cards: [], warnings: ['URL detected — use the URL fetch flow'] };

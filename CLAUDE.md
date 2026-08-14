@@ -49,7 +49,7 @@ Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wra
 
 Live Scryfall API calls (`api.scryfall.com/cards/search`, `/cards/named`, and `/cards/collection` for batch lookups). No local card database.
 
-Deck **import** additionally contacts third-party deck sites on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api` and `api2.moxfield.com`. The Moxfield endpoint is an unofficial API that is CORS-blocked in practice and is slated for removal (#49). Any new external host must be disclosed in `docs/project-vision.md` §5.4 — the privacy claim depends on that list being exhaustive.
+Deck **import** additionally contacts one third-party deck site on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api`, exported as `URL_IMPORT_HOST` so the UI can disclose it next to the URL field before the fetch. The Moxfield fetch (`api2.moxfield.com`) was removed in #49 — it is an unofficial API, CORS-blocked in practice, so a pasted Moxfield URL now returns `MOXFIELD_URL_MESSAGE` pointing at their file export instead. Any new external host must be disclosed in `docs/project-vision.md` §5.5 — the privacy claim depends on that list being exhaustive.
 
 ### Routing
 
