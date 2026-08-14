@@ -22,6 +22,7 @@ import {
 
 import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
+import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
 import { formatCollectionAsCSV, formatCollectionAsText } from './export-format';
 import {
 	isFileSystemAccessSupported,
@@ -498,6 +499,18 @@ export async function mergeFromFile(): Promise<void> {
 }
 
 /**
+ * Read a restore file and validate it without touching the database, so the UI
+ * can show what is about to be loaded — and refuse the file — before the user
+ * commits to a destructive restore (#52). Throws `ImportValidationError`.
+ */
+export async function inspectImportFile(file: File): Promise<ImportPayload> {
+	const data = new Uint8Array(await file.arrayBuffer());
+	const payload = parseImportFile(data);
+	assertRestorable(payload);
+	return payload;
+}
+
+/**
  * Load database from a file (JSON or Yjs format).
  * Clears existing data, imports from the file, then reloads the store.
  */
@@ -506,12 +519,14 @@ export async function loadFromFile(
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
 	const _db = await ensureDB();
-	store.dbMode = 'active';
 
 	const buffer = await file.arrayBuffer();
 	const data = new Uint8Array(buffer);
 
+	// importDatabase validates before it writes; leave dbMode alone until it
+	// succeeds, so a rejected file changes nothing at all (#52)
 	const result = await importDatabase(_db, data, false, onProgress);
+	store.dbMode = 'active';
 	await Promise.all([loadCardLists(), loadCollection()]);
 	await putMetadata(_db, 'autoLoadDB', true);
 	triggerAutoSave();
@@ -528,27 +543,16 @@ export async function importDatabase(
 	merge: boolean = false,
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
-	let cardLists: CardList[];
-	let collection: CollectionCard[] = [];
-
-	// Try to detect format
-	try {
-		const decoder = new TextDecoder();
-		const jsonString = decoder.decode(data);
-		const importData = JSON.parse(jsonString);
-		cardLists = importData.cardLists ?? importData.decks ?? [];
-		collection = importData.collection ?? [];
-	} catch {
-		// If JSON parsing fails, try Yjs format
-		try {
-			const { importWithMetadata } = await import('./yjs-integration');
-			const result = importWithMetadata(data);
-			cardLists = result.cardLists;
-			collection = result.collection;
-		} catch {
-			throw new Error('Invalid file format. Please use a valid .lmdb or .json export file.');
-		}
+	// Validate before destroying anything: parseImportFile throws for a file that
+	// is not one of our exports, and assertRestorable throws for an empty payload,
+	// both before the first write. Restoring is destructive; being wrong is fatal (#52).
+	const payload = parseImportFile(data);
+	if (!merge) {
+		assertRestorable(payload);
 	}
+
+	const cardLists = payload.cardLists;
+	const collection = payload.collection;
 
 	let imported = 0;
 	let merged = 0;

@@ -10,6 +10,7 @@
 		clearDB,
 		exportDB,
 		loadFromFile,
+		inspectImportFile,
 		exportCollectionToText,
 		exportCollectionToCSV,
 		isFileSystemAccessSupported,
@@ -23,6 +24,7 @@
 		importCardsToCollection,
 		importCardsToNewList
 	} from '$lib/store.svelte';
+	import { describeImport } from '$lib/import-guard';
 	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
 	import { fetchDeckFromUrl, URL_IMPORT_HOST } from '$lib/import-url';
@@ -81,6 +83,8 @@
 	let importTotal = $state(0);
 	let importResult = $state<{ imported: number; merged: number; errors: number } | null>(null);
 	let importError = $state<string | null>(null);
+	/** What the selected restore file says it holds, or null when it failed validation. */
+	let importPreview = $state<string | null>(null);
 	let imageCacheCount = $state(0);
 	let imageCacheBytes = $state(0);
 	// e.g. "412 images · 86.4 MB" — the size is what the Clear button is judged against (#51)
@@ -145,10 +149,21 @@
 		activeSection = activeSection === section ? null : section;
 	}
 
-	function handleFileSelect(event: Event) {
+	async function handleFileSelect(event: Event) {
 		const target = event.target as HTMLInputElement;
-		if (target.files && target.files.length > 0) {
-			selectedFile = target.files[0];
+		if (!target.files || target.files.length === 0) return;
+
+		selectedFile = target.files[0];
+		importResult = null;
+		importError = null;
+		importPreview = null;
+
+		// Validate up front — the user should see what they are about to restore,
+		// and a file we would refuse should never reach the Restore button (#52)
+		try {
+			importPreview = describeImport(await inspectImportFile(selectedFile));
+		} catch (e) {
+			importError = e instanceof Error ? e.message : 'Could not read this file';
 		}
 	}
 
@@ -1022,8 +1037,13 @@
 										class="mb-3 block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
 									/>
 									{#if selectedFile && !importResult && !importError}
-										<p class="mb-3 text-xs text-slate-400">
+										<p class="mb-1 text-xs text-slate-400">
 											Selected file: {selectedFile.name}
+										</p>
+									{/if}
+									{#if importPreview && !importResult}
+										<p class="mb-3 text-xs text-slate-500" data-testid="restore-preview">
+											{importPreview}
 										</p>
 									{/if}
 									{#if importResult}
@@ -1052,7 +1072,10 @@
 									{/if}
 									<button
 										onclick={handleLoadFile}
-										disabled={!selectedFile || isLoadingFile || importResult !== null}
+										disabled={!selectedFile ||
+											!importPreview ||
+											isLoadingFile ||
+											importResult !== null}
 										class="btn btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
 									>
 										{#if isLoadingFile}

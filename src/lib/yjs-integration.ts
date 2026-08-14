@@ -207,11 +207,14 @@ export function mergeListCardQuantities(
 export function exportWithMetadata(store: StoreInterface): Uint8Array {
 	const ydoc = new Y.Doc();
 
-	// Add metadata
+	// Add metadata. total_lists / total_cards are declared counts: the importer
+	// compares them against what it decodes and refuses a truncated file (#52).
 	const yMeta = ydoc.getMap('metadata');
 	yMeta.set('version', '1.0');
 	yMeta.set('exported_at', Date.now());
 	yMeta.set('app', 'LM Deck Tools');
+	yMeta.set('total_lists', store.savedCardLists.length);
+	yMeta.set('total_cards', store.collection.length);
 
 	// Add collection
 	const yCollection = ydoc.getMap('collection');
@@ -288,8 +291,9 @@ export function importWithMetadata(data: Uint8Array): {
 		version: string;
 		exported_at: number;
 		app: string;
-		total_lists: number;
-		total_cards: number;
+		/** Written since #52 — absent in files exported by earlier builds. */
+		total_lists?: number;
+		total_cards?: number;
 	};
 } {
 	const ydoc = new Y.Doc();
@@ -300,8 +304,8 @@ export function importWithMetadata(data: Uint8Array): {
 		version: yMeta.get('version') as string,
 		exported_at: yMeta.get('exported_at') as number,
 		app: yMeta.get('app') as string,
-		total_lists: yMeta.get('total_lists') as number,
-		total_cards: yMeta.get('total_cards') as number
+		total_lists: yMeta.get('total_lists') as number | undefined,
+		total_cards: yMeta.get('total_cards') as number | undefined
 	};
 
 	const cardLists = yDocToCardLists(ydoc);

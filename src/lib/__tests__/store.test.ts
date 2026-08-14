@@ -132,6 +132,50 @@ describe('Database Import', () => {
 		});
 	});
 
+	// #52 — restoring is destructive, so an unusable file must not reach clearDatabase()
+	async function seedOneList(): Promise<void> {
+		await saveCardList(db, {
+			...createEmptyCardList(),
+			name: 'Precious Local List',
+			cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]
+		});
+	}
+
+	it('leaves the database untouched when the file belongs to another app', async () => {
+		await seedOneList();
+		const foreign = new TextEncoder().encode(
+			JSON.stringify({ app: 'Moxfield', cardLists: [{ name: 'Theirs' }] })
+		);
+
+		const { importDatabase } = await import('../store.svelte');
+		await expect(importDatabase(db, foreign, false)).rejects.toThrow(/not LM Deck Tools/);
+
+		const survivors = await loadAllCardLists(db);
+		expect(survivors.map((l) => l.name)).toEqual(['Precious Local List']);
+	});
+
+	it('leaves the database untouched when the file is unrelated JSON', async () => {
+		await seedOneList();
+		const unrelated = new TextEncoder().encode(JSON.stringify({ tasks: ['buy milk'] }));
+
+		const { importDatabase } = await import('../store.svelte');
+		await expect(importDatabase(db, unrelated, false)).rejects.toThrow(/not an LM Deck Tools/);
+
+		expect(await loadAllCardLists(db)).toHaveLength(1);
+	});
+
+	it('leaves the database untouched when the export is empty', async () => {
+		await seedOneList();
+		const empty = new TextEncoder().encode(
+			JSON.stringify({ app: 'LM Deck Tools', version: '1.0', cardLists: [], collection: [] })
+		);
+
+		const { importDatabase } = await import('../store.svelte');
+		await expect(importDatabase(db, empty, false)).rejects.toThrow(/Create New Database/);
+
+		expect(await loadAllCardLists(db)).toHaveLength(1);
+	});
+
 	// [planned] Import a database from a .yjs file
 	it('imports card lists from a Yjs binary file', async () => {
 		// First, export card lists to get binary data via a different path

@@ -162,6 +162,18 @@ describe('Yjs Integration', () => {
 			expect(result.cardLists[0].name).toBe('Red Aggro');
 			expect(result.cardLists[0].cards).toHaveLength(2);
 		});
+
+		it('declares total_lists and total_cards so the importer can spot a truncated file', () => {
+			const mockStore = {
+				savedCardLists: [makeCardList({ name: 'Red Aggro' }), makeCardList({ name: 'Blue Tempo' })],
+				collection: [{ id: 'c1', name: 'Lightning Bolt', quantity_owned: 4 }]
+			};
+
+			const result = importWithMetadata(exportWithMetadata(mockStore as any));
+
+			expect(result.metadata.total_lists).toBe(2);
+			expect(result.metadata.total_cards).toBe(1);
+		});
 	});
 
 	describe('calculateDiff', () => {
