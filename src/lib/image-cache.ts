@@ -34,13 +34,23 @@ export interface ImageCacheStats {
 }
 
 /**
- * Measuring bytes means hydrating every cached response, which is O(cache) —
- * so the last result is kept for the session and reused while the entry count
- * is unchanged. `cache.keys()` is cheap; only the sizing pass is not. The image
- * cache is append-only (entries are added, never rewritten in place), so a
- * matching count means matching bytes.
+ * Measuring bytes means hydrating cached responses, which is O(cache) — so the
+ * last result is kept for the session. `cache.keys()` is cheap; only the sizing
+ * pass is not.
+ *
+ * The cache is append-only (entries are added, never rewritten in place), which
+ * buys two things: an unchanged entry count means unchanged bytes, and when the
+ * count *has* grown only the new keys need sizing. So the URLs already measured
+ * are remembered alongside the total and the re-measure is incremental — which
+ * matters now that the DB modal re-reads this on every open (#64) rather than
+ * once per page load.
  */
-let statsMemo: ImageCacheStats | null = null;
+let statsMemo: (ImageCacheStats & { measured: Set<string> }) | null = null;
+
+/** The URL a cache key stands for — `cache.keys()` yields Requests, not strings. */
+function keyUrl(key: RequestInfo | URL): string {
+	return typeof key === 'string' ? key : key instanceof URL ? key.href : key.url;
+}
 
 /** Size of one cached response: the Content-Length header if present, else the blob. */
 async function measureEntry(cache: Cache, key: RequestInfo | URL): Promise<number> {
@@ -69,12 +79,25 @@ export async function getImageCacheStats(): Promise<ImageCacheStats> {
 		const keys = await cache.keys();
 
 		if (statsMemo && statsMemo.count === keys.length) {
-			return statsMemo;
+			return { count: statsMemo.count, bytes: statsMemo.bytes };
 		}
 
-		const sizes = await Promise.all(keys.map((key) => measureEntry(cache, key)));
-		statsMemo = { count: keys.length, bytes: sizes.reduce((total, size) => total + size, 0) };
-		return statsMemo;
+		// Size only what has not been sized before. On a cold read that is every
+		// entry; on a re-read after browsing, just the handful newly cached.
+		const measured = statsMemo?.measured ?? new Set<string>();
+		const fresh = keys.filter((key) => !measured.has(keyUrl(key)));
+		const sizes = await Promise.all(fresh.map((key) => measureEntry(cache, key)));
+
+		for (const key of fresh) {
+			measured.add(keyUrl(key));
+		}
+
+		statsMemo = {
+			count: keys.length,
+			bytes: (statsMemo?.bytes ?? 0) + sizes.reduce((total, size) => total + size, 0),
+			measured
+		};
+		return { count: statsMemo.count, bytes: statsMemo.bytes };
 	} catch {
 		return { count: 0, bytes: 0 };
 	}
