@@ -103,3 +103,49 @@ export function formatCollectionAsText(cards: ExportableCard[], fields: string[]
 
 	return text;
 }
+
+export type ExportFormat = 'csv' | 'text';
+
+/** How many rows the export preview renders. The file itself is never truncated. */
+export const PREVIEW_ROWS = 50;
+
+export interface ExportPreview {
+	/** Formatted text for the preview box — the first `shown` rows of the real export. */
+	text: string;
+	/** Rows rendered. */
+	shown: number;
+	/** Cards in the collection. */
+	total: number;
+	/** Whether anything was left out, i.e. the preview is not the whole file. */
+	truncated: boolean;
+}
+
+/**
+ * The head of an export, for display only (#63).
+ *
+ * The preview box used to render the entire collection — some 80 KB of text for
+ * a 5000-card collection — and rebuilt it on every format or field change, which
+ * is what made switching CSV ↔ Text stall. Nobody reads past the first screen of
+ * a preview, so only the first `limit` rows are formatted.
+ *
+ * Sorted before slicing, so the preview really is the top of the file the user
+ * will get rather than an arbitrary sample. Download and copy still format the
+ * whole collection — truncation must never reach a file.
+ */
+export function buildExportPreview(
+	cards: ExportableCard[],
+	fields: string[],
+	format: ExportFormat,
+	limit: number = PREVIEW_ROWS
+): ExportPreview {
+	const head = [...cards].sort(byName).slice(0, Math.max(0, limit));
+	const text =
+		format === 'csv' ? formatCollectionAsCSV(head, fields) : formatCollectionAsText(head, fields);
+
+	return {
+		text,
+		shown: head.length,
+		total: cards.length,
+		truncated: cards.length > head.length
+	};
+}

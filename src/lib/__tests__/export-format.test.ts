@@ -3,6 +3,8 @@ import {
 	escapeCSVField,
 	formatCollectionAsCSV,
 	formatCollectionAsText,
+	buildExportPreview,
+	PREVIEW_ROWS,
 	type ExportableCard
 } from '../export-format';
 import { parseImportInput, parseCSVLine } from '../import-parser';
@@ -167,5 +169,92 @@ describe('formatCollectionAsText', () => {
 		const text = formatCollectionAsText(collection, ['Name', 'Foil']);
 		expect(text).toContain('Counterspell (Foil)');
 		expect(text).toMatch(/Lightning Bolt\s/);
+	});
+});
+
+describe('buildExportPreview', () => {
+	/** `count` cards named so that alphabetical order matches numeric order. */
+	function manyCards(count: number): ExportableCard[] {
+		return Array.from({ length: count }, (_, i) => ({
+			id: `id-${i}`,
+			name: `Card ${String(i).padStart(4, '0')}`,
+			quantity_owned: 1,
+			set: 'neo'
+		}));
+	}
+
+	const fields = ['Count', 'Name'];
+
+	it('renders every card when the collection is small', () => {
+		const preview = buildExportPreview(collection, fields, 'csv');
+
+		expect(preview.total).toBe(2);
+		expect(preview.shown).toBe(2);
+		expect(preview.truncated).toBe(false);
+		expect(preview.text).toContain('Lightning Bolt');
+	});
+
+	it('caps the rendered rows once the collection is large', () => {
+		const preview = buildExportPreview(manyCards(500), fields, 'csv');
+
+		expect(preview.total).toBe(500);
+		expect(preview.shown).toBe(PREVIEW_ROWS);
+		expect(preview.truncated).toBe(true);
+		// Header row plus PREVIEW_ROWS data rows, and nothing more
+		expect(preview.text.trimEnd().split('\r\n')).toHaveLength(PREVIEW_ROWS + 1);
+	});
+
+	it('previews the top of the file, not an arbitrary slice', () => {
+		// Reverse-sorted input: a preview that skipped sorting would start at 0499
+		const reversed = manyCards(500).reverse();
+
+		const preview = buildExportPreview(reversed, fields, 'csv');
+
+		expect(preview.text).toContain('Card 0000');
+		expect(preview.text).toContain(`Card ${String(PREVIEW_ROWS - 1).padStart(4, '0')}`);
+		expect(preview.text).not.toContain('Card 0499');
+	});
+
+	it('matches the head of the full export it stands in for', () => {
+		const cards = manyCards(200);
+
+		const preview = buildExportPreview(cards, fields, 'csv');
+		const full = formatCollectionAsCSV(cards, fields);
+
+		expect(full.startsWith(preview.text.trimEnd())).toBe(true);
+	});
+
+	it('previews the text format too', () => {
+		const preview = buildExportPreview(manyCards(100), fields, 'text', 10);
+
+		expect(preview.text).toContain('# My Collection');
+		expect(preview.shown).toBe(10);
+		expect(preview.truncated).toBe(true);
+	});
+
+	it('honours an explicit limit', () => {
+		const preview = buildExportPreview(manyCards(100), fields, 'csv', 3);
+
+		expect(preview.shown).toBe(3);
+		expect(preview.truncated).toBe(true);
+	});
+
+	it('handles an empty collection', () => {
+		const preview = buildExportPreview([], fields, 'csv');
+
+		expect(preview).toMatchObject({ shown: 0, total: 0, truncated: false });
+	});
+
+	it('renders nothing when no fields are selected', () => {
+		expect(buildExportPreview(collection, [], 'csv').text).toBe('');
+	});
+
+	it('does not reorder the caller\u2019s array', () => {
+		const cards = manyCards(5).reverse();
+		const firstBefore = cards[0].name;
+
+		buildExportPreview(cards, fields, 'csv');
+
+		expect(cards[0].name).toBe(firstBefore);
 	});
 });

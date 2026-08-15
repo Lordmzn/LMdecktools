@@ -14,6 +14,7 @@
 		inspectImportFile,
 		exportCollectionToText,
 		exportCollectionToCSV,
+		exportCollectionPreview,
 		isFileSystemAccessSupported,
 		linkFile,
 		linkExistingFile,
@@ -26,6 +27,7 @@
 		importCardsToNewList,
 		logAppError
 	} from '$lib/store.svelte';
+	import type { ExportFormat } from '$lib/export-format';
 	import { describeImport } from '$lib/import-guard';
 	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
@@ -377,19 +379,32 @@
 	];
 	let csvSelectedFields = $state(['Count', 'Name', 'Edition']);
 	// CSV re-imports into this app and opens in a spreadsheet; text is what other MTG tools paste (#50)
-	type ExportFormat = 'csv' | 'text';
 	let exportFormat = $state<ExportFormat>('csv');
-	let csvText = $derived.by(() =>
-		exportFormat === 'csv'
+
+	/**
+	 * Only the first `PREVIEW_ROWS` rows are formatted for the box (#63). Rendering
+	 * the whole collection here — ~80 KB of text for 5000 cards — and rebuilding it
+	 * on every format or field change is what made switching CSV ↔ Text stall.
+	 * The file itself is built in full, on demand, by the two handlers below.
+	 */
+	let exportPreview = $derived(exportCollectionPreview(csvSelectedFields, exportFormat));
+
+	/** Whether there is anything to export at all — drives the two buttons. */
+	let hasExport = $derived(csvSelectedFields.length > 0 && store.uniqueOwnedCards > 0);
+
+	/** The real export: every card, never the truncated preview. */
+	function buildFullExport(): string {
+		return exportFormat === 'csv'
 			? exportCollectionToCSV(csvSelectedFields)
-			: exportCollectionToText(csvSelectedFields)
-	);
+			: exportCollectionToText(csvSelectedFields);
+	}
 
 	function handleCsvCopy() {
-		navigator.clipboard.writeText(csvText);
+		navigator.clipboard.writeText(buildFullExport());
 	}
 
 	function handleCsvDownload() {
+		const csvText = buildFullExport();
 		if (!csvText) return;
 		const isCsv = exportFormat === 'csv';
 		const blob = new Blob([csvText], {
@@ -928,24 +943,39 @@
 							</div>
 						</div>
 
-						<textarea
-							value={csvText}
-							readonly
-							class="h-64 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-300"
-							placeholder="Select fields to generate preview..."
-						></textarea>
+						<div>
+							<textarea
+								value={exportPreview.text}
+								readonly
+								class="h-64 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-300"
+								placeholder="Select fields to generate preview..."
+							></textarea>
+							<!-- Say plainly that the box is a sample, so nobody reads the row
+							     count off it and thinks the file is short (#63) -->
+							<p class="mt-2 text-xs text-slate-500" data-testid="export-preview-note">
+								{#if exportPreview.truncated}
+									Preview — first {exportPreview.shown} of {exportPreview.total} cards. Download and
+									copy include all of them.
+								{:else if exportPreview.total > 0}
+									Preview — all {exportPreview.total}
+									{exportPreview.total === 1 ? 'card' : 'cards'}.
+								{:else}
+									Nothing to export yet — your collection is empty.
+								{/if}
+							</p>
+						</div>
 
 						<div class="flex gap-3">
 							<button
 								onclick={handleCsvDownload}
-								disabled={!csvText}
+								disabled={!hasExport}
 								class="btn btn-primary flex-1 disabled:cursor-not-allowed sm:flex-none"
 							>
 								Download File
 							</button>
 							<button
 								onclick={handleCsvCopy}
-								disabled={!csvText}
+								disabled={!hasExport}
 								class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 							>
 								Copy to Clipboard

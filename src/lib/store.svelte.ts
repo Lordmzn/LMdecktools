@@ -29,7 +29,13 @@ import {
 import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
-import { formatCollectionAsCSV, formatCollectionAsText } from './export-format';
+import {
+	formatCollectionAsCSV,
+	formatCollectionAsText,
+	buildExportPreview,
+	type ExportFormat,
+	type ExportPreview
+} from './export-format';
 import {
 	buildCollectionIndex,
 	checkOwnership,
@@ -1108,6 +1114,18 @@ export function exportCollectionToCSV(fields: string[]): string {
  */
 export function exportCollectionToText(fields: string[]): string {
 	return formatCollectionAsText(store.collection, fields);
+}
+
+/**
+ * The head of an export, for the preview box only (#63). Download and copy go
+ * through the full formatters above — a preview is never what lands in a file.
+ */
+export function exportCollectionPreview(
+	fields: string[],
+	format: ExportFormat,
+	limit?: number
+): ExportPreview {
+	return buildExportPreview(store.collection, fields, format, limit);
 }
 
 // ==================== CARD LIST FUNCTIONS ====================
