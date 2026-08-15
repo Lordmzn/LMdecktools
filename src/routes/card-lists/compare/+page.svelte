@@ -3,6 +3,7 @@
 	import { compareCardLists, exportCompareToText, type CompareResult } from '$lib/compare';
 	import type { CardMatching, LanguageMatching } from '$lib/db';
 	import CompareColumn from './CompareColumn.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let indexA = $state(0);
 	let indexB = $state(1);
@@ -35,21 +36,23 @@
 		onclick={() => (showExportModal = false)}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Export Comparison"
+		aria-label={m.compare_export_modal_title()}
 	>
 		<div
 			class="panel w-full max-w-lg rounded-xl p-6 shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h2 class="mb-4 text-xl font-bold text-slate-100">Export Comparison</h2>
+			<h2 class="mb-4 text-xl font-bold text-slate-100">{m.compare_export_modal_title()}</h2>
 			<pre
 				data-testid="export-text"
 				class="h-64 w-full overflow-auto rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm whitespace-pre-wrap text-slate-300">{exportText}</pre>
 			<div class="mt-4 flex justify-end gap-2">
 				<button onclick={() => navigator.clipboard.writeText(exportText)} class="btn btn-quiet">
-					Copy
+					{m.common_copy()}
 				</button>
-				<button onclick={() => (showExportModal = false)} class="btn btn-primary"> Close </button>
+				<button onclick={() => (showExportModal = false)} class="btn btn-primary"
+					>{m.common_close()}</button
+				>
 			</div>
 		</div>
 	</div>
@@ -59,8 +62,8 @@
 	<!-- Guard: need at least 2 lists -->
 	{#if lists.length < 2}
 		<div class="surface-card p-8 text-center">
-			<p class="mb-4 text-slate-400">You need at least two card lists to compare.</p>
-			<a href="/card-lists" class="btn btn-primary inline-block"> Back to Card Lists </a>
+			<p class="mb-4 text-slate-400">{m.compare_need_two_lists()}</p>
+			<a href="/card-lists" class="btn btn-primary inline-block">{m.compare_back_to_lists()}</a>
 		</div>
 	{:else}
 		<!-- Header panel -->
@@ -69,7 +72,7 @@
 				<a
 					href="/card-lists"
 					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
-					title="Back to Card Lists"
+					title={m.compare_back_to_lists()}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -84,15 +87,15 @@
 					</svg>
 				</a>
 				<div>
-					<div class="eyebrow">Two charts, one course</div>
-					<h1 class="text-xl font-extrabold tracking-tight text-white">Compare Lists</h1>
+					<div class="eyebrow">{m.compare_eyebrow()}</div>
+					<h1 class="text-xl font-extrabold tracking-tight text-white">{m.compare_title()}</h1>
 				</div>
 			</div>
 
 			<!-- List selectors -->
 			<div class="mb-4 flex flex-wrap items-center gap-4">
 				<div class="flex items-center gap-2">
-					<span class="text-sm font-medium text-amber-400">List A:</span>
+					<span class="text-sm font-medium text-amber-400">{m.compare_list_a()}</span>
 					<select bind:value={indexA} class="field min-w-[160px]">
 						{#each lists as list, i (list.id ?? i)}
 							<option value={i}>{list.name}</option>
@@ -100,7 +103,7 @@
 					</select>
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="text-sm font-medium text-blue-400">List B:</span>
+					<span class="text-sm font-medium text-blue-400">{m.compare_list_b()}</span>
 					<select bind:value={indexB} class="field min-w-[160px]">
 						{#each lists as list, i (list.id ?? i)}
 							<option value={i}>{list.name}</option>
@@ -112,36 +115,36 @@
 			<!-- Matching toggles -->
 			<div class="mb-4 flex flex-wrap items-center gap-3 text-sm">
 				<div class="flex items-center gap-2">
-					<span class="font-medium text-slate-400">Card Matching:</span>
+					<span class="font-medium text-slate-400">{m.common_card_matching_label()}</span>
 					<div class="inline-flex">
 						<button
 							onclick={() => (matching = 'generic')}
 							class="seg seg-l {matching === 'generic' ? 'seg-active' : ''}"
 						>
-							Generic
+							{m.common_generic()}
 						</button>
 						<button
 							onclick={() => (matching = 'specific')}
 							class="seg seg-r {matching === 'specific' ? 'seg-active' : ''}"
 						>
-							Specific
+							{m.common_specific()}
 						</button>
 					</div>
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="font-medium text-slate-400">Language:</span>
+					<span class="font-medium text-slate-400">{m.common_language_label()}</span>
 					<div class="inline-flex">
 						<button
 							onclick={() => (languageMatching = 'any')}
 							class="seg seg-l {languageMatching === 'any' ? 'seg-active' : ''}"
 						>
-							Any
+							{m.common_any()}
 						</button>
 						<button
 							onclick={() => (languageMatching = 'strict')}
 							class="seg seg-r {languageMatching === 'strict' ? 'seg-active' : ''}"
 						>
-							Strict
+							{m.common_strict()}
 						</button>
 					</div>
 				</div>
@@ -153,7 +156,7 @@
 						result.onlyInB.length === 0}
 					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 				>
-					Export
+					{m.common_export()}
 				</button>
 			</div>
 
@@ -162,31 +165,39 @@
 				<span
 					class="rounded-lg border border-amber-800 bg-amber-950 px-3 py-1 text-sm text-amber-400"
 				>
-					{result.onlyInA.length} only in A
+					{m.compare_badge_only_a({ count: result.onlyInA.length })}
 				</span>
 				<span
 					class="rounded-lg border border-green-800 bg-green-950 px-3 py-1 text-sm text-green-400"
 				>
-					{result.inBoth.length} in both
+					{m.compare_badge_both({ count: result.inBoth.length })}
 				</span>
 				<span class="rounded-lg border border-blue-800 bg-blue-950 px-3 py-1 text-sm text-blue-400">
-					{result.onlyInB.length} only in B
+					{m.compare_badge_only_b({ count: result.onlyInB.length })}
 				</span>
 			</div>
 		</div>
 
 		<!-- Desktop: 3-column grid (lg+) -->
 		<div class="hidden gap-4 lg:grid lg:grid-cols-3">
-			<CompareColumn title="Only in {listA?.name ?? 'A'}" color="amber" cards={result.onlyInA} />
 			<CompareColumn
-				title="In Both Lists"
+				title={m.compare_column_only_in({ name: listA?.name ?? 'A' })}
+				color="amber"
+				cards={result.onlyInA}
+			/>
+			<CompareColumn
+				title={m.compare_column_both()}
 				color="green"
 				cards={result.inBoth}
 				showBothQuantities
 				nameA={listA?.name ?? 'A'}
 				nameB={listB?.name ?? 'B'}
 			/>
-			<CompareColumn title="Only in {listB?.name ?? 'B'}" color="blue" cards={result.onlyInB} />
+			<CompareColumn
+				title={m.compare_column_only_in({ name: listB?.name ?? 'B' })}
+				color="blue"
+				cards={result.onlyInB}
+			/>
 		</div>
 
 		<!-- Mobile: tab bar + single column -->
@@ -198,7 +209,7 @@
 						? 'bg-amber-500 text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
-					Only A ({result.onlyInA.length})
+					{m.compare_tab_only_a({ count: result.onlyInA.length })}
 				</button>
 				<button
 					onclick={() => (activeTab = 'both')}
@@ -206,7 +217,7 @@
 						? 'bg-green-500 text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
-					Both ({result.inBoth.length})
+					{m.compare_tab_both({ count: result.inBoth.length })}
 				</button>
 				<button
 					onclick={() => (activeTab = 'onlyB')}
@@ -214,15 +225,19 @@
 						? 'bg-blue-500 text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
-					Only B ({result.onlyInB.length})
+					{m.compare_tab_only_b({ count: result.onlyInB.length })}
 				</button>
 			</div>
 
 			{#if activeTab === 'onlyA'}
-				<CompareColumn title="Only in {listA?.name ?? 'A'}" color="amber" cards={result.onlyInA} />
+				<CompareColumn
+					title={m.compare_column_only_in({ name: listA?.name ?? 'A' })}
+					color="amber"
+					cards={result.onlyInA}
+				/>
 			{:else if activeTab === 'both'}
 				<CompareColumn
-					title="In Both Lists"
+					title={m.compare_column_both()}
 					color="green"
 					cards={result.inBoth}
 					showBothQuantities
@@ -230,7 +245,11 @@
 					nameB={listB?.name ?? 'B'}
 				/>
 			{:else}
-				<CompareColumn title="Only in {listB?.name ?? 'B'}" color="blue" cards={result.onlyInB} />
+				<CompareColumn
+					title={m.compare_column_only_in({ name: listB?.name ?? 'B' })}
+					color="blue"
+					cards={result.onlyInB}
+				/>
 			{/if}
 		</div>
 	{/if}

@@ -15,6 +15,7 @@
 		type ErrorCategory,
 		type ErrorEntry
 	} from '$lib/error-journal';
+	import * as m from '$lib/paraglide/messages';
 
 	let entries = $state<ErrorEntry[]>([]);
 	let loaded = $state(false);
@@ -114,70 +115,65 @@
 </script>
 
 <svelte:head>
-	<title>Diagnostics · LM Deck Tools</title>
+	<title>{m.diagnostics_meta_title()}</title>
 </svelte:head>
 
 <div class="mx-auto max-w-5xl p-4">
 	<div class="surface-card p-6">
 		<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
 			<div>
-				<div class="eyebrow mb-1">The Log Book</div>
-				<h1 class="text-3xl font-extrabold tracking-tight text-white">Diagnostics</h1>
+				<div class="eyebrow mb-1">{m.diagnostics_eyebrow()}</div>
+				<h1 class="text-3xl font-extrabold tracking-tight text-white">{m.diagnostics_title()}</h1>
 				<p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
-					Errors this app ran into, recorded on your device and nowhere else. Nothing here is sent
-					anywhere unless you export it or choose to open a GitHub issue. The journal keeps the last
-					{MAX_ENTRIES} entries and drops anything older than {MAX_AGE_DAYS} days.
+					{m.diagnostics_intro({ maxEntries: MAX_ENTRIES, maxAgeDays: MAX_AGE_DAYS })}
 				</p>
 			</div>
 
 			<div class="flex flex-wrap items-center gap-2">
 				<button onclick={handleExport} disabled={entries.length === 0} class="btn btn-ghost btn-sm">
-					Export JSON
+					{m.diagnostics_export_json()}
 				</button>
 				<button
 					onclick={() => (showClearConfirm = true)}
 					disabled={entries.length === 0}
 					class="btn btn-danger btn-sm"
 				>
-					Clear All
+					{m.diagnostics_clear_all()}
 				</button>
 			</div>
 		</div>
 
 		{#if !journalAvailable}
 			<div class="py-12 text-center text-slate-400">
-				<p>No database open</p>
-				<p class="mt-2 text-sm">
-					Errors are journalled in your local database — click "Choose DB" in the header to start
-					recording them.
-				</p>
+				<p>{m.diagnostics_no_db_title()}</p>
+				<p class="mt-2 text-sm">{m.diagnostics_no_db_body()}</p>
 			</div>
 		{:else if !loaded}
-			<div class="py-12 text-center text-slate-400"><p>Loading…</p></div>
+			<div class="py-12 text-center text-slate-400"><p>{m.common_loading()}</p></div>
 		{:else if entries.length === 0}
 			<div class="py-12 text-center text-slate-400">
-				<p>No errors recorded</p>
-				<p class="mt-2 text-sm">Calm seas so far.</p>
+				<p>{m.diagnostics_empty_title()}</p>
+				<p class="mt-2 text-sm">{m.diagnostics_empty_body()}</p>
 			</div>
 		{:else}
 			<div class="mb-4 flex flex-wrap items-center gap-2">
 				<input
 					type="text"
 					bind:value={searchText}
-					placeholder="Search errors..."
+					placeholder={m.diagnostics_search_placeholder()}
 					class="field flex-1 sm:flex-none"
 					data-testid="diagnostics-search"
 				/>
 
 				<select bind:value={categoryFilter} class="field" data-testid="diagnostics-category">
-					<option value="all">All categories</option>
+					<option value="all">{m.diagnostics_all_categories()}</option>
 					{#each ERROR_CATEGORIES as category (category)}
 						<option value={category}>{category}</option>
 					{/each}
 				</select>
 
 				<span class="font-mono text-xs tracking-wider text-slate-400 uppercase">
-					{filteredEntries.length} of {entries.length}
+					{m.diagnostics_shown_of_total({ shown: filteredEntries.length, total: entries.length })}
 				</span>
 
 				<div class="ml-auto flex flex-wrap items-center gap-2">
@@ -186,28 +182,30 @@
 						disabled={filteredEntries.length === 0}
 						class="btn btn-quiet btn-sm"
 					>
-						Select shown
+						{m.diagnostics_select_shown()}
 					</button>
 					<button
 						onclick={() => (selectedIds = [])}
 						disabled={selectedIds.length === 0}
 						class="btn btn-quiet btn-sm"
 					>
-						Clear selection
+						{m.diagnostics_clear_selection()}
 					</button>
 					<button
 						onclick={() => (showReportPreview = true)}
 						disabled={selectedIds.length === 0}
 						class="btn btn-primary btn-sm"
 					>
-						{selectedIds.length > 0 ? `Report ${selectedIds.length} on GitHub` : 'Report on GitHub'}
+						{selectedIds.length > 0
+							? m.diagnostics_report_selected({ count: selectedIds.length })
+							: m.diagnostics_report()}
 					</button>
 				</div>
 			</div>
 
 			{#if filteredEntries.length === 0}
 				<div class="py-12 text-center text-slate-400">
-					<p>No errors match your filter</p>
+					<p>{m.diagnostics_no_match()}</p>
 				</div>
 			{:else}
 				<ul class="space-y-2" data-testid="diagnostics-list">
@@ -219,7 +217,7 @@
 									checked={selectedIds.includes(entry.id!)}
 									onchange={() => toggleSelected(entry.id!)}
 									class="mt-1 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500"
-									aria-label="Select error for reporting"
+									aria-label={m.diagnostics_select_entry_aria()}
 								/>
 
 								<div class="min-w-0 flex-1">
@@ -243,7 +241,9 @@
 											onclick={() => toggleExpanded(entry.id!)}
 											class="mt-2 font-mono text-[0.68rem] tracking-wider text-orange-400/80 uppercase transition-colors hover:text-orange-300"
 										>
-											{expandedIds.includes(entry.id!) ? 'Hide details' : 'Show details'}
+											{expandedIds.includes(entry.id!)
+												? m.diagnostics_hide_details()
+												: m.diagnostics_show_details()}
 										</button>
 
 										{#if expandedIds.includes(entry.id!)}
@@ -275,14 +275,15 @@
 {#if showClearConfirm}
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
 		<div class="panel w-full max-w-md rounded-xl p-6 shadow-xl">
-			<h2 class="text-xl font-bold text-slate-50">Clear the error journal?</h2>
+			<h2 class="text-xl font-bold text-slate-50">{m.diagnostics_clear_confirm_title()}</h2>
 			<p class="mt-2 text-sm text-slate-400">
-				All {entries.length} recorded errors will be deleted from this device. Export them first if you
-				plan to report a bug.
+				{m.diagnostics_clear_confirm_body({ count: entries.length })}
 			</p>
 			<div class="mt-6 flex justify-end gap-2">
-				<button onclick={() => (showClearConfirm = false)} class="btn btn-quiet">Cancel</button>
-				<button onclick={handleClear} class="btn btn-danger">Clear All</button>
+				<button onclick={() => (showClearConfirm = false)} class="btn btn-quiet"
+					>{m.common_cancel()}</button
+				>
+				<button onclick={handleClear} class="btn btn-danger">{m.diagnostics_clear_all()}</button>
 			</div>
 		</div>
 	</div>
@@ -293,11 +294,11 @@
 	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
 		<div class="panel max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl shadow-xl">
 			<div class="border-b border-orange-500/[0.08] p-6">
-				<h2 class="text-xl font-bold text-slate-50">Report on GitHub</h2>
+				<h2 class="text-xl font-bold text-slate-50">{m.diagnostics_report()}</h2>
 				<p class="mt-2 text-sm text-slate-400">
-					This opens a new, pre-filled issue on <span class="font-mono">github.com</span> in a new tab.
-					Below is exactly what would be sent — nothing else leaves your device, and you can still edit
-					or abandon the issue there.
+					{m.diagnostics_report_body_prefix()}
+					<span class="font-mono">github.com</span>
+					{m.diagnostics_report_body_suffix()}
 				</p>
 			</div>
 
@@ -308,8 +309,10 @@
 			</div>
 
 			<div class="flex justify-end gap-2 border-t border-orange-500/[0.08] p-6">
-				<button onclick={() => (showReportPreview = false)} class="btn btn-quiet">Cancel</button>
-				<button onclick={handleReport} class="btn btn-primary">Open GitHub issue</button>
+				<button onclick={() => (showReportPreview = false)} class="btn btn-quiet"
+					>{m.common_cancel()}</button
+				>
+				<button onclick={handleReport} class="btn btn-primary">{m.diagnostics_open_issue()}</button>
 			</div>
 		</div>
 	</div>

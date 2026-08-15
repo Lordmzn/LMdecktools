@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getImageUrl } from '$lib/image-cache';
+	import * as m from '$lib/paraglide/messages';
 
 	let { card, owned, onRemove, onAddToCollection, onIncrement, onDecrement, disabled } = $props<{
 		card: any;
@@ -41,7 +42,7 @@
 				onclick={() => onDecrement(card)}
 				{disabled}
 				class="rounded-l-full py-0.5 pr-0.5 pl-2 text-sm font-bold text-slate-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-				title={card.LM_quantity <= 1 ? 'Remove from list' : 'Decrease quantity'}
+				title={card.LM_quantity <= 1 ? m.card_remove_from_list() : m.card_decrease_quantity()}
 			>
 				−
 			</button>
@@ -52,7 +53,7 @@
 				onclick={() => onIncrement(card)}
 				{disabled}
 				class="rounded-r-full py-0.5 pr-2 pl-0.5 text-sm font-bold text-slate-100 transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
-				title="Increase quantity"
+				title={m.card_increase_quantity()}
 			>
 				+
 			</button>
@@ -63,7 +64,7 @@
 			<button
 				onclick={() => (flipped = !flipped)}
 				class="absolute top-2 left-2 rounded-full bg-slate-800/80 p-1.5 text-slate-100 shadow-lg transition hover:bg-slate-700"
-				title="Flip card"
+				title={m.common_flip_card()}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -92,7 +93,7 @@
 				onclick={() => onAddToCollection(card)}
 				{disabled}
 				class="rounded-lg bg-green-600 p-2 font-semibold text-slate-100 shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
-				title="Add to collection"
+				title={m.card_add_to_collection()}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -111,7 +112,7 @@
 				onclick={() => onRemove(card)}
 				{disabled}
 				class="rounded-lg bg-red-500 p-2 font-semibold text-slate-100 shadow-lg transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
-				title="Remove from list"
+				title={m.card_remove_from_list()}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -131,6 +132,6 @@
 
 	<!-- Owned / Missing indicator -->
 	<div class="mt-1 text-xs font-medium {owned ? 'text-green-400' : 'text-amber-400'}">
-		{owned ? '✓ Owned' : '✗ Missing'}
+		{owned ? m.card_owned() : m.card_missing()}
 	</div>
 </div>

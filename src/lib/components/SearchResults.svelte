@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Card from '$lib/components/Card.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let { isSearching, results, onAddCard, target = 'collection' } = $props();
 </script>
@@ -30,19 +31,19 @@
 				<circle cx="11" cy="11" r="8" />
 				<path d="m21 21-4.3-4.3" />
 			</svg>
-			<p class="text-lg">Search for cards to add to your list</p>
+			<p class="text-lg">{m.search_empty_title()}</p>
 			<p class="mt-2 text-sm">
 				<a
 					href="https://scryfall.com/docs/syntax"
 					target="_blank"
 					class="text-orange-600 hover:underline"
 				>
-					Learn Scryfall syntax
+					{m.search_learn_syntax()}
 				</a>
 			</p>
 			<p class="pt-20 font-sans text-sm antialiased">
-				<a href="http://wengu.tartarie.com/wg/wengu.php?l=Yijing&no=48" target="_blank">䷯</a> One draws
-				from the well without hindrance.
+				<a href="http://wengu.tartarie.com/wg/wengu.php?l=Yijing&no=48" target="_blank">䷯</a>
+				{m.search_hexagram_48()}
 			</p>
 		</div>
 	{/if}

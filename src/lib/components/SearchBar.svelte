@@ -1,4 +1,6 @@
 <script lang="ts">
+	import * as m from '$lib/paraglide/messages';
+
 	let { isSearching, resultCount, onSearch } = $props();
 
 	let searchInput = $state('');
@@ -35,12 +37,12 @@
 		<input
 			bind:value={searchInput}
 			type="text"
-			placeholder="Search for cards..."
+			placeholder={m.search_placeholder()}
 			onkeydown={handleKeydown}
 			class="field flex-1"
 		/>
 		<button onclick={handleSearch} class="btn btn-primary" disabled={isSearching}>
-			{isSearching ? 'Searching...' : 'Search'}
+			{isSearching ? m.search_searching() : m.search_button()}
 		</button>
 		<label
 			class="group flex cursor-pointer flex-col rounded-lg p-2 transition select-none hover:bg-slate-800"
@@ -60,15 +62,17 @@
 						class:translate-x-4={showAllPrints}
 					></div>
 				</div>
-				<span class="font-medium text-slate-300">{showAllPrints ? 'all prints' : 'unique'}</span>
+				<span class="font-medium text-slate-300"
+					>{showAllPrints ? m.search_all_prints() : m.search_unique()}</span
+				>
 			</div>
 
-			<span class="mt-1 text-xs text-slate-500"> Show all print versions </span>
+			<span class="mt-1 text-xs text-slate-500">{m.search_show_all_prints()}</span>
 		</label>
 	</div>
 	{#if resultCount > 0}
 		<div class="mt-2 text-sm text-slate-400">
-			{resultCount} results found
+			{m.search_results_found({ count: resultCount })}
 		</div>
 	{/if}
 </div>

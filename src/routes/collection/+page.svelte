@@ -11,8 +11,7 @@
 		logAppError
 	} from '$lib/store.svelte';
 	import type { ErrorCategory } from '$lib/error-journal';
-
-	const READ_ONLY_MSG = 'Select a database to enable editing — click "Preview" in the header';
+	import * as m from '$lib/paraglide/messages';
 
 	/**
 	 * A read-only database rejects writes by design, so those failures are a
@@ -95,15 +94,15 @@
 			const response = await fetch(url, { headers });
 			if (!response.ok) {
 				search_results = [];
-				notify(`No results found`, 'error');
+				notify(m.search_no_results(), 'error');
 			} else {
 				const json = await response.json();
 				search_results = json.data;
-				notify(`Found ${json.data.length} cards`);
+				notify(m.search_found_cards({ count: json.data.length }));
 			}
 		} catch (error) {
 			logAppError('scryfall-api', error, { operation: 'search', query: querystring });
-			notify('Search failed', 'error');
+			notify(m.search_failed(), 'error');
 		} finally {
 			isSearching = false;
 		}
@@ -113,10 +112,10 @@
 	async function addCard(card: any) {
 		try {
 			await addToCollection(card, 1);
-			notify(`Added ${card.name} to collection`);
+			notify(m.collection_notify_added({ name: card.name }));
 		} catch (error) {
 			reportFailure('indexeddb', error, { operation: 'addToCollection', cardName: card.name });
-			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
+			notify(store.isReadOnly ? m.common_read_only_hint() : m.error_failed_add_card(), 'error');
 		}
 	}
 
@@ -124,10 +123,10 @@
 	async function handleAddOne(card: any) {
 		try {
 			await addToCollection(card, 1);
-			notify(`Added one ${card.name}`);
+			notify(m.collection_notify_added_single({ name: card.name }));
 		} catch (error) {
 			reportFailure('indexeddb', error, { operation: 'addToCollection', cardName: card.name });
-			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
+			notify(store.isReadOnly ? m.common_read_only_hint() : m.error_failed_add_card(), 'error');
 		}
 	}
 
@@ -135,10 +134,10 @@
 	async function handleRemoveOne(card: any) {
 		try {
 			await removeFromCollection(card, 1);
-			notify(`Removed one ${card.name}`);
+			notify(m.collection_notify_removed_single({ name: card.name }));
 		} catch (error) {
 			reportFailure('indexeddb', error, { operation: 'removeFromCollection', cardName: card.name });
-			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to remove card', 'error');
+			notify(store.isReadOnly ? m.common_read_only_hint() : m.error_failed_remove_card(), 'error');
 		}
 	}
 
@@ -146,14 +145,17 @@
 	async function handleUpdateQuantity(card: any, quantity: number) {
 		try {
 			await updateCollectionQuantity(card, quantity);
-			notify(`Updated ${card.name} quantity`);
+			notify(m.collection_notify_updated({ name: card.name }));
 		} catch (error) {
 			reportFailure('indexeddb', error, {
 				operation: 'updateCollectionQuantity',
 				cardName: card.name,
 				quantity
 			});
-			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
+			notify(
+				store.isReadOnly ? m.common_read_only_hint() : m.error_failed_update_quantity(),
+				'error'
+			);
 		}
 	}
 
@@ -180,11 +182,13 @@
 			onclick={(e) => e.stopPropagation()}
 		>
 			<div class="flex items-center justify-between border-b border-orange-500/[0.08] p-6">
-				<h2 class="text-2xl font-bold tracking-tight text-slate-50">Add Cards to Collection</h2>
+				<h2 class="text-2xl font-bold tracking-tight text-slate-50">
+					{m.collection_add_modal_title()}
+				</h2>
 				<button
 					onclick={() => (showSearchModal = false)}
 					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
-					title="Close"
+					title={m.common_close()}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -215,11 +219,14 @@
 	<div class="surface-card p-6">
 		<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
 			<div>
-				<div class="eyebrow mb-1">The Hold</div>
-				<h1 class="text-3xl font-extrabold tracking-tight text-white">My Collection</h1>
+				<div class="eyebrow mb-1">{m.collection_eyebrow()}</div>
+				<h1 class="text-3xl font-extrabold tracking-tight text-white">{m.collection_title()}</h1>
 				{#if store.dbLoaded}
 					<p class="mt-1 text-sm text-slate-400">
-						{store.totalOwnedCards} cards ({store.uniqueOwnedCards} unique)
+						{m.collection_count({
+							total: store.totalOwnedCards,
+							unique: store.uniqueOwnedCards
+						})}
 					</p>
 				{/if}
 			</div>
@@ -230,15 +237,15 @@
 					type="text"
 					disabled={!store.dbLoaded}
 					bind:value={filterText}
-					placeholder="Filter cards..."
+					placeholder={m.common_filter_placeholder()}
 					class="field"
 				/>
 
 				<!-- Sort -->
 				<select bind:value={sortBy} disabled={!store.dbLoaded} class="field">
-					<option value="name">Sort by Name</option>
-					<option value="quantity">Sort by Quantity</option>
-					<option value="set">Sort by Set</option>
+					<option value="name">{m.common_sort_by_name()}</option>
+					<option value="quantity">{m.common_sort_by_quantity()}</option>
+					<option value="set">{m.common_sort_by_set()}</option>
 				</select>
 
 				<button
@@ -258,7 +265,7 @@
 						<path d="M5 12h14" />
 						<path d="M12 5v14" />
 					</svg>
-					Add Cards
+					{m.common_add_cards()}
 				</button>
 			</div>
 		</div>
@@ -277,13 +284,13 @@
 			{#if hasMore}
 				<div bind:this={sentinelEl} class="flex justify-center py-8">
 					<p class="font-mono text-xs tracking-wider text-slate-400 uppercase">
-						Showing {visibleCount} of {filteredCollection.length} cards...
+						{m.common_showing_of({ shown: visibleCount, total: filteredCollection.length })}
 					</p>
 				</div>
 			{/if}
 		{:else if filterText !== ''}
 			<div class="py-12 text-center text-slate-400">
-				<p>No cards match your filter</p>
+				<p>{m.common_no_cards_match_filter()}</p>
 			</div>
 		{:else}
 			<div class="py-12 text-center text-slate-400">
@@ -301,11 +308,11 @@
 					<path d="M3 9h18" />
 				</svg>
 				{#if store.dbLoaded}
-					<p>Your hold is empty</p>
-					<p class="mt-2 text-sm text-slate-400">Click "Add Cards" to start logging what you own</p>
+					<p>{m.collection_empty_title()}</p>
+					<p class="mt-2 text-sm text-slate-400">{m.collection_empty_body()}</p>
 				{:else}
-					<p>No database selected</p>
-					<p class="mt-2 text-sm text-slate-400">Click "Choose DB" to get started</p>
+					<p>{m.common_no_database_selected()}</p>
+					<p class="mt-2 text-sm text-slate-400">{m.collection_no_db_body()}</p>
 				{/if}
 			</div>
 		{/if}

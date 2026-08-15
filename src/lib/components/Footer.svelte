@@ -1,3 +1,8 @@
+<script lang="ts">
+	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
+	import * as m from '$lib/paraglide/messages';
+</script>
+
 <footer class="mt-12 border-t border-orange-500/[0.06] px-4 py-8">
 	<div class="mx-auto w-full max-w-screen-xl">
 		<div
@@ -32,7 +37,7 @@
 					</g>
 				</svg>
 				<p class="font-mono text-[0.62rem] tracking-wider text-slate-400 uppercase">
-					&copy; 2025–{new Date().getFullYear()} Lord M'zn · Local-first · Built for the community
+					{m.footer_credit({ year: new Date().getFullYear() })}
 				</p>
 			</div>
 
@@ -41,7 +46,8 @@
 					<li>
 						<a
 							href="/diagnostics/"
-							class="text-sm text-slate-400 transition-colors hover:text-orange-300">Diagnostics</a
+							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
+							>{m.footer_diagnostics()}</a
 						>
 					</li>
 					<li>
@@ -57,8 +63,11 @@
 							href="https://github.com/Lordmzn/LMdecktools/issues"
 							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
 							target="_blank"
-							rel="noopener noreferrer">Contribute</a
+							rel="noopener noreferrer">{m.footer_contribute()}</a
 						>
+					</li>
+					<li>
+						<LanguageSwitcher />
 					</li>
 				</ul>
 				<div class="flex flex-wrap items-center gap-x-1.5 text-sm text-slate-400">
@@ -72,7 +81,7 @@
 							d="M3.172 5.172a4 4 0 015.656 0L10 6.343l1.172-1.171a4 4 0 115.656 5.656L10 17.657l-6.828-6.829a4 4 0 010-5.656z"
 						/>
 					</svg>
-					<span>Support:</span>
+					<span>{m.footer_support()}</span>
 					<a
 						href="https://github.com/sponsors/Lordmzn"
 						class="transition-colors hover:text-orange-300"
@@ -98,34 +107,33 @@
 
 		<div class="space-y-2 text-xs leading-relaxed text-slate-400">
 			<p>
-				LM Deck Tools is not affiliated with, endorsed, sponsored, or approved by Wizards of the
-				Coast LLC. Magic: The Gathering is a trademark of Wizards of the Coast LLC.
+				{m.footer_wotc_disclaimer()}
 			</p>
 			<p>
-				Card data provided by <a
+				{m.footer_scryfall_prefix()}
+				<a
 					href="https://scryfall.com"
 					class="text-orange-400/80 underline decoration-orange-500/30 underline-offset-2 hover:text-orange-300"
 					target="_blank"
 					rel="noopener noreferrer">Scryfall</a
-				>. Scryfall is not affiliated with this project. Use of Scryfall data is subject to their
+				>{m.footer_scryfall_middle()}
 				<a
 					href="https://scryfall.com/docs/api"
 					class="text-orange-400/80 underline decoration-orange-500/30 underline-offset-2 hover:text-orange-300"
 					target="_blank"
-					rel="noopener noreferrer">API terms</a
+					rel="noopener noreferrer">{m.footer_scryfall_api_terms()}</a
 				>.
 			</p>
 			<p>
-				This app runs entirely in your browser. No personal data is collected, transmitted, or
-				stored on any server. All data (decks, collection, cached images) is stored locally via
-				IndexedDB and the Cache API. No cookies are used. No analytics are present.
+				{m.footer_privacy()}
 			</p>
 			<p>
-				Licensed under the <a
+				{m.footer_license_prefix()}
+				<a
 					href="https://github.com/Lordmzn/LMdecktools/blob/master/LICENSE"
 					class="text-orange-400/80 underline decoration-orange-500/30 underline-offset-2 hover:text-orange-300"
 					target="_blank"
-					rel="noopener noreferrer">GNU Affero General Public License v3.0</a
+					rel="noopener noreferrer">{m.footer_license_link()}</a
 				>.
 			</p>
 		</div>

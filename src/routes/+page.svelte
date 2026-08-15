@@ -6,14 +6,12 @@
 
 <script lang="ts">
 	import JollyRoger from '$lib/components/JollyRoger.svelte';
+	import * as m from '$lib/paraglide/messages';
 </script>
 
 <svelte:head>
-	<title>LM Deck Tools — Chart Your Own Course</title>
-	<meta
-		name="description"
-		content="Manage your Magic: The Gathering card lists and collection. Every plank of data stays on your device — no accounts, no servers, no middlemen."
-	/>
+	<title>{m.home_meta_title()}</title>
+	<meta name="description" content={m.home_meta_description()} />
 </svelte:head>
 
 <!-- HERO -->
@@ -145,7 +143,7 @@
 		style="animation-delay: 0.1s"
 	>
 		<span class="pulse-dot h-[5px] w-[5px] rounded-full bg-orange-500"></span>
-		No captain · No port · Your treasure
+		{m.home_eyebrow()}
 	</div>
 
 	<!-- Jolly Roger — tricorn skull over a fanned pair of cards -->
@@ -157,9 +155,9 @@
 		class="fade-up relative mb-5 text-[clamp(3.2rem,7.5vw,5.5rem)] leading-[1.02] font-black tracking-[-0.035em] text-white"
 		style="animation-delay: 0.3s"
 	>
-		Chart Your Own<br />
+		{m.home_hero_title_line1()}<br />
 		<span class="bg-gradient-to-br from-orange-400 to-orange-600 bg-clip-text text-transparent"
-			>Course</span
+			>{m.home_hero_title_line2()}</span
 		>
 	</h1>
 
@@ -167,8 +165,7 @@
 		class="fade-up relative mx-auto max-w-[460px] text-[1.15rem] leading-[1.65] text-slate-400"
 		style="animation-delay: 0.4s"
 	>
-		Manage your Magic: The Gathering card lists and collection. Every plank of data stays on your
-		device — no accounts, no servers, no middlemen.
+		{m.home_hero_subtitle()}
 	</p>
 
 	<div
@@ -190,7 +187,7 @@
 				<path d="M3 3v18h18" />
 				<path d="m19 9-5 5-4-4-3 3" />
 			</svg>
-			Manage Card Lists
+			{m.home_cta_card_lists()}
 		</a>
 		<a href="/collection" class="btn btn-ghost btn-lg">
 			<svg
@@ -207,7 +204,7 @@
 				<rect x="3" y="3" width="18" height="18" rx="2" />
 				<path d="M3 9h18" />
 			</svg>
-			Manage Collection
+			{m.home_cta_collection()}
 		</a>
 	</div>
 </section>
@@ -230,7 +227,7 @@
 		>
 			<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
 		</svg>
-		Local-first
+		{m.home_principle_local_first()}
 	</div>
 	<div class="flex items-center gap-2">
 		<svg
@@ -246,7 +243,7 @@
 			<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
 			<circle cx="12" cy="12" r="3" />
 		</svg>
-		Zero tracking
+		{m.home_principle_zero_tracking()}
 	</div>
 	<div class="flex items-center gap-2">
 		<svg
@@ -262,7 +259,7 @@
 			<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
 			<polyline points="14 2 14 8 20 8" />
 		</svg>
-		Open format
+		{m.home_principle_open_format()}
 	</div>
 	<div class="flex items-center gap-2">
 		<svg
@@ -278,7 +275,7 @@
 			<rect x="3" y="11" width="18" height="11" rx="2" />
 			<path d="M7 11V7a5 5 0 0110 0v4" />
 		</svg>
-		No account
+		{m.home_principle_no_account()}
 	</div>
 </div>
 
@@ -311,10 +308,11 @@
 					<path d="M14 20h6M17 17v6" />
 				</svg>
 			</div>
-			<h3 class="mb-2 text-[1.15rem] font-bold tracking-tight text-orange-100">Card Lists</h3>
+			<h3 class="mb-2 text-[1.15rem] font-bold tracking-tight text-orange-100">
+				{m.home_feature_lists_title()}
+			</h3>
 			<p class="text-[0.9rem] leading-[1.7] text-slate-400">
-				Create and manage named card lists. Search Scryfall's full catalogue and cross-reference
-				ownership against your collection.
+				{m.home_feature_lists_body()}
 			</p>
 		</div>
 
@@ -338,10 +336,11 @@
 					<circle cx="6" cy="18" r="1" fill="currentColor" />
 				</svg>
 			</div>
-			<h3 class="mb-2 text-[1.15rem] font-bold tracking-tight text-orange-100">Track Your Hoard</h3>
+			<h3 class="mb-2 text-[1.15rem] font-bold tracking-tight text-orange-100">
+				{m.home_feature_hoard_title()}
+			</h3>
 			<p class="text-[0.9rem] leading-[1.7] text-slate-400">
-				Keep an inventory of every card you own. See at a glance what's in your hold and what you
-				need to complete your lists.
+				{m.home_feature_hoard_body()}
 			</p>
 		</div>
 
@@ -363,10 +362,11 @@
 					<line x1="12" y1="3" x2="12" y2="15" />
 				</svg>
 			</div>
-			<h3 class="mb-2 text-[1.15rem] font-bold tracking-tight text-orange-100">Import & Export</h3>
+			<h3 class="mb-2 text-[1.15rem] font-bold tracking-tight text-orange-100">
+				{m.home_feature_portability_title()}
+			</h3>
 			<p class="text-[0.9rem] leading-[1.7] text-slate-400">
-				Move data freely. Plain text in, plain text out. Share lists with your crew or stash a
-				backup — your treasure, your rules.
+				{m.home_feature_portability_body()}
 			</p>
 		</div>
 	</div>
@@ -395,9 +395,9 @@
 			>
 				<polygon points="3 11 22 2 13 21 11 13 3 11" />
 			</svg>
-			Set Sail
+			{m.home_start_eyebrow()}
 		</div>
-		<h2 class="text-[2.2rem] font-extrabold tracking-tight text-white">Getting Started</h2>
+		<h2 class="text-[2.2rem] font-extrabold tracking-tight text-white">{m.home_start_title()}</h2>
 	</div>
 
 	<div class="route grid grid-cols-2 gap-6 lg:grid-cols-4">
@@ -418,9 +418,11 @@
 					<path d="M8 12h8" />
 				</svg>
 			</div>
-			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">Log Your Hoard</h4>
+			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">
+				{m.home_step1_title()}
+			</h4>
 			<p class="mx-auto max-w-[200px] text-[0.82rem] leading-[1.6] text-slate-400">
-				Add cards you own to your collection. Search or import in bulk.
+				{m.home_step1_body()}
 			</p>
 		</div>
 
@@ -441,10 +443,10 @@
 				</svg>
 			</div>
 			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">
-				Chart Card Lists
+				{m.home_step2_title()}
 			</h4>
 			<p class="mx-auto max-w-[200px] text-[0.82rem] leading-[1.6] text-slate-400">
-				Build lists searching Scryfall. Ownership shows automatically.
+				{m.home_step2_body()}
 			</p>
 		</div>
 
@@ -464,9 +466,11 @@
 					<polyline points="22 4 12 14.01 9 11.01" />
 				</svg>
 			</div>
-			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">Track the Gap</h4>
+			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">
+				{m.home_step3_title()}
+			</h4>
 			<p class="mx-auto max-w-[200px] text-[0.82rem] leading-[1.6] text-slate-400">
-				See which lists are complete and which cards you still need.
+				{m.home_step3_body()}
 			</p>
 		</div>
 
@@ -487,9 +491,11 @@
 					<line x1="12" y1="2" x2="12" y2="15" />
 				</svg>
 			</div>
-			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">Share Freely</h4>
+			<h4 class="mb-1.5 text-[0.95rem] font-bold tracking-tight text-orange-100">
+				{m.home_step4_title()}
+			</h4>
 			<p class="mx-auto max-w-[200px] text-[0.82rem] leading-[1.6] text-slate-400">
-				Export plain text to share, trade, or backup your data.
+				{m.home_step4_body()}
 			</p>
 		</div>
 	</div>
@@ -531,14 +537,11 @@
 			</g>
 		</svg>
 
-		<div class="compact-label">The Compact</div>
+		<div class="compact-label">{m.home_compact_label()}</div>
 
 		<blockquote class="mb-8 text-[1.1rem] leading-[1.75] text-slate-300">
-			We built this tool on the same principles that governed the fairest ships on the sea —
-			<strong class="font-semibold text-orange-300"
-				>transparency in every process, no central authority, and every hand sovereign over their
-				own treasure.</strong
-			>
+			{m.home_compact_lead()}
+			<strong class="font-semibold text-orange-300">{m.home_compact_lead_strong()}</strong>
 		</blockquote>
 
 		<div
@@ -549,9 +552,8 @@
 					>I.</span
 				>
 				<span
-					><strong class="font-semibold text-orange-200">Your data never leaves your device.</strong
-					>
-					No server, no cloud, no third-party databases.</span
+					><strong class="font-semibold text-orange-200">{m.home_article_1_title()}</strong>
+					{m.home_article_1_body()}</span
 				>
 			</div>
 			<div class="flex items-start gap-3 text-[0.85rem] leading-[1.5] text-slate-400">
@@ -559,8 +561,8 @@
 					>II.</span
 				>
 				<span
-					><strong class="font-semibold text-orange-200">No accounts, no tracking.</strong> We don't
-					know who you are and we don't want to.</span
+					><strong class="font-semibold text-orange-200">{m.home_article_2_title()}</strong>
+					{m.home_article_2_body()}</span
 				>
 			</div>
 			<div class="flex items-start gap-3 text-[0.85rem] leading-[1.5] text-slate-400">
@@ -568,8 +570,8 @@
 					>III.</span
 				>
 				<span
-					><strong class="font-semibold text-orange-200">Open, portable formats.</strong> Export anytime.
-					Your collection is yours to take wherever you sail.</span
+					><strong class="font-semibold text-orange-200">{m.home_article_3_title()}</strong>
+					{m.home_article_3_body()}</span
 				>
 			</div>
 			<div class="flex items-start gap-3 text-[0.85rem] leading-[1.5] text-slate-400">
@@ -577,8 +579,8 @@
 					>IV.</span
 				>
 				<span
-					><strong class="font-semibold text-orange-200">Transparent code.</strong> Every plank of this
-					ship is visible. No hidden compartments.</span
+					><strong class="font-semibold text-orange-200">{m.home_article_4_title()}</strong>
+					{m.home_article_4_body()}</span
 				>
 			</div>
 		</div>

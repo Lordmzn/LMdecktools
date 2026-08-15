@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { store } from '$lib/store.svelte';
 	import { getImageUrl } from '$lib/image-cache';
+	import * as m from '$lib/paraglide/messages';
 
 	let { card, add = () => null, showOwned = true, target = 'collection' } = $props();
 	const isDFC = $derived(card.card_faces?.length > 1);
@@ -37,7 +38,7 @@
 			<div
 				class="absolute top-2 right-2 rounded-full bg-orange-500 px-2 py-1 text-xs font-bold text-slate-950 shadow-lg"
 			>
-				Own: {ownedQuantity}
+				{m.card_own_badge({ count: ownedQuantity })}
 			</div>
 		{/if}
 
@@ -46,7 +47,7 @@
 			<button
 				onclick={() => (flipped = !flipped)}
 				class="absolute top-2 left-2 rounded-full bg-slate-800/80 p-1.5 text-slate-100 shadow-lg transition hover:bg-slate-700"
-				title="Flip card"
+				title={m.common_flip_card()}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -94,7 +95,7 @@
 					<path d="M8 12h8" />
 					<path d="M12 8v8" />
 				</svg>
-				Add to {target === 'collection' ? 'Collection' : 'List'}
+				{target === 'collection' ? m.card_add_to_collection_button() : m.card_add_to_list_button()}
 			</button>
 		</div>
 	</div>

@@ -3,6 +3,7 @@
 	import DBSelectionModal from '$lib/components/DBSelectionModal.svelte';
 
 	import { store } from '$lib/store.svelte';
+	import * as m from '$lib/paraglide/messages';
 
 	let showStartupModal = $state(false);
 </script>
@@ -24,7 +25,7 @@
 				: store.dbMode === 'peek'
 					? 'bg-amber-600 text-white hover:bg-amber-700'
 					: 'border border-orange-500/20 text-orange-300 hover:border-orange-500/40 hover:bg-orange-500/[0.06]'}"
-			title="Gestione Database"
+			title={m.header_db_button_title()}
 			data-testid="db-modal-toggle"
 		>
 			{#if store.linkedFileStatus === 'active'}
@@ -105,9 +106,9 @@
 				</svg>
 			{/if}
 			<span>
-				{#if store.dbMode === 'active'}Database
-				{:else if store.dbMode === 'peek'}Preview
-				{:else}Choose DB
+				{#if store.dbMode === 'active'}{m.header_db_active()}
+				{:else if store.dbMode === 'peek'}{m.header_db_peek()}
+				{:else}{m.header_db_none()}
 				{/if}
 			</span>
 			{#if showStartupModal}
