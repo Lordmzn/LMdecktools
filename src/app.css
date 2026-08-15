@@ -33,6 +33,56 @@
 	--color-surface: #0f1218;
 	--color-surface-raised: #1a1d26;
 
+	/* ── Feedback colours (#40) ───────────────────────────────────────────────
+	   Two lanes, because these were doing two unrelated jobs under one name.
+
+	   ALARM LANE — success / warning / danger. These interrupt, so they are
+	   meant to break the visual field; blending them into the chrome would be
+	   the wrong goal. Success and danger keep their previous values verbatim.
+	   Warning does not: amber-600 sat 11° from --color-orange-500 in OKLCH and
+	   was used as a solid button fill, so it read as a second, slightly-wrong
+	   primary rather than as a warning. Brass at 95° is the fix. */
+	--color-success: #4ade80;
+	--color-success-surface: #052e16;
+	--color-success-edge: #166534;
+	--color-success-solid: #16a34a;
+
+	--color-warning: #e4ca64;
+	--color-warning-surface: #2c2303;
+	--color-warning-edge: #5a4c14;
+	--color-warning-solid: #caac2f;
+
+	--color-danger: #f87171;
+	--color-danger-surface: #450a0a;
+	--color-danger-edge: #991b1b;
+	--color-danger-solid: #ef4444;
+
+	/* CATEGORICAL LANE — compare columns, diagnostics category chips. These are
+	   labels, not alarms: nothing is wrong and nothing needs attention, so no
+	   one value may look more urgent than its neighbours. All six are built to
+	   one recipe — OKLCH lightness pinned at 0.83, chroma held under the
+	   brand's own 0.187 — which is what makes them read as a set. This scale is
+	   also what absorbed the stray sky / emerald / purple utilities that had
+	   accumulated in the diagnostics chips with no token behind them. */
+	--color-cat-parchment: #e1c79b;
+	--color-cat-parchment-surface: #292010;
+	--color-cat-parchment-edge: #5a4726;
+	--color-cat-parchment-solid: #ccac76;
+
+	--color-cat-sea: #8adcad;
+	--color-cat-sea-surface: #15261c;
+	--color-cat-sea-edge: #2f543f;
+	--color-cat-sea-solid: #61c28e;
+
+	--color-cat-steel: #9bcdfc;
+	--color-cat-steel-surface: #16232f;
+	--color-cat-steel-edge: #324d67;
+	--color-cat-steel-solid: #6daae3;
+
+	--color-cat-violet: #d0bafa;
+	--color-cat-rose: #fdb0b1;
+	--color-cat-stone: #bec5cc;
+
 	--radius-card: 16px;
 	--radius-compact: 20px;
 
@@ -285,13 +335,13 @@ body::after {
 
 	.btn-danger {
 		background: transparent;
-		color: #f87171;
-		border-color: rgba(239, 68, 68, 0.3);
+		color: var(--color-danger);
+		border-color: color-mix(in srgb, var(--color-danger-solid) 30%, transparent);
 	}
 
 	.btn-danger:hover:not(:disabled) {
-		background: rgba(239, 68, 68, 0.12);
-		border-color: rgba(239, 68, 68, 0.5);
+		background: color-mix(in srgb, var(--color-danger-solid) 12%, transparent);
+		border-color: color-mix(in srgb, var(--color-danger-solid) 50%, transparent);
 	}
 
 	/* Segmented control — mutually exclusive options sharing one pill. */

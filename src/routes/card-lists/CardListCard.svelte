@@ -27,8 +27,8 @@
 	<!-- Card Image -->
 	<div
 		class="relative w-full overflow-hidden rounded-lg shadow-lg {owned
-			? 'ring-2 ring-green-500'
-			: 'ring-2 ring-amber-500'}"
+			? 'ring-success ring-2'
+			: 'ring-warning ring-2'}"
 	>
 		{#await getImageUrl(imageUrl) then cachedUrl}
 			<img src={cachedUrl} alt={card.name} class="h-auto w-full" />
@@ -92,7 +92,7 @@
 			<button
 				onclick={() => onAddToCollection(card)}
 				{disabled}
-				class="rounded-lg bg-green-600 p-2 font-semibold text-slate-100 shadow-lg transition hover:bg-green-700 disabled:cursor-not-allowed disabled:opacity-50"
+				class="bg-success-solid hover:bg-success rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50"
 				title={m.card_add_to_collection()}
 			>
 				<svg
@@ -111,7 +111,7 @@
 			<button
 				onclick={() => onRemove(card)}
 				{disabled}
-				class="rounded-lg bg-red-500 p-2 font-semibold text-slate-100 shadow-lg transition hover:bg-red-600 disabled:cursor-not-allowed disabled:opacity-50"
+				class="bg-danger-solid hover:bg-danger rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition disabled:cursor-not-allowed disabled:opacity-50"
 				title={m.card_remove_from_list()}
 			>
 				<svg
@@ -131,7 +131,7 @@
 	</div>
 
 	<!-- Owned / Missing indicator -->
-	<div class="mt-1 text-xs font-medium {owned ? 'text-green-400' : 'text-amber-400'}">
+	<div class="mt-1 text-xs font-medium {owned ? 'text-success' : 'text-warning'}">
 		{owned ? m.card_owned() : m.card_missing()}
 	</div>
 </div>

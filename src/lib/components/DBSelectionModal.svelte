@@ -631,7 +631,7 @@
 									</div>
 									{#if store.dbMode === 'peek'}
 										<div
-											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+											class="border-warning-edge bg-warning-surface text-warning mb-3 rounded-lg border p-3 text-sm"
 										>
 											{m.db_peek_notice()}
 										</div>
@@ -646,7 +646,7 @@
 
 					<!-- DB info when active -->
 					{#if store.dbMode === 'active'}
-						<div class="rounded-xl border-2 border-green-800 p-5">
+						<div class="border-success-edge rounded-xl border-2 p-5">
 							<div class="flex items-start gap-4">
 								<div
 									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
@@ -707,7 +707,7 @@
 								</p>
 								{#if exportBackupSuccess}
 									<div
-										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
+										class="border-success-edge bg-success-surface text-success mb-3 rounded-lg border p-3 text-sm"
 									>
 										{m.db_download_started()}
 									</div>
@@ -775,7 +775,7 @@
 								{#if importResult}
 									{#if importResult.errors === 0}
 										<div
-											class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
+											class="border-success-edge bg-success-surface text-success mb-3 rounded-lg border p-3 text-sm"
 										>
 											{importResult.imported === 1
 												? m.db_restore_success_one({ count: importResult.imported })
@@ -785,7 +785,7 @@
 													{m.db_restore_link_hint_prefix()}
 													<button
 														onclick={() => toggleSection('link')}
-														class="underline underline-offset-2 hover:text-green-300"
+														class="hover:text-success underline underline-offset-2"
 														>{m.db_tab_file()}</button
 													>
 													{m.db_restore_link_hint_suffix()}
@@ -794,7 +794,7 @@
 										</div>
 									{:else}
 										<div
-											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+											class="border-warning-edge bg-warning-surface text-warning mb-3 rounded-lg border p-3 text-sm"
 										>
 											{m.db_restore_partial({
 												imported: importResult.imported,
@@ -805,7 +805,7 @@
 								{/if}
 								{#if importError}
 									<div
-										class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+										class="border-danger-edge bg-danger-surface text-danger mb-3 rounded-lg border p-3 text-sm"
 									>
 										{importError}
 									</div>
@@ -1001,10 +1001,10 @@
 						<div class="flex items-start gap-4">
 							{#if store.linkedFileStatus === 'active'}
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+									class="bg-success-edge flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full"
 								>
 									<svg
-										class="h-6 w-6 text-green-400"
+										class="text-success h-6 w-6"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -1025,10 +1025,10 @@
 								</div>
 							{:else if store.linkedFileStatus === 'reconnect'}
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-900"
+									class="bg-warning-edge flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full"
 								>
 									<svg
-										class="h-6 w-6 text-amber-400"
+										class="text-warning h-6 w-6"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -1043,10 +1043,10 @@
 								</div>
 							{:else if store.linkedFileStatus === 'not-found' || store.linkedFileStatus === 'write-error'}
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-900"
+									class="bg-danger-edge flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full"
 								>
 									<svg
-										class="h-6 w-6 text-red-400"
+										class="text-danger h-6 w-6"
 										fill="none"
 										stroke="currentColor"
 										viewBox="0 0 24 24"
@@ -1134,7 +1134,7 @@
 									</p>
 									{#if store.linkedFilePermissionDenied}
 										<p
-											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+											class="border-warning-edge bg-warning-surface text-warning mb-3 rounded-lg border p-3 text-sm"
 										>
 											{m.db_permission_denied()}
 										</p>
@@ -1158,7 +1158,7 @@
 									<p class="mb-3 text-sm text-slate-400">
 										{m.db_not_found_body({ name: store.linkedFileName ?? '' })}
 									</p>
-									<p class="mb-4 text-sm text-green-400">{m.db_data_safe()}</p>
+									<p class="text-success mb-4 text-sm">{m.db_data_safe()}</p>
 									<button onclick={() => unlinkFile()} class="btn btn-quiet">{m.db_unlink()}</button
 									>
 								{:else if store.linkedFileStatus === 'write-error'}
@@ -1167,7 +1167,7 @@
 									</h3>
 									{#if store.linkedFileError}
 										<p
-											class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+											class="border-danger-edge bg-danger-surface text-danger mb-3 rounded-lg border p-3 text-sm"
 										>
 											{store.linkedFileError}
 										</p>
@@ -1175,7 +1175,7 @@
 									<p class="mb-3 text-sm text-slate-400">
 										{m.db_write_error_body({ name: store.linkedFileName ?? '' })}
 									</p>
-									<p class="mb-4 text-sm text-green-400">{m.db_data_safe()}</p>
+									<p class="text-success mb-4 text-sm">{m.db_data_safe()}</p>
 									<div class="flex gap-2">
 										<button onclick={() => retryWrite()} class="btn btn-subtle flex-1">
 											{m.db_retry()}
@@ -1360,7 +1360,7 @@
 								{#if extImportPreview.warnings.length > 0}
 									<div class="mt-2 space-y-1">
 										{#each extImportPreview.warnings as warning, i (i)}
-											<p class="text-xs text-amber-400">{warning}</p>
+											<p class="text-warning text-xs">{warning}</p>
 										{/each}
 									</div>
 								{/if}
@@ -1369,7 +1369,9 @@
 
 						<!-- Error -->
 						{#if extImportErr}
-							<div class="rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400">
+							<div
+								class="border-danger-edge bg-danger-surface text-danger rounded-lg border p-3 text-sm"
+							>
 								{extImportErr}
 							</div>
 						{/if}
@@ -1378,13 +1380,11 @@
 						{#if extImportSummary}
 							<div
 								class="rounded-lg border {extImportSummary.failed === 0
-									? 'border-green-800 bg-green-950'
-									: 'border-amber-800 bg-amber-950'} p-3"
+									? 'border-success-edge bg-success-surface'
+									: 'border-warning-edge bg-warning-surface'} p-3"
 							>
 								<p
-									class="text-sm {extImportSummary.failed === 0
-										? 'text-green-400'
-										: 'text-amber-400'}"
+									class="text-sm {extImportSummary.failed === 0 ? 'text-success' : 'text-warning'}"
 								>
 									{#if extImportSummary.failed > 0}
 										{extImportSummary.success === 1
@@ -1491,7 +1491,7 @@
 			<h3 class="mb-3 text-lg font-bold text-slate-100">{m.db_restore_confirm_title()}</h3>
 			<p class="mb-3 text-sm text-slate-400">
 				{m.db_restore_confirm_prefix()}
-				<strong class="text-red-400">{m.db_restore_replaces()}</strong>
+				<strong class="text-danger">{m.db_restore_replaces()}</strong>
 				{m.db_restore_confirm_suffix({
 					lists:
 						store.savedCardLists.length === 1
@@ -1539,11 +1539,13 @@
 			<h3 class="mb-3 text-lg font-bold text-slate-100">{m.db_create_confirm_title()}</h3>
 			<p class="mb-3 text-sm text-slate-400">
 				{m.db_create_confirm_prefix()}
-				<strong class="text-red-400">{m.db_create_confirm_strong()}</strong>
+				<strong class="text-danger">{m.db_create_confirm_strong()}</strong>
 				{m.db_create_confirm_suffix()}
 			</p>
 			{#if store.linkedFileStatus !== 'none'}
-				<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
+				<p
+					class="border-warning-edge bg-warning-surface text-warning mb-3 rounded-lg border p-3 text-sm"
+				>
 					{m.db_create_confirm_unlink({ name: store.linkedFileName ?? '' })}
 				</p>
 			{/if}

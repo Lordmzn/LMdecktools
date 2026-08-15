@@ -2,7 +2,9 @@
 	import type { ComparedCard } from '$lib/compare';
 	import * as m from '$lib/paraglide/messages';
 
-	type ColorVariant = 'amber' | 'green' | 'blue';
+	// Named for the column's job, not its hue — these are categorical labels, so
+	// the palette behind them is free to move without the call sites lying (#40).
+	type ColorVariant = 'onlyA' | 'both' | 'onlyB';
 
 	interface Props {
 		title: string;
@@ -26,23 +28,23 @@
 		ColorVariant,
 		{ border: string; bg: string; text: string; badge: string }
 	> = {
-		amber: {
-			border: 'border-amber-800',
-			bg: 'bg-amber-950',
-			text: 'text-amber-400',
-			badge: 'bg-amber-500'
+		onlyA: {
+			border: 'border-cat-parchment-edge',
+			bg: 'bg-cat-parchment-surface',
+			text: 'text-cat-parchment',
+			badge: 'bg-cat-parchment-solid'
 		},
-		green: {
-			border: 'border-green-800',
-			bg: 'bg-green-950',
-			text: 'text-green-400',
-			badge: 'bg-green-500'
+		both: {
+			border: 'border-cat-sea-edge',
+			bg: 'bg-cat-sea-surface',
+			text: 'text-cat-sea',
+			badge: 'bg-cat-sea-solid'
 		},
-		blue: {
-			border: 'border-blue-800',
-			bg: 'bg-blue-950',
-			text: 'text-blue-400',
-			badge: 'bg-blue-500'
+		onlyB: {
+			border: 'border-cat-steel-edge',
+			bg: 'bg-cat-steel-surface',
+			text: 'text-cat-steel',
+			badge: 'bg-cat-steel-solid'
 		}
 	};
 
@@ -52,7 +54,7 @@
 <div class="flex flex-col rounded-xl border {colorClasses.border} {colorClasses.bg} p-4">
 	<h3 class="mb-3 text-sm font-semibold tracking-wide uppercase {colorClasses.text}">
 		{title}
-		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-slate-100">
+		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-slate-950">
 			{cards.length}
 		</span>
 	</h3>
@@ -99,13 +101,13 @@
 					<!-- Quantity badge(s) -->
 					{#if showBothQuantities}
 						<span class="text-xs text-slate-400" title="{nameA} / {nameB}">
-							<span class="text-amber-400">{quantityA}</span>
+							<span class="text-cat-parchment">{quantityA}</span>
 							/
-							<span class="text-blue-400">{quantityB}</span>
+							<span class="text-cat-steel">{quantityB}</span>
 						</span>
 					{:else}
 						<span
-							class="rounded-full {colorClasses.badge} min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-bold text-slate-100"
+							class="rounded-full {colorClasses.badge} min-w-[1.5rem] px-1.5 py-0.5 text-center text-xs font-bold text-slate-950"
 						>
 							{quantityA || quantityB}
 						</span>

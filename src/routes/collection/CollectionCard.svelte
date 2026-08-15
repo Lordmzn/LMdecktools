@@ -90,7 +90,7 @@
 			<div class="flex translate-y-4 transform gap-2 transition-all group-hover:translate-y-0">
 				<button
 					onclick={handleRemove}
-					class="rounded-lg bg-red-500/90 p-2 font-semibold text-white shadow-lg transition hover:bg-red-500"
+					class="bg-danger-solid hover:bg-danger rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition"
 					title={m.card_remove_single()}
 				>
 					<svg
@@ -126,7 +126,7 @@
 
 				<button
 					onclick={handleAdd}
-					class="rounded-lg bg-green-500/90 p-2 font-semibold text-white shadow-lg transition hover:bg-green-500"
+					class="bg-success-solid hover:bg-success rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition"
 					title={m.card_add_single()}
 				>
 					<svg

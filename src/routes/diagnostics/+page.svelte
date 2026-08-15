@@ -27,15 +27,17 @@
 	let showClearConfirm = $state(false);
 	let showReportPreview = $state(false);
 
-	// Category → badge tint. Feedback colours are used only for status, per the
-	// design system — a diagnostic category is exactly that.
+	// Category → badge tint, drawn from the categorical lane (#40). A category is
+	// a label, not an alarm — every entry in this list is already an error, so
+	// tinting one of them redder than the rest would rank them by hue rather than
+	// by what they are. Matched lightness across all six is the point.
 	const CATEGORY_STYLES: Record<ErrorCategory, string> = {
-		'scryfall-api': 'border-sky-500/30 bg-sky-500/10 text-sky-300',
-		indexeddb: 'border-purple-500/30 bg-purple-500/10 text-purple-300',
-		'linked-file': 'border-amber-500/30 bg-amber-500/10 text-amber-300',
-		import: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
-		unhandled: 'border-red-500/30 bg-red-500/10 text-red-300',
-		unknown: 'border-slate-500/30 bg-slate-500/10 text-slate-300'
+		'scryfall-api': 'border-cat-steel/30 bg-cat-steel/10 text-cat-steel',
+		indexeddb: 'border-cat-violet/30 bg-cat-violet/10 text-cat-violet',
+		'linked-file': 'border-cat-parchment/30 bg-cat-parchment/10 text-cat-parchment',
+		import: 'border-cat-sea/30 bg-cat-sea/10 text-cat-sea',
+		unhandled: 'border-cat-rose/30 bg-cat-rose/10 text-cat-rose',
+		unknown: 'border-cat-stone/30 bg-cat-stone/10 text-cat-stone'
 	};
 
 	// Keyed on dbMode, not onMount: the layout's tryAutoLoadDB() often opens the
