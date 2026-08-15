@@ -22,6 +22,114 @@
 - No DB loaded: dark button `[Choose DB v]`
 - DB loaded: orange button `[Database v]` with green checkmark on icon
 - DB loaded + linked file active: orange button `[Database v]` with green checkmark + small link icon
+- DB open read-only ("peek" mode): brass button `[Database v]` — `--color-warning-solid`,
+  deliberately **not** the orange primary, see [Feedback Colours](#feedback-colours)
+
+---
+
+## Feedback Colours
+
+The palette is slate + orange: `--color-orange-500` (`#f97316`) is the brand
+accent and owns the chrome — primary buttons, active nav, focus rings, the
+eyebrow labels, the rope dividers. Everything in this section is about the
+colours that are *not* chrome.
+
+Those split into **two lanes**, because they do two unrelated jobs. Deciding
+which lane a new piece of UI belongs to is the whole of the design decision;
+picking the hex is mechanical afterwards.
+
+### Alarm lane — interrupts
+
+Success, warning, danger. These are supposed to break the visual field: a failed
+write, a destructive confirm, a file that needs reconnecting. Blending them into
+the chrome would defeat the point, so they stay loud.
+
+| Token | Text | Surface | Edge | Solid fill |
+| --- | --- | --- | --- | --- |
+| success | `#4ade80` | `#052e16` | `#166534` | `#16a34a` |
+| warning | `#e4ca64` | `#2c2303` | `#5a4c14` | `#caac2f` |
+| danger | `#f87171` | `#450a0a` | `#991b1b` | `#ef4444` |
+
+Used as `text-success`, `bg-warning-surface`, `border-danger-edge`,
+`bg-warning-solid` — Tailwind generates these from `@theme` in `src/app.css`.
+
+**Why warning is brass and not amber.** The obvious choice for a warning on a
+dark UI is Tailwind's amber, and that is what shipped originally. It was wrong
+here: in OKLCH, `amber-600` sits **11°** from `orange-500`, and it was being used
+as a *solid button fill* (the peek-mode DB button, the linked-file toast). At
+that distance it does not read as a warning — it reads as a second,
+slightly-wrong primary button. Brass at 95° is far enough from the brand to be
+unmistakably a different thing.
+
+The same measurement produced a less obvious result worth recording: `red-400`
+is 25° from the brand and `amber-400` is 37°, so danger was *closer* to the
+accent than warning was. On a warm near-black ground that made the destructive
+confirm read as "hot" rather than "stop". Danger keeps its value for now — it is
+attached to database operations and quieting it is a usability decision, not a
+taste one — but that is the reason to revisit it, not aesthetics.
+
+### Categorical lane — labels
+
+Compare columns, diagnostics category chips, anything that distinguishes without
+ranking. Nothing here is wrong and nothing needs attention, so **no value may
+look more urgent than its neighbours.**
+
+| Token | Value | Used for |
+| --- | --- | --- |
+| `cat-parchment` | `#e1c79b` | Compare "only in A"; `linked-file` errors |
+| `cat-sea` | `#8adcad` | Compare "in both"; `import` errors |
+| `cat-steel` | `#9bcdfc` | Compare "only in B"; `scryfall-api` errors |
+| `cat-violet` | `#d0bafa` | `indexeddb` errors |
+| `cat-rose` | `#fdb0b1` | `unhandled` errors |
+| `cat-stone` | `#bec5cc` | `unknown` errors |
+
+Parchment, sea and steel also carry `-surface`, `-edge` and `-solid` variants,
+because the compare columns need a tinted panel and a badge fill:
+
+| Token | Surface | Edge | Solid fill |
+| --- | --- | --- | --- |
+| `cat-parchment` | `#292010` | `#5a4726` | `#ccac76` |
+| `cat-sea` | `#15261c` | `#2f543f` | `#61c28e` |
+| `cat-steel` | `#16232f` | `#324d67` | `#6daae3` |
+
+The other three are chip tints only and use opacity modifiers
+(`bg-cat-violet/10`, `border-cat-violet/30`).
+
+All six are built to **one recipe** — OKLCH lightness pinned at 0.83, chroma held
+below the brand's own 0.187. Matched lightness is what makes them read as a set
+rather than as six unrelated accents, and it is the property to preserve if the
+scale ever grows. Note that the diagnostics chips are a good illustration of why
+this lane exists: every entry in that journal is already an error, so tinting one
+category redder than another would rank them by hue rather than by what they are.
+
+### Rules
+
+- **Pick the lane first.** "Is something wrong?" → alarm. "Is this one of
+  several equally-valid kinds?" → categorical. A compare column holding cards you
+  do not own is *not* a warning.
+- **Never use a raw Tailwind hue utility** (`text-amber-400`, `bg-sky-500`) for
+  either lane. The tokens exist so a retune is one edit; the diagnostics chips
+  previously introduced `sky`, `emerald` and `purple` inline, and those three
+  hues then existed nowhere in any token file.
+- **Dark labels on solid fills.** Every `-solid` value is light enough that
+  white or `slate-100` on it fails AA — this was a real bug, with the compare
+  badge at 1.96:1. Use `text-slate-950`, the same rule `.btn-primary` follows.
+- **Name variants for the job, not the hue.** `CompareColumn` takes
+  `onlyA` / `both` / `onlyB`, not `amber` / `green` / `blue`, so the call sites
+  do not start lying the next time the palette moves.
+
+Every value above holds AA or better on all three surfaces (`#0a0c10`,
+`#0f1218`, `#1a1d26`) and on its own tint background. Contrast is not the
+constraint that decides anything here — hue distance from the brand is.
+
+The tokens are defined once in `src/app.css` under `@theme` and mirrored in the
+design-system skill at
+`.claude/skills/LM Deck Tools Design System/tokens/colors.css`, where `--info`
+and `--purple` survive as aliases into the categorical lane (both were single
+tokens doing categorical work under older names).
+
+Background and the two alternatives that were designed but not taken — a full
+retune of the alarm lane, and a maritime signal-flag palette — are in issue #40.
 
 ---
 
@@ -96,9 +204,13 @@
 |  [img]   |
 |      2x  |
 |~~~~~~~~~~|
-| [-] [pen] [+] |   <- red / orange / green action buttons
+| [-] [pen] [+] |   <- danger / brand / success action buttons
 +----------+
 ```
+
+Action-button fills are `bg-danger-solid`, the orange primary, and
+`bg-success-solid`, all with `text-slate-950` labels — see
+[Feedback Colours](#feedback-colours).
 
 **Empty states:**
 
@@ -162,7 +274,7 @@
 |                                                                  |
 |  Desktop (lg+): three-column grid                                |
 |  +------------------+ +------------------+ +------------------+  |
-|  | ONLY IN A (amber)| | IN BOTH (green)  | | ONLY IN B (blue) |  |
+|  | ONLY IN A (parch.)| | IN BOTH (sea)   | | ONLY IN B (steel)|  |
 |  | [img] Card  4x   | | [img] Card 2/3   | | [img] Card  1x   |  |
 |  | [img] Card  1x   | | [img] Card 1/1   | | [img] Card  2x   |  |
 |  +------------------+ +------------------+ +------------------+  |
@@ -175,6 +287,11 @@
 **"In Both" quantity format:** `quantityA / quantityB cardName`
 
 **Guard state:** If fewer than 2 lists exist, show message with link back to `/card-lists`.
+
+**Column colours:** the three columns are categorical labels, not status — see
+[Feedback Colours](#feedback-colours). They must stay matched in lightness so no
+column reads as more urgent than the others; do not reach for `--color-warning`
+or `--color-danger` here just because a column happens to be "missing" cards.
 
 ---
 
