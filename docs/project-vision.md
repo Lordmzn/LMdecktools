@@ -124,7 +124,8 @@ Absolute Privacy is a claim about *where data goes*, so the set of hosts this ap
 | `api.scryfall.com` | Card search, batch lookup by name/ID | The search text or card names/IDs being resolved |
 | `cards.scryfall.io` | Card images (first load only; cached thereafter) | The image URL |
 | `archidekt.com/api` | Only when the user pastes an Archidekt deck URL and confirms the import | The deck ID in that URL |
+| `github.com` | Only when the user selects entries on /diagnostics and confirms "Open GitHub issue" | The selected error entries, shown verbatim in a preview first — a new tab opens on GitHub's issue form, which the user can still edit or abandon |
 
-Collection contents, card lists, and the linked file are never transmitted to any of them — a card name leaves the device only because resolving it is the whole point of the request. No analytics, no error reporting, no fonts or scripts from a CDN: the build is fully self-hosted and static.
+Collection contents, card lists, and the linked file are never transmitted to any of them — a card name leaves the device only because resolving it is the whole point of the request. No analytics, no automatic error reporting, no fonts or scripts from a CDN: the build is fully self-hosted and static. The error journal behind /diagnostics (#30) is written to local IndexedDB and stays there; reporting one is a navigation the user initiates, having read exactly what it carries, not a background upload.
 
 Adding a host to this table is a deliberate decision, not an implementation detail. Anything that would fetch in the background, rather than in direct response to a user action, does not belong here at all.

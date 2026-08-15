@@ -14,10 +14,26 @@
 		updateListParams,
 		updateListName,
 		addAllToCollection,
-		addToCollection
+		addToCollection,
+		logAppError
 	} from '$lib/store.svelte';
+	import type { ErrorCategory } from '$lib/error-journal';
 
 	const READ_ONLY_MSG = 'Select a database to enable editing — click "Preview" in the header';
+
+	/**
+	 * A read-only database rejects writes by design, so those failures are a
+	 * user-flow message rather than a defect — journaling them would bury the
+	 * real errors on /diagnostics.
+	 */
+	function reportFailure(
+		category: ErrorCategory,
+		error: unknown,
+		context: Record<string, unknown>
+	) {
+		if (store.isReadOnly) return;
+		logAppError(category, error, context);
+	}
 
 	let searchResults = $state<any[]>([]);
 	let isSearching = $state(false);
@@ -53,7 +69,7 @@
 				notify('No results found', 'error');
 			}
 		} catch (error) {
-			console.error(error);
+			logAppError('scryfall-api', error, { operation: 'search', query: querystring });
 			notify('Search failed', 'error');
 		} finally {
 			isSearching = false;
@@ -65,7 +81,7 @@
 			await addCardToList(card);
 			notify(`Added ${card.name} to list`);
 		} catch (error) {
-			console.error('Failed to add card:', error);
+			reportFailure('indexeddb', error, { operation: 'addCardToList', cardName: card.name });
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
 		}
 	}
@@ -75,7 +91,7 @@
 			await removeCardFromList(card);
 			notify(`Removed ${card.name} from list`);
 		} catch (error) {
-			console.error('Failed to remove card:', error);
+			reportFailure('indexeddb', error, { operation: 'removeCardFromList', cardName: card.name });
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to remove card', 'error');
 		}
 	}
@@ -101,7 +117,7 @@
 			await createNewCardList();
 			notify('New list created');
 		} catch (error) {
-			console.error('Failed to create list:', error);
+			reportFailure('indexeddb', error, { operation: 'createNewCardList' });
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to create list', 'error');
 		}
 	}
@@ -112,7 +128,7 @@
 			showDeleteConfirmModal = false;
 			notify('List deleted');
 		} catch (error) {
-			console.error('Failed to delete list:', error);
+			reportFailure('indexeddb', error, { operation: 'deleteCardList' });
 			showDeleteConfirmModal = false;
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to delete list', 'error');
 		}
@@ -135,7 +151,10 @@
 			importText = '';
 			notify('List imported');
 		} catch (error) {
-			console.error('Import failed:', error);
+			reportFailure('import', error, {
+				operation: 'importListFromText',
+				lines: importText.split('\n').length
+			});
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Import failed', 'error');
 		} finally {
 			isImporting = false;
@@ -176,7 +195,7 @@
 			if (store.isReadOnly) {
 				notify(READ_ONLY_MSG, 'error');
 			} else {
-				console.error('Failed to update card matching', e);
+				logAppError('indexeddb', e, { operation: 'updateListParams', cardMatching: value });
 			}
 		}
 	}
@@ -188,7 +207,7 @@
 			if (store.isReadOnly) {
 				notify(READ_ONLY_MSG, 'error');
 			} else {
-				console.error('Failed to update language matching', e);
+				logAppError('indexeddb', e, { operation: 'updateListParams', languageMatching: value });
 			}
 		}
 	}
@@ -543,7 +562,7 @@
 						}
 						if (trimmed !== store.currentCardList?.name) {
 							updateListName(trimmed).catch((err) => {
-								console.error('Failed to rename list:', err);
+								reportFailure('indexeddb', err, { operation: 'updateListName', name: trimmed });
 								notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to rename list', 'error');
 							});
 						}

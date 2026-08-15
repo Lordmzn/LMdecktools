@@ -7,10 +7,26 @@
 		store,
 		addToCollection,
 		removeFromCollection,
-		updateCollectionQuantity
+		updateCollectionQuantity,
+		logAppError
 	} from '$lib/store.svelte';
+	import type { ErrorCategory } from '$lib/error-journal';
 
 	const READ_ONLY_MSG = 'Select a database to enable editing — click "Preview" in the header';
+
+	/**
+	 * A read-only database rejects writes by design, so those failures are a
+	 * user-flow message rather than a defect — journaling them would bury the
+	 * real errors on /diagnostics.
+	 */
+	function reportFailure(
+		category: ErrorCategory,
+		error: unknown,
+		context: Record<string, unknown>
+	) {
+		if (store.isReadOnly) return;
+		logAppError(category, error, context);
+	}
 
 	let search_results = $state<any[]>([]);
 	let isSearching = $state(false);
@@ -86,7 +102,7 @@
 				notify(`Found ${json.data.length} cards`);
 			}
 		} catch (error) {
-			console.error(error instanceof Error ? error.message : error);
+			logAppError('scryfall-api', error, { operation: 'search', query: querystring });
 			notify('Search failed', 'error');
 		} finally {
 			isSearching = false;
@@ -99,7 +115,7 @@
 			await addToCollection(card, 1);
 			notify(`Added ${card.name} to collection`);
 		} catch (error) {
-			console.error('Failed to add card:', error);
+			reportFailure('indexeddb', error, { operation: 'addToCollection', cardName: card.name });
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
 		}
 	}
@@ -110,7 +126,7 @@
 			await addToCollection(card, 1);
 			notify(`Added one ${card.name}`);
 		} catch (error) {
-			console.error('Failed to add card:', error);
+			reportFailure('indexeddb', error, { operation: 'addToCollection', cardName: card.name });
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to add card', 'error');
 		}
 	}
@@ -121,7 +137,7 @@
 			await removeFromCollection(card, 1);
 			notify(`Removed one ${card.name}`);
 		} catch (error) {
-			console.error('Failed to remove card:', error);
+			reportFailure('indexeddb', error, { operation: 'removeFromCollection', cardName: card.name });
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to remove card', 'error');
 		}
 	}
@@ -132,7 +148,11 @@
 			await updateCollectionQuantity(card, quantity);
 			notify(`Updated ${card.name} quantity`);
 		} catch (error) {
-			console.error('Failed to update quantity:', error);
+			reportFailure('indexeddb', error, {
+				operation: 'updateCollectionQuantity',
+				cardName: card.name,
+				quantity
+			});
 			notify(store.isReadOnly ? READ_ONLY_MSG : 'Failed to update quantity', 'error');
 		}
 	}

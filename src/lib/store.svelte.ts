@@ -20,6 +20,13 @@ import {
 	type LanguageMatching
 } from './db';
 
+import {
+	logError,
+	loadErrorJournal as dbLoadErrorJournal,
+	clearErrorJournal as dbClearErrorJournal,
+	type ErrorCategory,
+	type ErrorEntry
+} from './error-journal';
 import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
@@ -251,6 +258,46 @@ export function exportDB() {
 	return exportWithMetadata(store);
 }
 
+// ==================== ERROR JOURNAL ====================
+
+/**
+ * Record an error in the local journal for /diagnostics. Never throws and never
+ * blocks the caller — a failure to log must not compound the failure being logged.
+ *
+ * Deliberately does not call `ensureDB()`: opening IndexedDB is the user's choice
+ * (see `tryAutoLoadDB`), and an error is no reason to create a database behind
+ * their back. With no DB open, the console is all we get.
+ */
+export function logAppError(
+	category: ErrorCategory,
+	error: unknown,
+	context?: Record<string, unknown>
+): void {
+	console.error(`[${category}]`, error, context ?? '');
+
+	if (!db) return;
+
+	logError(db, category, error, context).catch((journalError) => {
+		console.error('Failed to write to the error journal:', journalError);
+	});
+}
+
+/** Entries for the /diagnostics page, newest first. Empty when no DB is open. */
+export async function loadErrorJournal(): Promise<ErrorEntry[]> {
+	if (!db) return [];
+	return dbLoadErrorJournal(db);
+}
+
+export async function clearErrorJournal(): Promise<void> {
+	if (!db) return;
+	return dbClearErrorJournal(db);
+}
+
+/** Whether the journal is reachable — false means no database has been opened yet. */
+export function isErrorJournalAvailable(): boolean {
+	return db !== null;
+}
+
 // ==================== LINKED FILE ====================
 
 let linkedHandle: FileSystemFileHandle | null = null;
@@ -262,9 +309,9 @@ function applyWriteSuccess(timestamp: number): void {
 }
 
 function applyWriteError(error: unknown): void {
-	console.error('Linked file write error:', error);
-
 	const kind = classifyWriteError(error);
+	logAppError('linked-file', error, { operation: 'write', kind, fileName: store.linkedFileName });
+
 	if (kind === 'permission') {
 		// Access was revoked rather than the write failing — reconnecting
 		// re-prompts for permission, which "Retry" cannot do.
@@ -345,7 +392,11 @@ export async function initLinkedFile(): Promise<void> {
 		} else {
 			store.linkedFileStatus = 'reconnect';
 		}
-	} catch {
+	} catch (error) {
+		logAppError('linked-file', error, {
+			operation: 'initLinkedFile',
+			fileName: store.linkedFileName
+		});
 		store.linkedFileStatus = 'not-found';
 	}
 }
@@ -598,7 +649,7 @@ export async function importDatabase(
 				imported++;
 			}
 		} catch (error) {
-			console.error('Error importing card list:', error);
+			logAppError('import', error, { operation: 'importCardList', listName: cardList.name, merge });
 			errors++;
 		}
 		current++;
@@ -622,7 +673,11 @@ export async function importDatabase(
 				await saveCollectionCard(db, card);
 			}
 		} catch (error) {
-			console.error('Error importing collection card:', error);
+			logAppError('import', error, {
+				operation: 'importCollectionCard',
+				cardName: card.name,
+				merge
+			});
 			errors++;
 		}
 	}
@@ -686,7 +741,11 @@ async function fetchCardsByName(
 				// Treat all cards in this batch as not found
 				notFound.push(...chunk);
 			}
-		} catch {
+		} catch (error) {
+			logAppError('scryfall-api', error, {
+				operation: 'fetchCardsByName',
+				batchSize: chunk.length
+			});
 			notFound.push(...chunk);
 		}
 
@@ -734,7 +793,11 @@ async function fetchCardsByIds(
 			} else {
 				notFound.push(...chunk);
 			}
-		} catch {
+		} catch (error) {
+			logAppError('scryfall-api', error, {
+				operation: 'fetchCardsByIds',
+				batchSize: chunk.length
+			});
 			notFound.push(...chunk);
 		}
 
@@ -898,8 +961,12 @@ export async function importCollectionFromText(
 			try {
 				await updateCollectionQuantity(card, entry.quantity);
 				results.success++;
-			} catch {
-				console.error(`Failed to import ${entry.name}`);
+			} catch (error) {
+				logAppError('import', error, {
+					operation: 'importCollectionFromText',
+					cardName: entry.name,
+					quantity: entry.quantity
+				});
 				results.failed++;
 			}
 		} else {
@@ -988,7 +1055,12 @@ export async function importCardsToCollection(
 			try {
 				await updateCollectionQuantity(card, entry.quantity);
 				success++;
-			} catch {
+			} catch (error) {
+				logAppError('import', error, {
+					operation: 'importCardsToCollection',
+					cardName: entry.name,
+					quantity: entry.quantity
+				});
 				failed++;
 			}
 		} else {
@@ -1160,7 +1232,11 @@ export async function addAllToCollection(): Promise<{ added: number; failed: num
 			await addToCollection(card, card.LM_quantity);
 			added++;
 		} catch (e) {
-			console.error(`Failed to add ${card.name} to collection:`, e);
+			logAppError('indexeddb', e, {
+				operation: 'addAllToCollection',
+				cardName: card.name,
+				quantity: card.LM_quantity
+			});
 			failed++;
 		}
 	}
@@ -1313,7 +1389,10 @@ export async function importListFromText(
 				});
 			}
 		} else {
-			console.error(`Failed to import ${entry.name}`);
+			logAppError('scryfall-api', `Card not found: ${entry.name}`, {
+				operation: 'importListFromText',
+				cardName: entry.name
+			});
 		}
 	}
 	const newCards = [...cardMap.values()];

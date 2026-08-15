@@ -40,6 +40,12 @@
 				<ul class="flex flex-wrap items-center gap-x-6 gap-y-2">
 					<li>
 						<a
+							href="/diagnostics/"
+							class="text-sm text-slate-400 transition-colors hover:text-orange-300">Diagnostics</a
+						>
+					</li>
+					<li>
+						<a
 							href="https://github.com/Lordmzn/LMdecktools"
 							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
 							target="_blank"

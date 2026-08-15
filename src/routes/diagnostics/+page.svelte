@@ -1,0 +1,316 @@
+<script lang="ts">
+	import {
+		store,
+		loadErrorJournal,
+		clearErrorJournal,
+		isErrorJournalAvailable
+	} from '$lib/store.svelte';
+	import {
+		ERROR_CATEGORIES,
+		MAX_AGE_DAYS,
+		MAX_ENTRIES,
+		buildGitHubIssueUrl,
+		exportErrorJournal,
+		formatEntriesAsMarkdown,
+		type ErrorCategory,
+		type ErrorEntry
+	} from '$lib/error-journal';
+
+	let entries = $state<ErrorEntry[]>([]);
+	let loaded = $state(false);
+	let journalAvailable = $state(true);
+	let categoryFilter = $state<ErrorCategory | 'all'>('all');
+	let searchText = $state('');
+	let selectedIds = $state<number[]>([]);
+	let expandedIds = $state<number[]>([]);
+	let showClearConfirm = $state(false);
+	let showReportPreview = $state(false);
+
+	// Category → badge tint. Feedback colours are used only for status, per the
+	// design system — a diagnostic category is exactly that.
+	const CATEGORY_STYLES: Record<ErrorCategory, string> = {
+		'scryfall-api': 'border-sky-500/30 bg-sky-500/10 text-sky-300',
+		indexeddb: 'border-purple-500/30 bg-purple-500/10 text-purple-300',
+		'linked-file': 'border-amber-500/30 bg-amber-500/10 text-amber-300',
+		import: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-300',
+		unhandled: 'border-red-500/30 bg-red-500/10 text-red-300',
+		unknown: 'border-slate-500/30 bg-slate-500/10 text-slate-300'
+	};
+
+	// Keyed on dbMode, not onMount: the layout's tryAutoLoadDB() often opens the
+	// database after this page has mounted, and the journal is unreachable until it does.
+	$effect(() => {
+		void store.dbMode;
+		void refresh();
+	});
+
+	async function refresh() {
+		journalAvailable = isErrorJournalAvailable();
+		entries = await loadErrorJournal();
+		loaded = true;
+	}
+
+	let filteredEntries = $derived(
+		entries.filter((entry) => {
+			if (categoryFilter !== 'all' && entry.category !== categoryFilter) return false;
+			if (searchText.trim() === '') return true;
+			const needle = searchText.toLowerCase();
+			return (
+				entry.message.toLowerCase().includes(needle) ||
+				entry.category.includes(needle) ||
+				JSON.stringify(entry.context ?? {})
+					.toLowerCase()
+					.includes(needle)
+			);
+		})
+	);
+
+	let selectedEntries = $derived(entries.filter((entry) => selectedIds.includes(entry.id!)));
+
+	function toggleSelected(id: number) {
+		selectedIds = selectedIds.includes(id)
+			? selectedIds.filter((s) => s !== id)
+			: [...selectedIds, id];
+	}
+
+	function toggleExpanded(id: number) {
+		expandedIds = expandedIds.includes(id)
+			? expandedIds.filter((s) => s !== id)
+			: [...expandedIds, id];
+	}
+
+	function selectAllFiltered() {
+		selectedIds = filteredEntries.map((entry) => entry.id!);
+	}
+
+	function handleExport() {
+		const blob = new Blob([exportErrorJournal(entries)], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const link = document.createElement('a');
+		link.href = url;
+		link.download = `lm-decktools-errors-${new Date().toISOString().slice(0, 10)}.json`;
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
+
+	async function handleClear() {
+		await clearErrorJournal();
+		showClearConfirm = false;
+		selectedIds = [];
+		expandedIds = [];
+		await refresh();
+	}
+
+	function handleReport() {
+		window.open(buildGitHubIssueUrl(selectedEntries), '_blank', 'noopener,noreferrer');
+		showReportPreview = false;
+	}
+
+	function formatTimestamp(timestamp: number): string {
+		return new Date(timestamp).toLocaleString();
+	}
+</script>
+
+<svelte:head>
+	<title>Diagnostics · LM Deck Tools</title>
+</svelte:head>
+
+<div class="mx-auto max-w-5xl p-4">
+	<div class="surface-card p-6">
+		<div class="mb-6 flex flex-wrap items-start justify-between gap-4">
+			<div>
+				<div class="eyebrow mb-1">The Log Book</div>
+				<h1 class="text-3xl font-extrabold tracking-tight text-white">Diagnostics</h1>
+				<p class="mt-2 max-w-2xl text-sm leading-relaxed text-slate-400">
+					Errors this app ran into, recorded on your device and nowhere else. Nothing here is sent
+					anywhere unless you export it or choose to open a GitHub issue. The journal keeps the last
+					{MAX_ENTRIES} entries and drops anything older than {MAX_AGE_DAYS} days.
+				</p>
+			</div>
+
+			<div class="flex flex-wrap items-center gap-2">
+				<button onclick={handleExport} disabled={entries.length === 0} class="btn btn-ghost btn-sm">
+					Export JSON
+				</button>
+				<button
+					onclick={() => (showClearConfirm = true)}
+					disabled={entries.length === 0}
+					class="btn btn-danger btn-sm"
+				>
+					Clear All
+				</button>
+			</div>
+		</div>
+
+		{#if !journalAvailable}
+			<div class="py-12 text-center text-slate-400">
+				<p>No database open</p>
+				<p class="mt-2 text-sm">
+					Errors are journalled in your local database — click "Choose DB" in the header to start
+					recording them.
+				</p>
+			</div>
+		{:else if !loaded}
+			<div class="py-12 text-center text-slate-400"><p>Loading…</p></div>
+		{:else if entries.length === 0}
+			<div class="py-12 text-center text-slate-400">
+				<p>No errors recorded</p>
+				<p class="mt-2 text-sm">Calm seas so far.</p>
+			</div>
+		{:else}
+			<div class="mb-4 flex flex-wrap items-center gap-2">
+				<input
+					type="text"
+					bind:value={searchText}
+					placeholder="Search errors..."
+					class="field flex-1 sm:flex-none"
+					data-testid="diagnostics-search"
+				/>
+
+				<select bind:value={categoryFilter} class="field" data-testid="diagnostics-category">
+					<option value="all">All categories</option>
+					{#each ERROR_CATEGORIES as category (category)}
+						<option value={category}>{category}</option>
+					{/each}
+				</select>
+
+				<span class="font-mono text-xs tracking-wider text-slate-400 uppercase">
+					{filteredEntries.length} of {entries.length}
+				</span>
+
+				<div class="ml-auto flex flex-wrap items-center gap-2">
+					<button
+						onclick={selectAllFiltered}
+						disabled={filteredEntries.length === 0}
+						class="btn btn-quiet btn-sm"
+					>
+						Select shown
+					</button>
+					<button
+						onclick={() => (selectedIds = [])}
+						disabled={selectedIds.length === 0}
+						class="btn btn-quiet btn-sm"
+					>
+						Clear selection
+					</button>
+					<button
+						onclick={() => (showReportPreview = true)}
+						disabled={selectedIds.length === 0}
+						class="btn btn-primary btn-sm"
+					>
+						{selectedIds.length > 0 ? `Report ${selectedIds.length} on GitHub` : 'Report on GitHub'}
+					</button>
+				</div>
+			</div>
+
+			{#if filteredEntries.length === 0}
+				<div class="py-12 text-center text-slate-400">
+					<p>No errors match your filter</p>
+				</div>
+			{:else}
+				<ul class="space-y-2" data-testid="diagnostics-list">
+					{#each filteredEntries as entry (entry.id)}
+						<li class="rounded-lg border border-orange-500/[0.08] bg-slate-900/60 p-4">
+							<div class="flex items-start gap-3">
+								<input
+									type="checkbox"
+									checked={selectedIds.includes(entry.id!)}
+									onchange={() => toggleSelected(entry.id!)}
+									class="mt-1 rounded border-slate-600 bg-slate-800 text-orange-500 focus:ring-orange-500"
+									aria-label="Select error for reporting"
+								/>
+
+								<div class="min-w-0 flex-1">
+									<div class="flex flex-wrap items-center gap-2">
+										<span
+											class="rounded-full border px-2 py-0.5 font-mono text-[0.62rem] tracking-wider uppercase {CATEGORY_STYLES[
+												entry.category
+											] ?? CATEGORY_STYLES.unknown}"
+										>
+											{entry.category}
+										</span>
+										<span class="font-mono text-xs text-slate-500">
+											{formatTimestamp(entry.timestamp)}
+										</span>
+									</div>
+
+									<p class="mt-2 break-words text-slate-200">{entry.message}</p>
+
+									{#if entry.context || entry.stack}
+										<button
+											onclick={() => toggleExpanded(entry.id!)}
+											class="mt-2 font-mono text-[0.68rem] tracking-wider text-orange-400/80 uppercase transition-colors hover:text-orange-300"
+										>
+											{expandedIds.includes(entry.id!) ? 'Hide details' : 'Show details'}
+										</button>
+
+										{#if expandedIds.includes(entry.id!)}
+											{#if entry.context}
+												<pre
+													class="mt-2 overflow-x-auto rounded-lg bg-slate-950/80 p-3 font-mono text-xs text-slate-300">{JSON.stringify(
+														entry.context,
+														null,
+														2
+													)}</pre>
+											{/if}
+											{#if entry.stack}
+												<pre
+													class="mt-2 overflow-x-auto rounded-lg bg-slate-950/80 p-3 font-mono text-xs text-slate-400">{entry.stack}</pre>
+											{/if}
+										{/if}
+									{/if}
+								</div>
+							</div>
+						</li>
+					{/each}
+				</ul>
+			{/if}
+		{/if}
+	</div>
+</div>
+
+<!-- Clear confirmation -->
+{#if showClearConfirm}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<div class="panel w-full max-w-md rounded-xl p-6 shadow-xl">
+			<h2 class="text-xl font-bold text-slate-50">Clear the error journal?</h2>
+			<p class="mt-2 text-sm text-slate-400">
+				All {entries.length} recorded errors will be deleted from this device. Export them first if you
+				plan to report a bug.
+			</p>
+			<div class="mt-6 flex justify-end gap-2">
+				<button onclick={() => (showClearConfirm = false)} class="btn btn-quiet">Cancel</button>
+				<button onclick={handleClear} class="btn btn-danger">Clear All</button>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Report preview — the user sees exactly what would leave the device -->
+{#if showReportPreview}
+	<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+		<div class="panel max-h-[90vh] w-full max-w-3xl overflow-hidden rounded-xl shadow-xl">
+			<div class="border-b border-orange-500/[0.08] p-6">
+				<h2 class="text-xl font-bold text-slate-50">Report on GitHub</h2>
+				<p class="mt-2 text-sm text-slate-400">
+					This opens a new, pre-filled issue on <span class="font-mono">github.com</span> in a new tab.
+					Below is exactly what would be sent — nothing else leaves your device, and you can still edit
+					or abandon the issue there.
+				</p>
+			</div>
+
+			<div class="max-h-[calc(90vh-220px)] overflow-y-auto p-6">
+				<pre
+					class="overflow-x-auto rounded-lg bg-slate-950/80 p-4 font-mono text-xs whitespace-pre-wrap text-slate-300"
+					data-testid="report-preview">{formatEntriesAsMarkdown(selectedEntries)}</pre>
+			</div>
+
+			<div class="flex justify-end gap-2 border-t border-orange-500/[0.08] p-6">
+				<button onclick={() => (showReportPreview = false)} class="btn btn-quiet">Cancel</button>
+				<button onclick={handleReport} class="btn btn-primary">Open GitHub issue</button>
+			</div>
+		</div>
+	</div>
+{/if}

@@ -38,10 +38,11 @@ export interface CollectionCard {
 }
 
 const DB_NAME = 'LMdecktools';
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 const STORE_NAME = 'card_lists';
 const COLLECTION_STORE = 'collection';
 const METADATA_STORE = 'metadata';
+export const ERROR_JOURNAL_STORE = 'error_journal';
 
 /**
  * Check local DB existence
@@ -99,6 +100,17 @@ export async function openDatabase(): Promise<IDBDatabase> {
 			// Create metadata store for tracking changes
 			if (!db.objectStoreNames.contains(METADATA_STORE)) {
 				db.createObjectStore(METADATA_STORE, { keyPath: 'key' });
+			}
+
+			// v3 → v4: local error journal (see error-journal.ts). Diagnostics only —
+			// deliberately outside clearDatabase() and the export/restore payload.
+			if (!db.objectStoreNames.contains(ERROR_JOURNAL_STORE)) {
+				const journal = db.createObjectStore(ERROR_JOURNAL_STORE, {
+					keyPath: 'id',
+					autoIncrement: true
+				});
+				journal.createIndex('timestamp', 'timestamp', { unique: false });
+				journal.createIndex('category', 'category', { unique: false });
 			}
 		};
 	});

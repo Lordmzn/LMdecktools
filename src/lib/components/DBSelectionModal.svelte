@@ -22,7 +22,8 @@
 		retryWrite,
 		saveNow,
 		importCardsToCollection,
-		importCardsToNewList
+		importCardsToNewList,
+		logAppError
 	} from '$lib/store.svelte';
 	import { describeImport } from '$lib/import-guard';
 	import { parseImportInput } from '$lib/import-parser';
@@ -215,7 +216,7 @@
 				}
 			}
 		} catch (e) {
-			console.error('Failed to import file:', e);
+			logAppError('import', e, { operation: 'loadFromFile', fileName: selectedFile?.name });
 			importError = e instanceof Error ? e.message : 'Failed to import file';
 		} finally {
 			isLoadingFile = false;
@@ -338,7 +339,7 @@
 			URL.revokeObjectURL(url);
 			exportBackupSuccess = true;
 		} catch (e) {
-			console.error('Failed to export backup:', e);
+			logAppError('indexeddb', e, { operation: 'exportBackup' });
 		} finally {
 			isExportingBackup = false;
 		}
