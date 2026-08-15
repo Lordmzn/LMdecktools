@@ -23,7 +23,7 @@
 			'active'
 				? 'bg-orange-500 text-slate-950 shadow-[0_2px_16px_rgba(249,115,22,0.3)] hover:bg-orange-600'
 				: store.dbMode === 'peek'
-					? 'bg-amber-600 text-white hover:bg-amber-700'
+					? 'bg-warning-solid hover:bg-warning text-slate-950'
 					: 'border border-orange-500/20 text-orange-300 hover:border-orange-500/40 hover:bg-orange-500/[0.06]'}"
 			title={m.header_db_button_title()}
 			data-testid="db-modal-toggle"
@@ -31,17 +31,17 @@
 			{#if store.linkedFileStatus === 'active'}
 				<span class="absolute -top-1 -right-1 flex h-3 w-3">
 					<span
-						class="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75"
+						class="bg-success absolute inline-flex h-full w-full animate-ping rounded-full opacity-75"
 					></span>
-					<span class="relative inline-flex h-3 w-3 rounded-full bg-green-500"></span>
+					<span class="bg-success relative inline-flex h-3 w-3 rounded-full"></span>
 				</span>
 			{:else if store.linkedFileStatus === 'write-error' || store.linkedFileStatus === 'not-found'}
 				<span class="absolute -top-1 -right-1 flex h-3 w-3">
-					<span class="relative inline-flex h-3 w-3 rounded-full bg-red-500"></span>
+					<span class="bg-danger-solid relative inline-flex h-3 w-3 rounded-full"></span>
 				</span>
 			{:else if store.linkedFileStatus === 'reconnect'}
 				<span class="absolute -top-1 -right-1 flex h-3 w-3">
-					<span class="relative inline-flex h-3 w-3 rounded-full bg-amber-500"></span>
+					<span class="bg-warning relative inline-flex h-3 w-3 rounded-full"></span>
 				</span>
 			{/if}
 			{#if store.dbMode === 'none'}
@@ -96,7 +96,7 @@
 						/>
 						<path
 							d="M20 6 9 17l-5-5"
-							class="text-green-400"
+							class="text-success"
 							stroke="currentColor"
 							stroke-width="3"
 							stroke-linecap="round"

@@ -425,7 +425,7 @@
 			class="panel w-full max-w-sm rounded-xl p-6 shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h2 class="mb-3 text-xl font-bold text-red-400">{m.lists_delete_modal_title()}</h2>
+			<h2 class="text-danger mb-3 text-xl font-bold">{m.lists_delete_modal_title()}</h2>
 			<p class="mb-1 text-slate-300">
 				{m.lists_delete_confirm_prefix()}
 				<strong>{store.currentCardList?.name}</strong>?
@@ -731,14 +731,14 @@
 					{#if ownershipCheck.owned}
 						<div
 							data-testid="ownership-banner"
-							class="rounded-lg border border-green-800 bg-green-950 px-3 py-1 text-sm text-green-400"
+							class="border-success-edge bg-success-surface text-success rounded-lg border px-3 py-1 text-sm"
 						>
 							{m.lists_owned_banner()}
 						</div>
 					{:else}
 						<div
 							data-testid="ownership-banner"
-							class="rounded-lg border border-amber-800 bg-amber-950 px-3 py-1 text-sm text-amber-400"
+							class="border-warning-edge bg-warning-surface text-warning rounded-lg border px-3 py-1 text-sm"
 						>
 							{missingCount === 1
 								? m.lists_missing_banner_one({ count: missingCount })

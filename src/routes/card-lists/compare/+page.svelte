@@ -95,7 +95,7 @@
 			<!-- List selectors -->
 			<div class="mb-4 flex flex-wrap items-center gap-4">
 				<div class="flex items-center gap-2">
-					<span class="text-sm font-medium text-amber-400">{m.compare_list_a()}</span>
+					<span class="text-cat-parchment text-sm font-medium">{m.compare_list_a()}</span>
 					<select bind:value={indexA} class="field min-w-[160px]">
 						{#each lists as list, i (list.id ?? i)}
 							<option value={i}>{list.name}</option>
@@ -103,7 +103,7 @@
 					</select>
 				</div>
 				<div class="flex items-center gap-2">
-					<span class="text-sm font-medium text-blue-400">{m.compare_list_b()}</span>
+					<span class="text-cat-steel text-sm font-medium">{m.compare_list_b()}</span>
 					<select bind:value={indexB} class="field min-w-[160px]">
 						{#each lists as list, i (list.id ?? i)}
 							<option value={i}>{list.name}</option>
@@ -163,16 +163,18 @@
 			<!-- Summary badges -->
 			<div class="flex flex-wrap gap-2">
 				<span
-					class="rounded-lg border border-amber-800 bg-amber-950 px-3 py-1 text-sm text-amber-400"
+					class="border-cat-parchment-edge bg-cat-parchment-surface text-cat-parchment rounded-lg border px-3 py-1 text-sm"
 				>
 					{m.compare_badge_only_a({ count: result.onlyInA.length })}
 				</span>
 				<span
-					class="rounded-lg border border-green-800 bg-green-950 px-3 py-1 text-sm text-green-400"
+					class="border-cat-sea-edge bg-cat-sea-surface text-cat-sea rounded-lg border px-3 py-1 text-sm"
 				>
 					{m.compare_badge_both({ count: result.inBoth.length })}
 				</span>
-				<span class="rounded-lg border border-blue-800 bg-blue-950 px-3 py-1 text-sm text-blue-400">
+				<span
+					class="border-cat-steel-edge bg-cat-steel-surface text-cat-steel rounded-lg border px-3 py-1 text-sm"
+				>
 					{m.compare_badge_only_b({ count: result.onlyInB.length })}
 				</span>
 			</div>
@@ -182,12 +184,12 @@
 		<div class="hidden gap-4 lg:grid lg:grid-cols-3">
 			<CompareColumn
 				title={m.compare_column_only_in({ name: listA?.name ?? 'A' })}
-				color="amber"
+				color="onlyA"
 				cards={result.onlyInA}
 			/>
 			<CompareColumn
 				title={m.compare_column_both()}
-				color="green"
+				color="both"
 				cards={result.inBoth}
 				showBothQuantities
 				nameA={listA?.name ?? 'A'}
@@ -195,7 +197,7 @@
 			/>
 			<CompareColumn
 				title={m.compare_column_only_in({ name: listB?.name ?? 'B' })}
-				color="blue"
+				color="onlyB"
 				cards={result.onlyInB}
 			/>
 		</div>
@@ -206,7 +208,7 @@
 				<button
 					onclick={() => (activeTab = 'onlyA')}
 					class="flex-1 rounded-l-lg px-3 py-2 transition {activeTab === 'onlyA'
-						? 'bg-amber-500 text-slate-950'
+						? 'bg-cat-parchment-solid text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
 					{m.compare_tab_only_a({ count: result.onlyInA.length })}
@@ -214,7 +216,7 @@
 				<button
 					onclick={() => (activeTab = 'both')}
 					class="flex-1 border-x border-slate-700 px-3 py-2 transition {activeTab === 'both'
-						? 'bg-green-500 text-slate-950'
+						? 'bg-cat-sea-solid text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
 					{m.compare_tab_both({ count: result.inBoth.length })}
@@ -222,7 +224,7 @@
 				<button
 					onclick={() => (activeTab = 'onlyB')}
 					class="flex-1 rounded-r-lg px-3 py-2 transition {activeTab === 'onlyB'
-						? 'bg-blue-500 text-slate-950'
+						? 'bg-cat-steel-solid text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
 					{m.compare_tab_only_b({ count: result.onlyInB.length })}
@@ -232,13 +234,13 @@
 			{#if activeTab === 'onlyA'}
 				<CompareColumn
 					title={m.compare_column_only_in({ name: listA?.name ?? 'A' })}
-					color="amber"
+					color="onlyA"
 					cards={result.onlyInA}
 				/>
 			{:else if activeTab === 'both'}
 				<CompareColumn
 					title={m.compare_column_both()}
-					color="green"
+					color="both"
 					cards={result.inBoth}
 					showBothQuantities
 					nameA={listA?.name ?? 'A'}
@@ -247,7 +249,7 @@
 			{:else}
 				<CompareColumn
 					title={m.compare_column_only_in({ name: listB?.name ?? 'B' })}
-					color="blue"
+					color="onlyB"
 					cards={result.onlyInB}
 				/>
 			{/if}
