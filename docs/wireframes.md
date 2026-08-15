@@ -180,7 +180,9 @@
 
 ## DB Selection Modal
 
-Five-tab toolbar: **[In-browser DB]** **[Link File]** **[Cache]** **[Import]** **[Export]**
+Five-tab toolbar: **[In-browser DB]** **[File DB]** **[Cache]** **[Import]** **[Export]**
+
+The **File DB** tab is not rendered at all where the File System Access API is missing (Firefox); the In-browser DB tab says why, next to the download/restore controls that replace it there.
 
 Auto-load: If the user has previously connected to the local DB, the app auto-loads it on startup (no modal needed). The preference is stored in IndexedDB metadata.
 
@@ -190,7 +192,7 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 |        Welcome to LM Deck Tools                         |
 |   Choose how to start your MTG collection                |
 |                                                          |
-| [In-browser DB] [Link File] [Cache] [Import] [Export]    |
+| [In-browser DB] [File DB] [Cache] [Import] [Export]      |
 |                                     <- toolbar (5 tabs)  |
 |                                                          |
 | === IN-BROWSER DB TAB ===                                |
@@ -211,6 +213,28 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 | |   Total lists: N   Total cards: N                    | |
 | +------------------------------------------------------+ |
 |                                                          |
+| -------------------------------------------------------- |
+| +------------------------------------------------------+ |
+| | [download icon]                                      | |
+| | Download copy                                        | |
+| | Full DB (collection + all card lists). A one-off     | |
+| | snapshot; File DB keeps saving itself.               | |
+| | [Download .yjs file]   (disabled when no DB active)  | |
+| +------------------------------------------------------+ |
+| -------------------------------------------------------- |
+| +------------------------------------------------------+ |
+| | [restore icon]                                       | |
+| | Restore from file                                    | |
+| | Replaces everything stored. Always available —       | |
+| | any browser, any dbMode.                             | |
+| | [Choose file...  (.yjs, .json)]                      | |
+| |   app · version · exported_at · counts  (preview)    | |
+| | [Restore from file]                                  | |
+| +------------------------------------------------------+ |
+| (if !fsAccessSupported):                                 |
+| Auto-save requires Chrome 86+, Edge 86+, Safari 15.2+,  |
+| so this browser has no File DB tab.                      |
+| -------------------------------------------------------- |
 | +------------------------------------------------------+ |
 | | [+ icon]                                             | |
 | | Start from scratch                                   | |
@@ -218,28 +242,10 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 | | [Create New Database]                                | |
 | +------------------------------------------------------+ |
 |                                                          |
-| === LINK FILE TAB === (disabled when no DB active)       |
+| === FILE DB TAB === (disabled when no DB active;         |
+|                      absent when !fsAccessSupported)     |
 |                                                          |
-| (if fsAccessSupported):                                  |
 | (same linked file states as before — link/unlink/etc.)   |
-| -------------------------------------------------------- |
-| +------------------------------------------------------+ |
-| | [download icon]                                      | |
-| | Download copy                                        | |
-| | Download full DB (collection + all card lists).      | |
-| | [Download .yjs file]                                 | |
-| +------------------------------------------------------+ |
-|                                                          |
-| (if !fsAccessSupported — Firefox fallback):              |
-| +------------------------------------------------------+ |
-| | Download copy + [Download .yjs file]                 | |
-| +------------------------------------------------------+ |
-| +------------------------------------------------------+ |
-| | Restore from file                                    | |
-| | [Choose file...  (.yjs, .json)]                      | |
-| | [Restore from file]                                  | |
-| +------------------------------------------------------+ |
-| Auto-save requires Chrome 86+, Edge 86+, Safari 15.2+.  |
 |                                                          |
 | === CACHE TAB ===                                        |
 | +------------------------------------------------------+ |
