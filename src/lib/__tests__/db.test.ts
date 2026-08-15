@@ -8,6 +8,7 @@ import {
 	clearDatabase,
 	loadCollection,
 	saveCollectionCard,
+	saveCollectionCards,
 	deleteCollectionCard,
 	getCollectionCard,
 	type CardList,
@@ -162,6 +163,50 @@ describe('Collection Operations', () => {
 		const collection = await loadCollection(db);
 		expect(collection).toHaveLength(1);
 		expect(collection[0].quantity_owned).toBe(5);
+	});
+
+	it('saves many cards in one batch', async () => {
+		const cards: CollectionCard[] = [
+			{ id: 'a', name: 'Card A', quantity_owned: 1 },
+			{ id: 'b', name: 'Card B', quantity_owned: 2 },
+			{ id: 'c', name: 'Card C', quantity_owned: 3 }
+		];
+
+		await saveCollectionCards(db, cards);
+
+		const collection = await loadCollection(db);
+		expect(collection).toHaveLength(3);
+		expect(collection.map((c) => c.quantity_owned).sort()).toEqual([1, 2, 3]);
+	});
+
+	it('upserts in a batch, leaving other rows alone', async () => {
+		await saveCollectionCard(db, { id: 'a', name: 'Card A', quantity_owned: 1 });
+		await saveCollectionCard(db, { id: 'z', name: 'Card Z', quantity_owned: 9 });
+
+		await saveCollectionCards(db, [
+			{ id: 'a', name: 'Card A', quantity_owned: 4 },
+			{ id: 'b', name: 'Card B', quantity_owned: 2 }
+		]);
+
+		const collection = await loadCollection(db);
+		expect(collection).toHaveLength(3);
+		expect(collection.find((c) => c.id === 'a')?.quantity_owned).toBe(4);
+		expect(collection.find((c) => c.id === 'z')?.quantity_owned).toBe(9);
+	});
+
+	it('writes nothing for an empty batch', async () => {
+		await expect(saveCollectionCards(db, [])).resolves.toEqual([]);
+		expect(await loadCollection(db)).toHaveLength(0);
+	});
+
+	it('resolves only once the batch has committed', async () => {
+		// A read opened after the promise settles must already see every row
+		await saveCollectionCards(db, [
+			{ id: 'a', name: 'Card A', quantity_owned: 1 },
+			{ id: 'b', name: 'Card B', quantity_owned: 1 }
+		]);
+
+		expect(await loadCollection(db)).toHaveLength(2);
 	});
 
 	it('deletes a collection card', async () => {

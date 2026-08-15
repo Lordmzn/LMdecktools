@@ -356,6 +356,46 @@ export async function saveCollectionCard(
 }
 
 /**
+ * Add or update many cards in one transaction.
+ *
+ * `saveCollectionCard` in a loop costs a transaction per card, which is what
+ * made adding a whole list to the collection crawl (#62). One `readwrite`
+ * transaction covers the batch; the promise settles when the transaction
+ * commits, so a caller that awaits it knows every card is durable.
+ *
+ * All-or-nothing, as IndexedDB transactions are: if one `put` fails the
+ * transaction aborts and nothing in the batch lands. That is the right
+ * semantics here — a half-written bulk add is worse than a failed one.
+ */
+export async function saveCollectionCards(
+	db: IDBDatabase,
+	cards: CollectionCard[]
+): Promise<CollectionCard[]> {
+	if (cards.length === 0) return [];
+
+	return new Promise((resolve, reject) => {
+		const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
+		const store = transaction.objectStore(COLLECTION_STORE);
+
+		for (const card of cards) {
+			store.put(card);
+		}
+
+		transaction.oncomplete = () => {
+			resolve(cards);
+		};
+
+		transaction.onerror = () => {
+			reject(new Error(`Failed to save cards: ${transaction.error?.message}`));
+		};
+
+		transaction.onabort = () => {
+			reject(new Error(`Failed to save cards: ${transaction.error?.message ?? 'aborted'}`));
+		};
+	});
+}
+
+/**
  * Delete a card from the collection
  */
 export async function deleteCollectionCard(db: IDBDatabase, cardId: string): Promise<void> {
