@@ -8,6 +8,7 @@ import {
 	createEmptyCardList,
 	loadCollection as dbLoadCollection,
 	saveCollectionCard,
+	saveCollectionCards,
 	deleteCollectionCard,
 	getCollectionCard,
 	findCardListByName,
@@ -15,9 +16,7 @@ import {
 	putMetadata,
 	getMetadata,
 	type CardList,
-	type CollectionCard,
-	type CardMatching,
-	type LanguageMatching
+	type CollectionCard
 } from './db';
 
 import {
@@ -31,6 +30,14 @@ import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
 import { formatCollectionAsCSV, formatCollectionAsText } from './export-format';
+import {
+	buildCollectionIndex,
+	checkOwnership,
+	mergeCardsIntoCollection,
+	type OwnershipCheckParams,
+	type OwnershipCheckResult
+} from './collection';
+export type { OwnershipCheckParams, OwnershipCheckResult, CollectionIndex } from './collection';
 import {
 	isFileSystemAccessSupported,
 	pickAndLinkNewFile,
@@ -87,19 +94,6 @@ export interface StoreInterface {
 	collection: CollectionCard[];
 }
 
-export interface OwnershipCheckResult {
-	owned: boolean;
-	cards: {
-		card: import('./db').Card;
-		owned: boolean;
-	}[];
-}
-
-export interface OwnershipCheckParams {
-	cardMatching: CardMatching;
-	languageMatching: LanguageMatching;
-}
-
 class Store implements StoreInterface {
 	// DB state
 	dbMode = $state<DBMode>('none');
@@ -145,30 +139,18 @@ class Store implements StoreInterface {
 	linkedFileWriting = $state(false);
 	linkedFilePermissionDenied = $state(false);
 
+	/**
+	 * The collection indexed for ownership lookups, rebuilt whenever `collection`
+	 * changes — once, not once per card in the list (#62).
+	 */
+	collectionIndex = $derived(buildCollectionIndex(this.collection));
+
 	// Derived ownership check for current list
 	listOwnershipCheck = $derived.by((): OwnershipCheckResult => {
 		const list = this.currentCardList;
 		if (!list) return { owned: true, cards: [] };
 
-		const { cardMatching, languageMatching } = list;
-
-		const cardResults = this.listCards.map((card) => {
-			let candidates = this.collection.filter((c) =>
-				cardMatching === 'generic' ? c.name === card.name : c.id === card.id
-			);
-
-			if (languageMatching === 'strict') {
-				candidates = candidates.filter((c) => c.lang === card.lang);
-			}
-
-			const totalOwned = candidates.reduce((sum, c) => sum + c.quantity_owned, 0);
-			return { card, owned: totalOwned >= card.LM_quantity };
-		});
-
-		return {
-			owned: cardResults.every((r) => r.owned),
-			cards: cardResults
-		};
+		return checkOwnership(this.listCards, this.collectionIndex, list);
 	});
 }
 
@@ -1221,26 +1203,50 @@ export async function deleteCardList() {
 /**
  * Add all cards in the current list to the collection, respecting LM_quantity.
  * Returns counts of added and failed cards.
+ *
+ * Deliberately not `addToCollection` in a loop (#62). That cost two IndexedDB
+ * transactions per card, an O(n) copy of `store.collection` per card, and — via
+ * the reassignment — a full ownership re-check and grid repaint per card, which
+ * is what made a long list appear to cycle through itself. Here the merge
+ * happens in memory against the collection we already hold, the whole batch
+ * goes to disk in one transaction, and `store.collection` is assigned exactly
+ * once, so the UI updates a single time.
+ *
+ * The batch is all-or-nothing, as an IndexedDB transaction is. The old
+ * per-card `try/catch` could only ever have caught DB-level failures that would
+ * have taken every other card down too, so nothing partial is lost by this.
  */
 export async function addAllToCollection(): Promise<{ added: number; failed: number }> {
 	assertWritable();
-	const cards = $state.snapshot(store.listCards) as any[];
-	let added = 0;
-	let failed = 0;
-	for (const card of cards) {
-		try {
-			await addToCollection(card, card.LM_quantity);
-			added++;
-		} catch (e) {
-			logAppError('indexeddb', e, {
-				operation: 'addAllToCollection',
-				cardName: card.name,
-				quantity: card.LM_quantity
-			});
-			failed++;
-		}
+	// Read the list off plain state rather than the `listCards` derived: this is a
+	// mutation path, not a render path, and it is the same value either way.
+	const currentList = store.savedCardLists[store.currentCardListIndex];
+	const cards = $state.snapshot(currentList?.cards ?? []) as any[];
+	if (cards.length === 0) return { added: 0, failed: 0 };
+
+	try {
+		const _db = await ensureDB();
+
+		const merge = mergeCardsIntoCollection(
+			$state.snapshot(store.collection) as CollectionCard[],
+			cards,
+			toPlainCard
+		);
+
+		// Only the touched rows need writing; the rest of the collection is untouched.
+		await saveCollectionCards(_db, merge.touched);
+
+		store.collection = merge.collection;
+		triggerAutoSave();
+
+		return { added: cards.length, failed: 0 };
+	} catch (e) {
+		logAppError('indexeddb', e, {
+			operation: 'addAllToCollection',
+			cardCount: cards.length
+		});
+		return { added: 0, failed: cards.length };
 	}
-	return { added, failed };
 }
 
 /**
