@@ -43,7 +43,7 @@ A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-base
 
 ### Storage Layer
 
-Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Database `LMdecktools` v3 with three object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle).
+Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Database `LMdecktools` v4 with four object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle), and `error_journal` (autoIncrement, `timestamp` + `category` indexes — added in v4, see Error Journal).
 
 ### Card Data
 
@@ -57,9 +57,21 @@ Deck **import** additionally contacts one third-party deck site on explicit user
 
 CSV is RFC 4180 (header row, comma-delimited, CRLF, quotes doubled) and its column names are deliberately the ones `import-parser.ts` resolves via `QUANTITY_ALIASES` / `NAME_ALIASES` / `SET_ALIASES` / `COLLECTOR_ALIASES` / `ID_ALIASES`, so an export re-imports without an importer change (#50) — `export-format.test.ts` asserts that round-trip. The Text format is the space-separated `4 Lightning Bolt` form with a `# My Collection` header, which only `parsePlainText()` accepts; never emit it under a `.csv` extension.
 
+### Error Journal
+
+`src/lib/error-journal.ts` records runtime errors in the `error_journal` store so the diagnostic context survives closing the console (#30). It must never import from `store.svelte.ts` — the dependency runs one way, which is what keeps it testable without a rune owner.
+
+Call sites use `logAppError(category, error, context?)` from `store.svelte.ts`: it echoes to `console.error`, then writes if a DB is open. It never throws, and it deliberately does **not** call `ensureDB()` — opening IndexedDB is the user's choice, and an error is no reason to create a database behind their back. Failures a read-only DB produces by design are not journalled (the `reportFailure` helpers in `collection/+page.svelte` and `card-lists/+page.svelte` skip them) — they are a user-flow message, not a defect.
+
+Global capture: `hooks.client.ts` (`handleError`) plus a `window.onunhandledrejection` listener in `+layout.svelte`, since SvelteKit's hook never sees rejected promises nothing awaits.
+
+Every write prunes to `MAX_ENTRIES` (100) and `MAX_AGE_DAYS` (30). The journal is outside `clearDatabase()` and outside the yjs export payload — it is diagnostics, not user data, so restoring a backup neither wipes it nor carries it between machines.
+
+Reporting goes through `buildGitHubIssueUrl()`, which pre-fills GitHub's issue form (body truncated to ~8000 chars). `github.com` is in the `docs/project-vision.md` §5.5 host table for that reason; the /diagnostics page shows the full body before opening the tab, so nothing leaves the device unseen.
+
 ### Routing
 
-SvelteKit file-based routing. Current routes: `/` (home), `/collection`, `/card-lists`, `/card-lists/compare`.
+SvelteKit file-based routing. Current routes: `/` (home), `/collection`, `/card-lists`, `/card-lists/compare`, `/diagnostics` (linked from the footer, not the main nav).
 
 `src/routes/+layout.ts` sets `prerender = true` (every route is prerendered to real HTML — this is not an SPA-fallback setup) and `trailingSlash = 'always'`. The trailing slash makes the static adapter emit `collection/index.html` instead of `collection.html`, so any plain static host serves every route without rewrite rules. Don't remove it without adding host-side rewrites — `/collection` 404s on a dumb file server otherwise.
 
