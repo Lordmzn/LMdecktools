@@ -122,12 +122,31 @@
 		return 'cache';
 	}
 
+	/** Read the cache size into the indicator. Cheap while the entry count is unchanged. */
+	async function refreshImageCacheStats() {
+		const stats = await getImageCacheStats();
+		imageCacheCount = stats.count;
+		imageCacheBytes = stats.bytes;
+	}
+
+	/**
+	 * Re-measure whenever the modal opens, not once per page load (#64).
+	 *
+	 * This component is mounted unconditionally by Header.svelte — only its markup
+	 * is behind `{#if show}` — and the header survives client-side navigation, so
+	 * an `onMount` measurement happened once per hard reload and never again. The
+	 * indicator sat at whatever the cache held at page load, which after a clear
+	 * meant a permanent zero however many images were re-cached since.
+	 *
+	 * Sizing the cache hydrates every entry, but `getImageCacheStats` memoises on
+	 * the entry count and the cache is append-only, so re-opening with an
+	 * unchanged cache costs a `cache.keys()` and nothing more.
+	 */
+	$effect(() => {
+		if (show) refreshImageCacheStats();
+	});
+
 	onMount(() => {
-		// Measured once, on modal open — sizing the cache hydrates every entry
-		getImageCacheStats().then((stats) => {
-			imageCacheCount = stats.count;
-			imageCacheBytes = stats.bytes;
-		});
 		clockInterval = setInterval(() => {
 			now = Date.now();
 		}, 60_000);
@@ -1176,8 +1195,9 @@
 									onclick={async () => {
 										isClearingCache = true;
 										await clearImageCache();
-										imageCacheCount = 0;
-										imageCacheBytes = 0;
+										// Ask the cache rather than assuming zero — clearing drops the
+										// memo, so this is an honest reading and cheap on an empty cache
+										await refreshImageCacheStats();
 										isClearingCache = false;
 									}}
 									disabled={isClearingCache || imageCacheCount === 0}

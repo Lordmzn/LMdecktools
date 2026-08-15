@@ -158,6 +158,34 @@ describe('image-cache', () => {
 			expect((await getImageCacheStats()).bytes).toBe(2 * ENTRY_BYTES);
 		});
 
+		it('sizes only the newly added entries when re-measuring', async () => {
+			await getImageUrl('https://example.com/img1.jpg');
+			await getImageUrl('https://example.com/img2.jpg');
+			expect((await getImageCacheStats()).bytes).toBe(2 * ENTRY_BYTES);
+
+			await getImageUrl('https://example.com/img3.jpg');
+			mockCache.match.mockClear();
+
+			const stats = await getImageCacheStats();
+
+			expect(stats.bytes).toBe(3 * ENTRY_BYTES);
+			// The two already-sized entries were not hydrated again — the cache is
+			// append-only, so only the new key needed measuring (#64)
+			expect(mockCache.match).toHaveBeenCalledTimes(1);
+		});
+
+		it('re-measures everything after a clear', async () => {
+			await getImageUrl('https://example.com/img1.jpg');
+			expect((await getImageCacheStats()).bytes).toBe(ENTRY_BYTES);
+
+			await clearImageCache();
+			mockCache._store.clear();
+			await getImageUrl('https://example.com/img1.jpg');
+
+			// The memo was dropped, so this is a fresh reading rather than a stale sum
+			expect(await getImageCacheStats()).toEqual({ count: 1, bytes: ENTRY_BYTES });
+		});
+
 		it('returns zero when cache is empty', async () => {
 			const stats = await getImageCacheStats();
 			expect(stats).toEqual({ count: 0, bytes: 0 });
