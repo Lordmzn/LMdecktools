@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
+	import BrandMark from '$lib/components/BrandMark.svelte';
 	import { checkLocalDatabase } from '$lib/db';
 	import { getImageCacheStats, clearImageCache, formatBytes } from '$lib/image-cache';
 	import {
@@ -433,33 +434,8 @@
 			<div
 				class="flex items-center gap-4 border-b border-orange-500/[0.12] bg-gradient-to-br from-orange-500/[0.12] to-transparent px-6 py-5"
 			>
-				<!-- Jolly Roger — replaces the two stray emoji the design system flagged -->
-				<svg
-					class="h-10 w-10 shrink-0 text-orange-400"
-					viewBox="0 0 100 100"
-					fill="none"
-					stroke="currentColor"
-					stroke-width="2"
-					stroke-linecap="round"
-					stroke-linejoin="round"
-					aria-hidden="true"
-				>
-					<g opacity="0.6">
-						<path
-							d="M50 2C32 2 20 15 20 30c0 10 5 18 12 23v7h36v-7c7-5 12-13 12-23C80 15 68 2 50 2z"
-						/>
-						<circle cx="39" cy="28" r="5.5" fill="currentColor" />
-						<circle cx="61" cy="28" r="5.5" fill="currentColor" />
-						<path d="M50 40v3" />
-						<path d="M36 49h28" />
-					</g>
-					<g transform="rotate(-20, 50, 88)">
-						<rect x="32" y="48" width="28" height="40" rx="3" fill="#0f1218" stroke-width="2" />
-					</g>
-					<g transform="rotate(20, 50, 88)">
-						<rect x="40" y="48" width="28" height="40" rx="3" fill="#0f1218" stroke-width="2" />
-					</g>
-				</svg>
+				<!-- The brand mark, same art as the site header (#66) -->
+				<BrandMark class="h-10 w-10 shrink-0" />
 				<div>
 					<h2 class="text-2xl font-extrabold tracking-tight text-white">
 						Welcome to LM Deck Tools

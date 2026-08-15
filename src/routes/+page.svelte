@@ -4,6 +4,10 @@
 	course, the hold, the crew, and a ship's charter ("The Compact").
 -->
 
+<script lang="ts">
+	import JollyRoger from '$lib/components/JollyRoger.svelte';
+</script>
+
 <svelte:head>
 	<title>LM Deck Tools — Chart Your Own Course</title>
 	<meta
@@ -144,40 +148,9 @@
 		No captain · No port · Your treasure
 	</div>
 
-	<!-- Jolly Roger — skull playing cards -->
+	<!-- Jolly Roger — tricorn skull over a fanned pair of cards -->
 	<div class="jolly-roger fade-up relative mb-6" style="animation-delay: 0.2s" aria-hidden="true">
-		<svg
-			width="90"
-			height="90"
-			viewBox="0 0 100 100"
-			fill="none"
-			stroke="#fb923c"
-			stroke-width="2"
-			stroke-linecap="round"
-			stroke-linejoin="round"
-		>
-			<g opacity="0.5">
-				<path d="M50 2C32 2 20 15 20 30c0 10 5 18 12 23v7h36v-7c7-5 12-13 12-23C80 15 68 2 50 2z" />
-				<circle cx="39" cy="28" r="5.5" fill="#fb923c" />
-				<circle cx="61" cy="28" r="5.5" fill="#fb923c" />
-				<path d="M50 40v3" />
-				<path d="M36 49h28" />
-				<line x1="42" y1="49" x2="42" y2="60" />
-				<line x1="50" y1="49" x2="50" y2="60" />
-				<line x1="58" y1="49" x2="58" y2="60" />
-			</g>
-			<!-- Cards fanned in front, played from below -->
-			<g transform="rotate(-20, 50, 88)">
-				<rect x="32" y="48" width="28" height="40" rx="3" fill="#0a0c10" stroke-width="2" />
-				<rect x="35" y="51" width="22" height="34" rx="1.5" stroke-width="0.7" opacity="0.4" />
-				<circle cx="39" cy="55.5" r="2" stroke-width="0.8" opacity="0.5" />
-			</g>
-			<g transform="rotate(20, 50, 88)">
-				<rect x="40" y="48" width="28" height="40" rx="3" fill="#0a0c10" stroke-width="2" />
-				<rect x="43" y="51" width="22" height="34" rx="1.5" stroke-width="0.7" opacity="0.4" />
-				<circle cx="47" cy="55.5" r="2" stroke-width="0.8" opacity="0.5" />
-			</g>
-		</svg>
+		<JollyRoger class="w-[90px]" />
 	</div>
 
 	<h1
