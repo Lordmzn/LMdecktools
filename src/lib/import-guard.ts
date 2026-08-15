@@ -9,6 +9,7 @@
  */
 
 import type { CardList, CollectionCard } from './db';
+import * as m from './paraglide/messages';
 import { importWithMetadata } from './yjs-integration';
 
 export const APP_NAME = 'LM Deck Tools';
@@ -55,20 +56,19 @@ function asArray(value: unknown): unknown[] | null {
  */
 function checkIdentity(app: string | null, version: string | null, hasKnownShape: boolean): void {
 	if (app !== null && app !== APP_NAME) {
-		throw new ImportValidationError(
-			`This file was exported by "${app}", not ${APP_NAME}. Nothing was changed.`
-		);
+		throw new ImportValidationError(m.import_error_foreign_app({ app, appName: APP_NAME }));
 	}
 
 	if (app === null && !hasKnownShape) {
-		throw new ImportValidationError(
-			`This is not an ${APP_NAME} export — it contains no card lists or collection. Nothing was changed.`
-		);
+		throw new ImportValidationError(m.import_error_not_an_export({ appName: APP_NAME }));
 	}
 
 	if (version !== null && !SUPPORTED_VERSIONS.includes(version)) {
 		throw new ImportValidationError(
-			`This file is export format version ${version}; this app reads ${SUPPORTED_VERSIONS.join(', ')}. Update the app before restoring. Nothing was changed.`
+			m.import_error_unsupported_version({
+				version,
+				supported: SUPPORTED_VERSIONS.join(', ')
+			})
 		);
 	}
 }
@@ -78,23 +78,27 @@ function checkDeclaredCounts(payload: ImportPayload): void {
 	const { declaredLists, declaredCards, cardLists, collection } = payload;
 
 	if (declaredLists !== null && declaredLists !== cardLists.length) {
+		const params = { declared: declaredLists, actual: cardLists.length };
 		throw new ImportValidationError(
-			`This file looks incomplete: it declares ${declaredLists} card list${declaredLists === 1 ? '' : 's'} but contains ${cardLists.length}. Nothing was changed.`
+			declaredLists === 1
+				? m.import_error_truncated_lists_one(params)
+				: m.import_error_truncated_lists_other(params)
 		);
 	}
 
 	if (declaredCards !== null && declaredCards !== collection.length) {
+		const params = { declared: declaredCards, actual: collection.length };
 		throw new ImportValidationError(
-			`This file looks incomplete: it declares ${declaredCards} collection card${declaredCards === 1 ? '' : 's'} but contains ${collection.length}. Nothing was changed.`
+			declaredCards === 1
+				? m.import_error_truncated_cards_one(params)
+				: m.import_error_truncated_cards_other(params)
 		);
 	}
 }
 
 function parseJSONPayload(raw: unknown): ImportPayload {
 	if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
-		throw new ImportValidationError(
-			`This is not an ${APP_NAME} export — it contains no card lists or collection. Nothing was changed.`
-		);
+		throw new ImportValidationError(m.import_error_not_an_export({ appName: APP_NAME }));
 	}
 
 	const source = raw as Record<string, unknown>;
@@ -123,9 +127,7 @@ function parseYjsPayload(data: Uint8Array): ImportPayload {
 	try {
 		decoded = importWithMetadata(data);
 	} catch {
-		throw new ImportValidationError(
-			'Unrecognised file format. Please choose a .yjs or .json file exported from this app. Nothing was changed.'
-		);
+		throw new ImportValidationError(m.import_error_unrecognised_format());
 	}
 
 	const { cardLists, collection, metadata } = decoded;
@@ -173,19 +175,23 @@ function checkedPayload(payload: ImportPayload): ImportPayload {
  */
 export function assertRestorable(payload: ImportPayload): void {
 	if (payload.cardLists.length === 0 && payload.collection.length === 0) {
-		throw new ImportValidationError(
-			'This file contains no card lists and no collection cards, so restoring from it would erase your data and put nothing back. Nothing was changed — use "Create New Database" if you meant to start over.'
-		);
+		throw new ImportValidationError(m.import_error_empty_payload());
 	}
 }
 
 /** One-line summary of what the user is about to restore, for the confirmation UI. */
 export function describeImport(payload: ImportPayload): string {
-	const lists = `${payload.cardLists.length} list${payload.cardLists.length === 1 ? '' : 's'}`;
-	const cards = `${payload.collection.length} collection card${payload.collection.length === 1 ? '' : 's'}`;
+	const lists =
+		payload.cardLists.length === 1
+			? m.import_summary_lists_one({ count: payload.cardLists.length })
+			: m.import_summary_lists_other({ count: payload.cardLists.length });
+	const cards =
+		payload.collection.length === 1
+			? m.import_summary_cards_one({ count: payload.collection.length })
+			: m.import_summary_cards_other({ count: payload.collection.length });
 
 	const parts = [
-		`${payload.app ?? 'Legacy export'}${payload.version ? ` v${payload.version}` : ''}`
+		`${payload.app ?? m.import_summary_legacy()}${payload.version ? ` v${payload.version}` : ''}`
 	];
 	if (payload.exportedAt !== null) {
 		parts.push(new Date(payload.exportedAt).toLocaleString());

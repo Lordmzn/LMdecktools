@@ -1,3 +1,5 @@
+import * as m from './paraglide/messages';
+
 export type ImportSourceType = 'csv' | 'text' | 'moxfield-url' | 'archidekt-url' | 'unknown';
 
 export interface ParsedCard {
@@ -131,7 +133,7 @@ export function parseCSV(text: string): ParseResult {
 		const fields = parseCSVLine(lines[i]);
 		const name = fields[nameIdx]?.trim();
 		if (!name) {
-			warnings.push(`Line ${i + 1}: missing card name, skipped`);
+			warnings.push(m.import_parse_missing_name({ line: i + 1 }));
 			continue;
 		}
 
@@ -182,7 +184,7 @@ export function parsePlainText(text: string): ParseResult {
 		if (match) {
 			cards.push({ quantity: parseInt(match[1], 10), name: match[2].trim() });
 		} else {
-			warnings.push(`Line ${i + 1}: could not parse "${line}", skipped`);
+			warnings.push(m.import_parse_unparseable({ line: i + 1, text: line }));
 		}
 	}
 

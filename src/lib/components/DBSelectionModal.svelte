@@ -32,6 +32,7 @@
 	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
 	import { fetchDeckFromUrl, URL_IMPORT_HOST } from '$lib/import-url';
+	import * as m from '$lib/paraglide/messages';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
@@ -62,20 +63,20 @@
 
 	function formatRelativeTime(timestamp: number): string {
 		const delta = Math.floor((now - timestamp) / 1000);
-		if (delta < 60) return 'just now';
+		if (delta < 60) return m.time_just_now();
 		const mins = Math.floor(delta / 60);
-		if (mins < 60) return `${mins} min ago`;
+		if (mins < 60) return m.time_minutes_ago({ count: mins });
 		const hours = Math.floor(mins / 60);
-		if (hours < 24) return `${hours}h ago`;
+		if (hours < 24) return m.time_hours_ago({ count: hours });
 		const days = Math.floor(hours / 24);
-		return `${days}d ago`;
+		return m.time_days_ago({ count: days });
 	}
 
 	let lastSavedText = $derived(
 		store.linkedFileWriting
-			? 'Saving…'
+			? m.db_saving()
 			: store.linkedFileLastSaved
-				? `Last saved: ${formatRelativeTime(store.linkedFileLastSaved)}`
+				? m.db_last_saved({ time: formatRelativeTime(store.linkedFileLastSaved) })
 				: null
 	);
 
@@ -93,7 +94,9 @@
 	let imageCacheBytes = $state(0);
 	// e.g. "412 images · 86.4 MB" — the size is what the Clear button is judged against (#51)
 	let imageCacheSummary = $derived(
-		`${imageCacheCount} ${imageCacheCount === 1 ? 'image' : 'images'} · ${formatBytes(imageCacheBytes)}`
+		imageCacheCount === 1
+			? m.db_cache_summary_one({ count: imageCacheCount, size: formatBytes(imageCacheBytes) })
+			: m.db_cache_summary_other({ count: imageCacheCount, size: formatBytes(imageCacheBytes) })
 	);
 	let isClearingCache = $state(false);
 	let showCreateNewConfirm = $state(false);
@@ -196,7 +199,7 @@
 		try {
 			importPreview = describeImport(await inspectImportFile(selectedFile));
 		} catch (e) {
-			importError = e instanceof Error ? e.message : 'Could not read this file';
+			importError = e instanceof Error ? e.message : m.db_could_not_read_file();
 		}
 	}
 
@@ -239,7 +242,7 @@
 			}
 		} catch (e) {
 			logAppError('import', e, { operation: 'loadFromFile', fileName: selectedFile?.name });
-			importError = e instanceof Error ? e.message : 'Failed to import file';
+			importError = e instanceof Error ? e.message : m.db_failed_to_import_file();
 		} finally {
 			isLoadingFile = false;
 		}
@@ -273,7 +276,7 @@
 				const text = await extImportSelectedFile.text();
 				extImportPreview = parseImportInput(text);
 			} catch {
-				extImportErr = 'Could not read file';
+				extImportErr = m.db_import_could_not_read_file();
 				extImportPreview = null;
 			}
 		}
@@ -298,7 +301,7 @@
 			const deck = await fetchDeckFromUrl(extImportUrl);
 			extImportPreview = { listName: deck.name, cards: deck.cards, warnings: [] };
 		} catch (e) {
-			extImportErr = e instanceof Error ? e.message : 'Failed to fetch deck';
+			extImportErr = e instanceof Error ? e.message : m.db_import_failed_fetch();
 		} finally {
 			extImportFetching = false;
 		}
@@ -316,14 +319,14 @@
 			};
 			// Strip Svelte $state proxy — plain objects are needed for Map lookups in the store
 			const cards = $state.snapshot(extImportPreview.cards);
-			const listName = extImportPreview.listName || 'Imported List';
+			const listName = extImportPreview.listName || m.db_import_default_list_name();
 			if (extImportTarget === 'collection') {
 				extImportSummary = await importCardsToCollection(cards, progressCb);
 			} else {
 				extImportSummary = await importCardsToNewList(cards, listName, progressCb);
 			}
 		} catch (e) {
-			extImportErr = e instanceof Error ? e.message : 'Import failed';
+			extImportErr = e instanceof Error ? e.message : m.error_import_failed();
 		} finally {
 			extImportRunning = false;
 		}
@@ -368,14 +371,16 @@
 	}
 
 	// CSV collection export state
+	// `value` is the CSV column header the importer resolves, so it stays English
+	// however the label is translated — a translated export must still re-import (#50).
 	const csvFieldOptions = [
-		{ label: 'Count', value: 'Count' },
-		{ label: 'Name', value: 'Name' },
-		{ label: 'Edition', value: 'Edition' },
-		{ label: 'Collector #', value: 'Collector Number' },
-		{ label: 'Foil', value: 'Foil' },
-		{ label: 'Language', value: 'Language' },
-		{ label: 'Scryfall ID', value: 'Scryfall ID' }
+		{ label: m.db_export_field_count(), value: 'Count' },
+		{ label: m.db_export_field_name(), value: 'Name' },
+		{ label: m.db_export_field_edition(), value: 'Edition' },
+		{ label: m.db_export_field_collector_number(), value: 'Collector Number' },
+		{ label: m.db_export_field_foil(), value: 'Foil' },
+		{ label: m.db_export_field_language(), value: 'Language' },
+		{ label: m.db_export_field_scryfall_id(), value: 'Scryfall ID' }
 	];
 	let csvSelectedFields = $state(['Count', 'Name', 'Edition']);
 	// CSV re-imports into this app and opens in a spreadsheet; text is what other MTG tools paste (#50)
@@ -429,15 +434,15 @@
 <!-- What the database actually holds: lists plus the collection -->
 {#snippet dbContentStats()}
 	<div class="flex justify-between">
-		<span class="font-medium">Card lists:</span>
+		<span class="font-medium">{m.db_stat_lists()}</span>
 		<span class="font-mono" data-testid="db-stat-lists">{store.savedCardLists.length}</span>
 	</div>
 	<div class="flex justify-between">
-		<span class="font-medium">Cards in lists:</span>
+		<span class="font-medium">{m.db_stat_list_cards()}</span>
 		<span class="font-mono" data-testid="db-stat-list-cards">{store.totalListCards}</span>
 	</div>
 	<div class="flex justify-between">
-		<span class="font-medium">Collection cards:</span>
+		<span class="font-medium">{m.db_stat_collection()}</span>
 		<span class="font-mono" data-testid="db-stat-collection"
 			>{store.totalOwnedCards} ({store.uniqueOwnedCards} unique)</span
 		>
@@ -471,10 +476,8 @@
 				<!-- The brand mark, same art as the site header (#66) -->
 				<BrandMark class="h-10 w-10 shrink-0" />
 				<div>
-					<h2 class="text-2xl font-extrabold tracking-tight text-white">
-						Welcome to LM Deck Tools
-					</h2>
-					<p class="mt-0.5 text-sm text-slate-400">Choose how to start your MTG collection</p>
+					<h2 class="text-2xl font-extrabold tracking-tight text-white">{m.db_modal_title()}</h2>
+					<p class="mt-0.5 text-sm text-slate-400">{m.db_modal_subtitle()}</p>
 				</div>
 			</div>
 
@@ -499,7 +502,7 @@
 							d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"
 						></path>
 					</svg>
-					In-browser DB
+					{m.db_tab_local()}
 				</button>
 				<!-- Without the File System Access API there is no file DB to speak of;
 				     the In-browser DB section says so next to Download copy instead -->
@@ -522,7 +525,7 @@
 								d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
 							></path>
 						</svg>
-						File DB
+						{m.db_tab_file()}
 					</button>
 				{/if}
 				<button
@@ -541,7 +544,7 @@
 							d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
 						></path>
 					</svg>
-					Cache
+					{m.db_tab_cache()}
 				</button>
 				<button
 					onclick={() => {
@@ -564,7 +567,7 @@
 							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"
 						></path>
 					</svg>
-					Import
+					{m.db_tab_import()}
 				</button>
 				<button
 					onclick={() => toggleSection('export')}
@@ -584,7 +587,7 @@
 							d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
 						></path>
 					</svg>
-					Export
+					{m.db_tab_export()}
 				</button>
 			</div>
 
@@ -618,9 +621,9 @@
 								<div class="flex-1">
 									<h3 class="mb-2 text-lg font-semibold text-slate-100">
 										{#if localDBexists === null}
-											Searching for local database
+											{m.db_local_searching()}
 										{:else}
-											Local database found
+											{m.db_local_found()}
 										{/if}
 									</h3>
 									<div class="mb-4 space-y-2 text-sm text-slate-400">
@@ -630,11 +633,11 @@
 										<div
 											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
 										>
-											Previewing in read-only mode. Click "Connect" to enable editing.
+											{m.db_peek_notice()}
 										</div>
 									{/if}
 									<button onclick={handleLoadLocal} class="btn btn-subtle w-full">
-										Connect to local DB
+										{m.db_connect_local()}
 									</button>
 								</div>
 							</div>
@@ -663,7 +666,7 @@
 									</svg>
 								</div>
 								<div class="flex-1">
-									<h3 class="mb-2 text-lg font-semibold text-slate-100">Local database active</h3>
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_local_active()}</h3>
 									<div class="space-y-2 text-sm text-slate-400">
 										{@render dbContentStats()}
 									</div>
@@ -698,16 +701,15 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-slate-100">Download copy</h3>
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_download_title()}</h3>
 								<p class="mb-4 text-sm text-slate-400">
-									Download a full copy of your database (collection + all card lists). A one-off
-									snapshot — for a file that keeps saving itself, link one under File DB.
+									{m.db_download_body()}
 								</p>
 								{#if exportBackupSuccess}
 									<div
 										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
 									>
-										Download started.
+										{m.db_download_started()}
 									</div>
 								{/if}
 								<button
@@ -715,7 +717,7 @@
 									disabled={isExportingBackup || store.dbMode !== 'active'}
 									class="btn btn-subtle flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
 								>
-									{isExportingBackup ? 'Preparing…' : 'Download .yjs file'}
+									{isExportingBackup ? m.db_download_preparing() : m.db_download_button()}
 								</button>
 							</div>
 						</div>
@@ -747,11 +749,10 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-slate-100">Restore from file</h3>
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_restore_title()}</h3>
 								<p class="mb-4 text-sm text-slate-400">
-									Restore your database from a previously downloaded copy. This <em>replaces</em>
-									everything currently stored — to fold a file into what you already have instead, link
-									it under File DB.
+									{m.db_restore_body_prefix()} <em>{m.db_restore_replaces()}</em>
+									{m.db_restore_body_suffix()}
 								</p>
 								<input
 									type="file"
@@ -763,7 +764,7 @@
 								/>
 								{#if selectedFile && !importResult && !importError}
 									<p class="mb-1 text-xs text-slate-400">
-										Selected file: {selectedFile.name}
+										{m.db_restore_selected_file({ name: selectedFile.name })}
 									</p>
 								{/if}
 								{#if importPreview && !importResult}
@@ -776,16 +777,18 @@
 										<div
 											class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
 										>
-											Restored {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+											{importResult.imported === 1
+												? m.db_restore_success_one({ count: importResult.imported })
+												: m.db_restore_success_other({ count: importResult.imported })}
 											{#if restoreSuggestsLink}
 												<p class="mt-2">
-													Link a file under
+													{m.db_restore_link_hint_prefix()}
 													<button
 														onclick={() => toggleSection('link')}
 														class="underline underline-offset-2 hover:text-green-300"
-														>File DB</button
+														>{m.db_tab_file()}</button
 													>
-													to keep this copy saving itself, or close this window.
+													{m.db_restore_link_hint_suffix()}
 												</p>
 											{/if}
 										</div>
@@ -793,7 +796,10 @@
 										<div
 											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
 										>
-											Restored {importResult.imported}, failed {importResult.errors}.
+											{m.db_restore_partial({
+												imported: importResult.imported,
+												errors: importResult.errors
+											})}
 										</div>
 									{/if}
 								{/if}
@@ -830,12 +836,12 @@
 											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
 										</svg>
 										{#if importTotal > 0}
-											Restoring… ({importCurrent}/{importTotal} lists)
+											{m.db_restore_progress({ current: importCurrent, total: importTotal })}
 										{:else}
-											Restoring…
+											{m.db_restoring()}
 										{/if}
 									{:else}
-										Restore from file
+										{m.db_restore_button()}
 									{/if}
 								</button>
 							</div>
@@ -844,8 +850,7 @@
 
 					{#if !fsAccessSupported}
 						<p class="mt-4 text-xs text-slate-500">
-							Auto-save to a linked file requires Chrome 86+, Edge 86+, or Safari 15.2+, so this
-							browser has no File DB tab. Download and restore copies here instead.
+							{m.db_no_fs_access()}
 						</p>
 					{/if}
 
@@ -875,15 +880,15 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-slate-100">Start from scratch</h3>
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_create_title()}</h3>
 								<p class="mb-4 text-sm text-slate-400">
-									Create a new empty database. All existing data will be cleared.
+									{m.db_create_body()}
 								</p>
 								<button
 									onclick={() => (showCreateNewConfirm = true)}
 									class="btn btn-primary w-full"
 								>
-									Create New Database
+									{m.db_create_button()}
 								</button>
 							</div>
 						</div>
@@ -893,12 +898,12 @@
 				<!-- Export Section (CSV collection export) -->
 				{#if activeSection === 'export'}
 					<div class="space-y-4">
-						<p class="text-sm text-slate-400">
-							Export your collection to share with other tools and services.
-						</p>
+						<p class="text-sm text-slate-400">{m.db_export_intro()}</p>
 
 						<div>
-							<label class="mb-2 block text-sm font-semibold text-slate-300">Format:</label>
+							<label class="mb-2 block text-sm font-semibold text-slate-300"
+								>{m.db_export_format_label()}</label
+							>
 							<div class="flex gap-2">
 								<button
 									onclick={() => (exportFormat = 'csv')}
@@ -916,18 +921,18 @@
 										? 'bg-orange-500 text-white'
 										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
-									Text
+									{m.db_export_format_text()}
 								</button>
 							</div>
 							<p class="mt-2 text-xs text-slate-500">
-								{exportFormat === 'csv'
-									? 'One column per field, opens in a spreadsheet, and imports back into this app.'
-									: 'Space-separated lines (4 Lightning Bolt) for pasting into other MTG tools.'}
+								{exportFormat === 'csv' ? m.db_export_csv_hint() : m.db_export_text_hint()}
 							</p>
 						</div>
 
 						<div>
-							<label class="mb-2 block text-sm font-semibold text-slate-300">Include Fields:</label>
+							<label class="mb-2 block text-sm font-semibold text-slate-300"
+								>{m.db_export_fields_label()}</label
+							>
 							<div class="grid grid-cols-2 gap-2 text-sm text-slate-300 sm:grid-cols-4">
 								{#each csvFieldOptions as option (option.value)}
 									<label class="flex cursor-pointer items-center gap-2">
@@ -948,19 +953,22 @@
 								value={exportPreview.text}
 								readonly
 								class="h-64 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-300"
-								placeholder="Select fields to generate preview..."
+								placeholder={m.db_export_preview_placeholder()}
 							></textarea>
 							<!-- Say plainly that the box is a sample, so nobody reads the row
 							     count off it and thinks the file is short (#63) -->
 							<p class="mt-2 text-xs text-slate-500" data-testid="export-preview-note">
 								{#if exportPreview.truncated}
-									Preview — first {exportPreview.shown} of {exportPreview.total} cards. Download and
-									copy include all of them.
+									{m.db_export_preview_truncated({
+										shown: exportPreview.shown,
+										total: exportPreview.total
+									})}
 								{:else if exportPreview.total > 0}
-									Preview — all {exportPreview.total}
-									{exportPreview.total === 1 ? 'card' : 'cards'}.
+									{exportPreview.total === 1
+										? m.db_export_preview_all_one({ total: exportPreview.total })
+										: m.db_export_preview_all_other({ total: exportPreview.total })}
 								{:else}
-									Nothing to export yet — your collection is empty.
+									{m.db_export_preview_empty()}
 								{/if}
 							</p>
 						</div>
@@ -971,14 +979,14 @@
 								disabled={!hasExport}
 								class="btn btn-primary flex-1 disabled:cursor-not-allowed sm:flex-none"
 							>
-								Download File
+								{m.db_export_download()}
 							</button>
 							<button
 								onclick={handleCsvCopy}
 								disabled={!hasExport}
 								class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 							>
-								Copy to Clipboard
+								{m.db_export_copy()}
 							</button>
 						</div>
 					</div>
@@ -1072,12 +1080,9 @@
 							{/if}
 							<div class="flex-1">
 								{#if store.linkedFileStatus === 'none'}
-									<h3 class="mb-2 text-lg font-semibold text-slate-100">
-										Link a File (Bring Your Own Cloud)
-									</h3>
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_link_title()}</h3>
 									<p class="mb-3 text-sm text-slate-400">
-										Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
-										iCloud, OneDrive) for cross-device sync with zero server involvement.
+										{m.db_link_body()}
 									</p>
 									<div class="flex gap-2">
 										<button
@@ -1085,57 +1090,53 @@
 											disabled={store.dbMode !== 'active'}
 											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 										>
-											New File...
+											{m.db_link_new_file()}
 										</button>
 										<button
 											onclick={() => linkExistingFile()}
 											disabled={store.dbMode !== 'active'}
 											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 										>
-											Existing File...
+											{m.db_link_existing_file()}
 										</button>
 									</div>
 								{:else if store.linkedFileStatus === 'active'}
 									<h3 class="mb-2 text-lg font-semibold text-slate-100">
-										Linked: {store.linkedFileName}
+										{m.db_linked_title({ name: store.linkedFileName ?? '' })}
 									</h3>
 									{#if lastSavedText}
 										<p class="mb-3 text-sm text-slate-400">
 											{lastSavedText}
 										</p>
 									{/if}
-									<p class="mb-4 text-sm text-slate-400">
-										Changes are automatically saved to this file.
-									</p>
+									<p class="mb-4 text-sm text-slate-400">{m.db_linked_body()}</p>
 									<div class="flex gap-2">
 										<button
 											onclick={() => saveNow()}
 											disabled={store.linkedFileWriting}
 											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 										>
-											{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
+											{store.linkedFileWriting ? m.db_saving() : m.db_save_now()}
 										</button>
 										<button onclick={() => changeFile()} class="btn btn-subtle flex-1">
-											Change File...
+											{m.db_change_file()}
 										</button>
 										<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
-											Unlink
+											{m.db_unlink()}
 										</button>
 									</div>
 								{:else if store.linkedFileStatus === 'reconnect'}
 									<h3 class="mb-2 text-lg font-semibold text-slate-100">
-										File link needs reconnection
+										{m.db_reconnect_title()}
 									</h3>
 									<p class="mb-4 text-sm text-slate-400">
-										The browser needs your permission to access "{store.linkedFileName}" again.
-										Click Reconnect to re-grant access.
+										{m.db_reconnect_body({ name: store.linkedFileName ?? '' })}
 									</p>
 									{#if store.linkedFilePermissionDenied}
 										<p
 											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
 										>
-											Permission was denied. Reload the page to try again, or grant access in your
-											browser settings.
+											{m.db_permission_denied()}
 										</p>
 									{/if}
 									<div class="flex gap-2">
@@ -1144,21 +1145,26 @@
 											disabled={store.linkedFilePermissionDenied}
 											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
 										>
-											Reconnect
+											{m.db_reconnect_button()}
 										</button>
 										<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
-											Unlink
+											{m.db_unlink()}
 										</button>
 									</div>
 								{:else if store.linkedFileStatus === 'not-found'}
-									<h3 class="mb-2 text-lg font-semibold text-slate-100">Linked file not found</h3>
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">
+										{m.db_not_found_title()}
+									</h3>
 									<p class="mb-3 text-sm text-slate-400">
-										File not found — "{store.linkedFileName}" could not be located.
+										{m.db_not_found_body({ name: store.linkedFileName ?? '' })}
 									</p>
-									<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
-									<button onclick={() => unlinkFile()} class="btn btn-quiet"> Unlink </button>
+									<p class="mb-4 text-sm text-green-400">{m.db_data_safe()}</p>
+									<button onclick={() => unlinkFile()} class="btn btn-quiet">{m.db_unlink()}</button
+									>
 								{:else if store.linkedFileStatus === 'write-error'}
-									<h3 class="mb-2 text-lg font-semibold text-slate-100">File write error</h3>
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">
+										{m.db_write_error_title()}
+									</h3>
 									{#if store.linkedFileError}
 										<p
 											class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
@@ -1167,16 +1173,15 @@
 										</p>
 									{/if}
 									<p class="mb-3 text-sm text-slate-400">
-										Failed to write to "{store.linkedFileName}". The file may be locked or
-										inaccessible.
+										{m.db_write_error_body({ name: store.linkedFileName ?? '' })}
 									</p>
-									<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
+									<p class="mb-4 text-sm text-green-400">{m.db_data_safe()}</p>
 									<div class="flex gap-2">
 										<button onclick={() => retryWrite()} class="btn btn-subtle flex-1">
-											Retry
+											{m.db_retry()}
 										</button>
 										<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
-											Unlink
+											{m.db_unlink()}
 										</button>
 									</div>
 								{/if}
@@ -1209,13 +1214,11 @@
 								</svg>
 							</div>
 							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-slate-100">Image Cache</h3>
-								<p class="mb-3 text-sm text-slate-400">
-									Card images are cached locally for faster loading.
-								</p>
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_cache_title()}</h3>
+								<p class="mb-3 text-sm text-slate-400">{m.db_cache_body()}</p>
 								<div class="mb-4 space-y-2 text-sm text-slate-400">
 									<div class="flex justify-between">
-										<span class="font-medium">Cached images:</span>
+										<span class="font-medium">{m.db_cache_stat_label()}</span>
 										<span class="font-mono" data-testid="image-cache-stats"
 											>{imageCacheSummary}</span
 										>
@@ -1233,7 +1236,7 @@
 									disabled={isClearingCache || imageCacheCount === 0}
 									class="btn btn-quiet w-full disabled:cursor-not-allowed disabled:opacity-50"
 								>
-									{isClearingCache ? 'Clearing…' : 'Clear Image Cache'}
+									{isClearingCache ? m.db_cache_clearing() : m.db_cache_clear()}
 								</button>
 							</div>
 						</div>
@@ -1245,9 +1248,11 @@
 					<div class="space-y-4">
 						<!-- Source mode selector -->
 						<div>
-							<label class="mb-2 block text-sm font-medium text-slate-400">Source</label>
+							<label class="mb-2 block text-sm font-medium text-slate-400"
+								>{m.db_import_source()}</label
+							>
 							<div class="flex gap-1">
-								{#each [{ value: 'file', label: 'File' }, { value: 'text', label: 'Paste' }, { value: 'url', label: 'URL' }] as opt (opt.value)}
+								{#each [{ value: 'file', label: m.db_import_source_file() }, { value: 'text', label: m.db_import_source_paste() }, { value: 'url', label: m.db_import_source_url() }] as opt (opt.value)}
 									<button
 										onclick={() => {
 											extImportMode = opt.value as ImportMode;
@@ -1266,7 +1271,9 @@
 
 						<!-- Target selector -->
 						<div>
-							<label class="mb-2 block text-sm font-medium text-slate-400">Import into</label>
+							<label class="mb-2 block text-sm font-medium text-slate-400"
+								>{m.db_import_target()}</label
+							>
 							<div class="flex gap-1">
 								<button
 									onclick={() => (extImportTarget = 'list')}
@@ -1275,7 +1282,7 @@
 										? 'bg-orange-500 text-slate-950'
 										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
-									New List
+									{m.db_import_target_list()}
 								</button>
 								<button
 									onclick={() => (extImportTarget = 'collection')}
@@ -1284,7 +1291,7 @@
 										? 'bg-orange-500 text-slate-950'
 										: 'bg-slate-800 text-slate-400 hover:text-slate-200'}"
 								>
-									Collection
+									{m.db_import_target_collection()}
 								</button>
 							</div>
 						</div>
@@ -1308,7 +1315,7 @@
 									bind:value={extImportText}
 									oninput={handleExtImportTextChange}
 									disabled={extImportRunning}
-									placeholder="4 Lightning Bolt&#10;2 Counterspell&#10;&#10;Or paste CSV data..."
+									placeholder={m.db_import_text_placeholder()}
 									class="h-36 w-full rounded-lg border border-slate-700 bg-slate-800 p-3 font-mono text-sm text-slate-100 placeholder-slate-500 focus:border-orange-500 focus:ring-2 focus:ring-orange-500/20 disabled:opacity-50"
 								></textarea>
 							{:else if extImportMode === 'url'}
@@ -1325,14 +1332,13 @@
 										disabled={!extImportUrl.trim() || extImportFetching || extImportRunning}
 										class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
 									>
-										{extImportFetching ? 'Fetching…' : 'Fetch'}
+										{extImportFetching ? m.db_import_fetching() : m.db_import_fetch()}
 									</button>
 								</div>
 								<p class="mt-2 text-xs text-slate-500">
-									Supported: Archidekt (public decks). Fetching sends a request to <span
-										class="text-slate-400">{URL_IMPORT_HOST}</span
-									> carrying the deck ID; no other data leaves your device. Any other site: export the
-									deck as a file and use the File tab.
+									{m.db_import_url_note_prefix()}
+									<span class="text-slate-400">{URL_IMPORT_HOST}</span>
+									{m.db_import_url_note_suffix()}
 								</p>
 							{/if}
 						</div>
@@ -1342,9 +1348,9 @@
 							<div class="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
 								<div class="flex items-center gap-2 text-sm text-slate-300">
 									<span class="font-medium"
-										>{extImportPreview.cards.length} card{extImportPreview.cards.length !== 1
-											? 's'
-											: ''} parsed</span
+										>{extImportPreview.cards.length === 1
+											? m.db_import_parsed_one({ count: extImportPreview.cards.length })
+											: m.db_import_parsed_other({ count: extImportPreview.cards.length })}</span
 									>
 									{#if extImportPreview.listName}
 										<span class="text-slate-500">—</span>
@@ -1380,18 +1386,28 @@
 										? 'text-green-400'
 										: 'text-amber-400'}"
 								>
-									Imported {extImportSummary.success} card{extImportSummary.success !== 1
-										? 's'
-										: ''}{extImportSummary.failed > 0
-										? `, ${extImportSummary.failed} failed`
-										: ' successfully'}.
+									{#if extImportSummary.failed > 0}
+										{extImportSummary.success === 1
+											? m.db_import_result_partial_one({
+													success: extImportSummary.success,
+													failed: extImportSummary.failed
+												})
+											: m.db_import_result_partial_other({
+													success: extImportSummary.success,
+													failed: extImportSummary.failed
+												})}
+									{:else}
+										{extImportSummary.success === 1
+											? m.db_import_result_ok_one({ success: extImportSummary.success })
+											: m.db_import_result_ok_other({ success: extImportSummary.success })}
+									{/if}
 								</p>
 								{#if extImportSummary.notFound.length > 0}
 									<details class="mt-2">
 										<summary class="cursor-pointer text-xs text-slate-400">
-											{extImportSummary.notFound.length} card{extImportSummary.notFound.length !== 1
-												? 's'
-												: ''} not found on Scryfall
+											{extImportSummary.notFound.length === 1
+												? m.db_import_not_found_one({ count: extImportSummary.notFound.length })
+												: m.db_import_not_found_other({ count: extImportSummary.notFound.length })}
 										</summary>
 										<ul class="mt-1 max-h-24 space-y-0.5 overflow-y-auto text-xs text-slate-500">
 											{#each extImportSummary.notFound as name, i (i)}
@@ -1430,12 +1446,17 @@
 										<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
 									</svg>
 									{#if extImportProgress.total > 0}
-										Importing… ({extImportProgress.current}/{extImportProgress.total} batches)
+										{m.db_import_progress({
+											current: extImportProgress.current,
+											total: extImportProgress.total
+										})}
 									{:else}
-										Importing…
+										{m.db_importing()}
 									{/if}
 								{:else}
-									Import {extImportTarget === 'collection' ? 'to Collection' : 'as New List'}
+									{extImportTarget === 'collection'
+										? m.db_import_run_collection()
+										: m.db_import_run_list()}
 								{/if}
 							</button>
 						{/if}
@@ -1445,8 +1466,8 @@
 				<!-- Info Note (always visible) -->
 				<div class="mt-6 rounded-lg border border-slate-800 bg-slate-800/50 p-4">
 					<p class="text-xs text-slate-400">
-						<strong>Note:</strong> You can always export or import your data later using the application
-						controls.
+						<strong>{m.db_note_label()}</strong>
+						{m.db_note_body()}
 					</p>
 				</div>
 			</div>
@@ -1461,18 +1482,26 @@
 		onclick={() => (showRestoreConfirm = false)}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Confirm restore"
+		aria-label={m.db_restore_confirm_aria()}
 	>
 		<div
 			class="panel mx-4 w-full max-w-md rounded-xl p-6 shadow-2xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h3 class="mb-3 text-lg font-bold text-slate-100">Restore over your database?</h3>
+			<h3 class="mb-3 text-lg font-bold text-slate-100">{m.db_restore_confirm_title()}</h3>
 			<p class="mb-3 text-sm text-slate-400">
-				Restoring <strong class="text-red-400">replaces</strong> your
-				{store.savedCardLists.length} card list{store.savedCardLists.length === 1 ? '' : 's'} and
-				{store.uniqueOwnedCards} collection card{store.uniqueOwnedCards === 1 ? '' : 's'} with the contents
-				of this file.
+				{m.db_restore_confirm_prefix()}
+				<strong class="text-red-400">{m.db_restore_replaces()}</strong>
+				{m.db_restore_confirm_suffix({
+					lists:
+						store.savedCardLists.length === 1
+							? m.db_count_lists_one({ count: store.savedCardLists.length })
+							: m.db_count_lists_other({ count: store.savedCardLists.length }),
+					cards:
+						store.uniqueOwnedCards === 1
+							? m.db_count_collection_one({ count: store.uniqueOwnedCards })
+							: m.db_count_collection_other({ count: store.uniqueOwnedCards })
+				})}
 			</p>
 			{#if importPreview}
 				<p
@@ -1481,15 +1510,13 @@
 					{importPreview}
 				</p>
 			{/if}
-			<p class="mb-5 text-sm text-slate-500">
-				This action cannot be undone. Download a copy first if you may want the current data back.
-			</p>
+			<p class="mb-5 text-sm text-slate-500">{m.db_restore_confirm_warning()}</p>
 			<div class="flex gap-3">
 				<button onclick={() => (showRestoreConfirm = false)} class="btn btn-quiet flex-1">
-					Cancel
+					{m.common_cancel()}
 				</button>
 				<button onclick={handleLoadFile} class="btn btn-danger flex-1">
-					Replace and Restore
+					{m.db_restore_confirm_button()}
 				</button>
 			</div>
 		</div>
@@ -1503,32 +1530,30 @@
 		onclick={() => (showCreateNewConfirm = false)}
 		role="dialog"
 		aria-modal="true"
-		aria-label="Confirm new database"
+		aria-label={m.db_create_confirm_aria()}
 	>
 		<div
 			class="panel mx-4 w-full max-w-md rounded-xl p-6 shadow-2xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h3 class="mb-3 text-lg font-bold text-slate-100">Create new database?</h3>
+			<h3 class="mb-3 text-lg font-bold text-slate-100">{m.db_create_confirm_title()}</h3>
 			<p class="mb-3 text-sm text-slate-400">
-				This will <strong class="text-red-400">permanently delete</strong> all your current data — card
-				lists, collection, and settings.
+				{m.db_create_confirm_prefix()}
+				<strong class="text-red-400">{m.db_create_confirm_strong()}</strong>
+				{m.db_create_confirm_suffix()}
 			</p>
 			{#if store.linkedFileStatus !== 'none'}
 				<p class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400">
-					Your linked file "{store.linkedFileName}" will be unlinked. The file itself won't be
-					deleted, but it will no longer sync with the app.
+					{m.db_create_confirm_unlink({ name: store.linkedFileName ?? '' })}
 				</p>
 			{/if}
-			<p class="mb-5 text-sm text-slate-500">
-				This action cannot be undone. Make sure you have a backup if needed.
-			</p>
+			<p class="mb-5 text-sm text-slate-500">{m.db_create_confirm_warning()}</p>
 			<div class="flex gap-3">
 				<button onclick={() => (showCreateNewConfirm = false)} class="btn btn-quiet flex-1">
-					Cancel
+					{m.common_cancel()}
 				</button>
 				<button onclick={handleCreateNew} class="btn btn-danger flex-1">
-					Delete and Create New
+					{m.db_create_confirm_button()}
 				</button>
 			</div>
 		</div>

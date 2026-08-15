@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { getImageUrl } from '$lib/image-cache';
+	import * as m from '$lib/paraglide/messages';
 
 	let { card, onAdd, onRemove, onUpdate } = $props();
 	const isDFC = $derived(card.card_faces?.length > 1);
@@ -61,7 +62,7 @@
 			<button
 				onclick={() => (flipped = !flipped)}
 				class="absolute top-2 left-2 rounded-full bg-slate-900/85 p-1.5 text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-orange-500 hover:text-slate-950"
-				title="Flip card"
+				title={m.common_flip_card()}
 			>
 				<svg
 					xmlns="http://www.w3.org/2000/svg"
@@ -90,7 +91,7 @@
 				<button
 					onclick={handleRemove}
 					class="rounded-lg bg-red-500/90 p-2 font-semibold text-white shadow-lg transition hover:bg-red-500"
-					title="Remove one"
+					title={m.card_remove_single()}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -108,7 +109,7 @@
 				<button
 					onclick={startEdit}
 					class="rounded-lg bg-slate-800/90 p-2 font-semibold text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-slate-700"
-					title="Edit quantity"
+					title={m.card_edit_quantity()}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -126,7 +127,7 @@
 				<button
 					onclick={handleAdd}
 					class="rounded-lg bg-green-500/90 p-2 font-semibold text-white shadow-lg transition hover:bg-green-500"
-					title="Add one"
+					title={m.card_add_single()}
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -156,17 +157,19 @@
 			class="panel w-full max-w-sm rounded-xl p-6 shadow-xl"
 			onclick={(e) => e.stopPropagation()}
 		>
-			<h3 class="mb-4 text-lg font-bold tracking-tight text-slate-50">Edit Quantity</h3>
+			<h3 class="mb-4 text-lg font-bold tracking-tight text-slate-50">
+				{m.card_edit_quantity_title()}
+			</h3>
 			<p class="mb-4 text-sm text-slate-400">{card.name}</p>
 
 			<div class="mb-6 flex items-center gap-3">
-				<label class="text-sm font-medium text-slate-300">Quantity:</label>
+				<label class="text-sm font-medium text-slate-300">{m.card_quantity_label()}</label>
 				<input type="number" bind:value={editQuantity} min="0" class="field flex-1" />
 			</div>
 
 			<div class="flex gap-3">
-				<button onclick={saveEdit} class="btn btn-primary flex-1"> Save </button>
-				<button onclick={cancelEdit} class="btn btn-quiet flex-1"> Cancel </button>
+				<button onclick={saveEdit} class="btn btn-primary flex-1">{m.common_save()}</button>
+				<button onclick={cancelEdit} class="btn btn-quiet flex-1">{m.common_cancel()}</button>
 			</div>
 		</div>
 	</div>

@@ -1,5 +1,6 @@
 <script lang="ts">
 	import type { ComparedCard } from '$lib/compare';
+	import * as m from '$lib/paraglide/messages';
 
 	type ColorVariant = 'amber' | 'green' | 'blue';
 
@@ -57,7 +58,7 @@
 	</h3>
 
 	{#if cards.length === 0}
-		<p class="py-6 text-center text-sm text-slate-500">No cards</p>
+		<p class="py-6 text-center text-sm text-slate-500">{m.compare_no_cards()}</p>
 	{:else}
 		<div class="space-y-2">
 			{#each cards as { card, quantityA, quantityB } (card.id + card.name)}
@@ -75,7 +76,7 @@
 								img.dataset.flipped = String(!isFlipped);
 							}}
 							class="shrink-0 cursor-pointer"
-							title="Flip card"
+							title={m.common_flip_card()}
 						>
 							<img
 								src={card.card_faces[0].image_uris.small}
