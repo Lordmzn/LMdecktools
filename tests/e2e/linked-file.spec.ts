@@ -48,12 +48,12 @@ async function createDB(page: import('@playwright/test').Page) {
 }
 
 test.describe('Linked File — File System Access API', () => {
-	test('the Link File section is unavailable until a database is active', async ({ page }) => {
+	test('the File DB section is unavailable until a database is active', async ({ page }) => {
 		await resetDB(page);
 		await openDBModal(page);
 
 		// Linking a file requires an active DB, so the whole section is disabled
-		await expect(page.getByRole('button', { name: 'Link File', exact: true })).toBeDisabled();
+		await expect(page.getByRole('button', { name: 'File DB', exact: true })).toBeDisabled();
 	});
 
 	test('shows "Link a File" section in DB modal when API is available', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('Linked File — File System Access API', () => {
 
 		// Creating the DB closes the modal — re-open it
 		await openDBModal(page);
-		await openSection(page, 'Link File');
+		await openSection(page, 'File DB');
 
 		// Chromium supports File System Access API, so the section should be visible
 		await expect(page.getByText('Link a File (Bring Your Own Cloud)')).toBeVisible();
@@ -76,7 +76,7 @@ test.describe('Linked File — File System Access API', () => {
 
 		// Creating the DB closes the modal — re-open it
 		await openDBModal(page);
-		await openSection(page, 'Link File');
+		await openSection(page, 'File DB');
 
 		for (const name of ['New File...', 'Existing File...']) {
 			const linkButton = page.getByRole('button', { name, exact: true });

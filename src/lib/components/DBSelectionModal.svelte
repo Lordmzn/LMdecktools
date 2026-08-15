@@ -93,11 +93,21 @@
 	);
 	let isClearingCache = $state(false);
 	let showCreateNewConfirm = $state(false);
+	let showRestoreConfirm = $state(false);
+	/** True once a successful restore left the modal open to offer linking a file. */
+	let restoreSuggestsLink = $state(false);
+
+	/** Whether a restore would destroy anything. Restoring into an empty DB asks nothing. */
+	let restoreWouldOverwrite = $derived(
+		store.savedCardLists.length > 0 || store.uniqueOwnedCards > 0
+	);
 
 	function computeDefaultSection(): Section {
 		if (store.dbMode === 'none' || store.dbMode === 'peek') {
 			return 'localdb';
 		}
+		// The File DB section is not rendered without the File System Access API
+		if (!fsAccessSupported) return 'localdb';
 		// dbMode === 'active'
 		if (store.linkedFileStatus === 'none') return 'link';
 		if (
@@ -167,21 +177,42 @@
 		}
 	}
 
+	/**
+	 * Restoring clears the database first, and it is now reachable with a database
+	 * already loaded, so anything that would be lost gets confirmed before the
+	 * write. An empty (or absent) database has nothing to lose — go straight in.
+	 */
+	function requestRestore() {
+		if (restoreWouldOverwrite) {
+			showRestoreConfirm = true;
+		} else {
+			handleLoadFile();
+		}
+	}
+
 	async function handleLoadFile() {
 		if (!selectedFile) return;
+		showRestoreConfirm = false;
 		isLoadingFile = true;
 		importCurrent = 0;
 		importTotal = 0;
 		importResult = null;
 		importError = null;
+		restoreSuggestsLink = false;
 		try {
 			const result = await loadFromFile(selectedFile, (current, total) => {
 				importCurrent = current;
 				importTotal = total;
 			});
 			importResult = result;
-			if (result.errors === 0 && !(fsAccessSupported && store.linkedFileStatus === 'none')) {
-				setTimeout(() => closeModal(), 1500);
+			if (result.errors === 0) {
+				// A restored database is a good moment to link a file for auto-save —
+				// stay open and say so, rather than closing on a browser that can (#42)
+				if (fsAccessSupported && store.linkedFileStatus === 'none') {
+					restoreSuggestsLink = true;
+				} else {
+					setTimeout(() => closeModal(), 1500);
+				}
 			}
 		} catch (e) {
 			console.error('Failed to import file:', e);
@@ -439,7 +470,10 @@
 			<!-- Toolbar -->
 			<div class="flex gap-1 border-b border-orange-500/[0.08] bg-slate-900 px-4 py-2">
 				<button
-					onclick={() => toggleSection('localdb')}
+					onclick={() => {
+						toggleSection('localdb');
+						exportBackupSuccess = false;
+					}}
 					aria-expanded={activeSection === 'localdb'}
 					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
 						{activeSection === 'localdb'
@@ -456,29 +490,30 @@
 					</svg>
 					In-browser DB
 				</button>
-				<button
-					onclick={() => {
-						toggleSection('link');
-						exportBackupSuccess = false;
-					}}
-					disabled={store.dbMode !== 'active'}
-					aria-expanded={activeSection === 'link'}
-					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
-						{activeSection === 'link'
-						? 'bg-orange-500/10 text-orange-400'
-						: 'text-slate-400 hover:text-orange-300'}
-						disabled:cursor-not-allowed disabled:opacity-40"
-				>
-					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-						<path
-							stroke-linecap="round"
-							stroke-linejoin="round"
-							stroke-width="2"
-							d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-						></path>
-					</svg>
-					Link File
-				</button>
+				<!-- Without the File System Access API there is no file DB to speak of;
+				     the In-browser DB section says so next to Download copy instead -->
+				{#if fsAccessSupported}
+					<button
+						onclick={() => toggleSection('link')}
+						disabled={store.dbMode !== 'active'}
+						aria-expanded={activeSection === 'link'}
+						class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+							{activeSection === 'link'
+							? 'bg-orange-500/10 text-orange-400'
+							: 'text-slate-400 hover:text-orange-300'}
+							disabled:cursor-not-allowed disabled:opacity-40"
+					>
+						<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+							></path>
+						</svg>
+						File DB
+					</button>
+				{/if}
 				<button
 					onclick={() => toggleSection('cache')}
 					aria-expanded={activeSection === 'cache'}
@@ -629,6 +664,183 @@
 					<!-- Separator -->
 					<div class="my-4 border-t border-orange-500/[0.08]"></div>
 
+					<!-- Download copy (all browsers) -->
+					<div
+						class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
+					>
+						<div class="flex items-start gap-4">
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
+							>
+								<svg
+									class="h-6 w-6 text-orange-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+									></path>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">Download copy</h3>
+								<p class="mb-4 text-sm text-slate-400">
+									Download a full copy of your database (collection + all card lists). A one-off
+									snapshot — for a file that keeps saving itself, link one under File DB.
+								</p>
+								{#if exportBackupSuccess}
+									<div
+										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
+									>
+										Download started.
+									</div>
+								{/if}
+								<button
+									onclick={handleExportBackup}
+									disabled={isExportingBackup || store.dbMode !== 'active'}
+									class="btn btn-subtle flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{isExportingBackup ? 'Preparing…' : 'Download .yjs file'}
+								</button>
+							</div>
+						</div>
+					</div>
+
+					<!-- Separator -->
+					<div class="my-4 border-t border-orange-500/[0.08]"></div>
+
+					<!-- Restore from file (Firefox fallback) -->
+					<div
+						class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
+					>
+						<div class="flex items-start gap-4">
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-800"
+							>
+								<svg
+									class="h-6 w-6 text-orange-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+									></path>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">Restore from file</h3>
+								<p class="mb-4 text-sm text-slate-400">
+									Restore your database from a previously downloaded copy. This <em>replaces</em>
+									everything currently stored — to fold a file into what you already have instead, link
+									it under File DB.
+								</p>
+								<input
+									type="file"
+									accept=".yjs,.json"
+									bind:this={fileInput}
+									onchange={handleFileSelect}
+									disabled={isLoadingFile}
+									class="mb-3 block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
+								/>
+								{#if selectedFile && !importResult && !importError}
+									<p class="mb-1 text-xs text-slate-400">
+										Selected file: {selectedFile.name}
+									</p>
+								{/if}
+								{#if importPreview && !importResult}
+									<p class="mb-3 text-xs text-slate-500" data-testid="restore-preview">
+										{importPreview}
+									</p>
+								{/if}
+								{#if importResult}
+									{#if importResult.errors === 0}
+										<div
+											class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
+										>
+											Restored {importResult.imported} list{importResult.imported !== 1 ? 's' : ''} successfully.
+											{#if restoreSuggestsLink}
+												<p class="mt-2">
+													Link a file under
+													<button
+														onclick={() => toggleSection('link')}
+														class="underline underline-offset-2 hover:text-green-300"
+														>File DB</button
+													>
+													to keep this copy saving itself, or close this window.
+												</p>
+											{/if}
+										</div>
+									{:else}
+										<div
+											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+										>
+											Restored {importResult.imported}, failed {importResult.errors}.
+										</div>
+									{/if}
+								{/if}
+								{#if importError}
+									<div
+										class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
+									>
+										{importError}
+									</div>
+								{/if}
+								<button
+									onclick={requestRestore}
+									disabled={!selectedFile ||
+										!importPreview ||
+										isLoadingFile ||
+										importResult !== null}
+									class="btn btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
+								>
+									{#if isLoadingFile}
+										<svg
+											class="h-4 w-4 animate-spin"
+											xmlns="http://www.w3.org/2000/svg"
+											fill="none"
+											viewBox="0 0 24 24"
+										>
+											<circle
+												class="opacity-25"
+												cx="12"
+												cy="12"
+												r="10"
+												stroke="currentColor"
+												stroke-width="4"
+											/>
+											<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+										</svg>
+										{#if importTotal > 0}
+											Restoring… ({importCurrent}/{importTotal} lists)
+										{:else}
+											Restoring…
+										{/if}
+									{:else}
+										Restore from file
+									{/if}
+								</button>
+							</div>
+						</div>
+					</div>
+
+					{#if !fsAccessSupported}
+						<p class="mt-4 text-xs text-slate-500">
+							Auto-save to a linked file requires Chrome 86+, Edge 86+, or Safari 15.2+, so this
+							browser has no File DB tab. Download and restore copies here instead.
+						</p>
+					{/if}
+
+					<!-- Separator -->
+					<div class="my-4 border-t border-orange-500/[0.08]"></div>
+
 					<!-- Create New sub-section -->
 					<div
 						class="mt-4 rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
@@ -748,265 +960,74 @@
 
 				<!-- Linked File Section -->
 				{#if activeSection === 'link'}
-					{#if fsAccessSupported}
-						<!-- Auto-save link controls -->
-						<div
-							class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
-						>
-							<div class="flex items-start gap-4">
-								{#if store.linkedFileStatus === 'active'}
-									<div
-										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
-									>
-										<svg
-											class="h-6 w-6 text-green-400"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
-											/>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M9 12l2 2 4-4"
-											/>
-										</svg>
-									</div>
-								{:else if store.linkedFileStatus === 'reconnect'}
-									<div
-										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-900"
-									>
-										<svg
-											class="h-6 w-6 text-amber-400"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
-											/>
-										</svg>
-									</div>
-								{:else if store.linkedFileStatus === 'not-found' || store.linkedFileStatus === 'write-error'}
-									<div
-										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-900"
-									>
-										<svg
-											class="h-6 w-6 text-red-400"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-											/>
-										</svg>
-									</div>
-								{:else}
-									<div
-										class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
-									>
-										<svg
-											class="h-6 w-6 text-orange-400"
-											fill="none"
-											stroke="currentColor"
-											viewBox="0 0 24 24"
-										>
-											<path
-												stroke-linecap="round"
-												stroke-linejoin="round"
-												stroke-width="2"
-												d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
-											/>
-										</svg>
-									</div>
-								{/if}
-								<div class="flex-1">
-									{#if store.linkedFileStatus === 'none'}
-										<h3 class="mb-2 text-lg font-semibold text-slate-100">
-											Link a File (Bring Your Own Cloud)
-										</h3>
-										<p class="mb-3 text-sm text-slate-400">
-											Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
-											iCloud, OneDrive) for cross-device sync with zero server involvement.
-										</p>
-										<div class="flex gap-2">
-											<button
-												onclick={() => linkFile()}
-												disabled={store.dbMode !== 'active'}
-												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
-											>
-												New File...
-											</button>
-											<button
-												onclick={() => linkExistingFile()}
-												disabled={store.dbMode !== 'active'}
-												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
-											>
-												Existing File...
-											</button>
-										</div>
-									{:else if store.linkedFileStatus === 'active'}
-										<h3 class="mb-2 text-lg font-semibold text-slate-100">
-											Linked: {store.linkedFileName}
-										</h3>
-										{#if lastSavedText}
-											<p class="mb-3 text-sm text-slate-400">
-												{lastSavedText}
-											</p>
-										{/if}
-										<p class="mb-4 text-sm text-slate-400">
-											Changes are automatically saved to this file.
-										</p>
-										<div class="flex gap-2">
-											<button
-												onclick={() => saveNow()}
-												disabled={store.linkedFileWriting}
-												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
-											>
-												{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
-											</button>
-											<button onclick={() => changeFile()} class="btn btn-subtle flex-1">
-												Change File...
-											</button>
-											<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
-												Unlink
-											</button>
-										</div>
-									{:else if store.linkedFileStatus === 'reconnect'}
-										<h3 class="mb-2 text-lg font-semibold text-slate-100">
-											File link needs reconnection
-										</h3>
-										<p class="mb-4 text-sm text-slate-400">
-											The browser needs your permission to access "{store.linkedFileName}" again.
-											Click Reconnect to re-grant access.
-										</p>
-										{#if store.linkedFilePermissionDenied}
-											<p
-												class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
-											>
-												Permission was denied. Reload the page to try again, or grant access in your
-												browser settings.
-											</p>
-										{/if}
-										<div class="flex gap-2">
-											<button
-												onclick={() => reconnectFile()}
-												disabled={store.linkedFilePermissionDenied}
-												class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
-											>
-												Reconnect
-											</button>
-											<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
-												Unlink
-											</button>
-										</div>
-									{:else if store.linkedFileStatus === 'not-found'}
-										<h3 class="mb-2 text-lg font-semibold text-slate-100">Linked file not found</h3>
-										<p class="mb-3 text-sm text-slate-400">
-											File not found — "{store.linkedFileName}" could not be located.
-										</p>
-										<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
-										<button onclick={() => unlinkFile()} class="btn btn-quiet"> Unlink </button>
-									{:else if store.linkedFileStatus === 'write-error'}
-										<h3 class="mb-2 text-lg font-semibold text-slate-100">File write error</h3>
-										{#if store.linkedFileError}
-											<p
-												class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
-											>
-												{store.linkedFileError}
-											</p>
-										{/if}
-										<p class="mb-3 text-sm text-slate-400">
-											Failed to write to "{store.linkedFileName}". The file may be locked or
-											inaccessible.
-										</p>
-										<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
-										<div class="flex gap-2">
-											<button onclick={() => retryWrite()} class="btn btn-subtle flex-1">
-												Retry
-											</button>
-											<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
-												Unlink
-											</button>
-										</div>
-									{/if}
-								</div>
-							</div>
-						</div>
-
-						<!-- Separator -->
-						<div class="my-4 border-t border-orange-500/[0.08]"></div>
-					{/if}
-
-					<!-- Download copy (all browsers) -->
+					<!-- Auto-save link controls -->
 					<div
 						class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
 					>
 						<div class="flex items-start gap-4">
-							<div
-								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
-							>
-								<svg
-									class="h-6 w-6 text-orange-400"
-									fill="none"
-									stroke="currentColor"
-									viewBox="0 0 24 24"
-								>
-									<path
-										stroke-linecap="round"
-										stroke-linejoin="round"
-										stroke-width="2"
-										d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-									></path>
-								</svg>
-							</div>
-							<div class="flex-1">
-								<h3 class="mb-2 text-lg font-semibold text-slate-100">Download copy</h3>
-								<p class="mb-4 text-sm text-slate-400">
-									Download a full copy of your database (collection + all card lists).
-								</p>
-								{#if exportBackupSuccess}
-									<div
-										class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
-									>
-										Download started.
-									</div>
-								{/if}
-								<button
-									onclick={handleExportBackup}
-									disabled={isExportingBackup}
-									class="btn btn-subtle flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
-								>
-									{isExportingBackup ? 'Preparing…' : 'Download .yjs file'}
-								</button>
-							</div>
-						</div>
-					</div>
-
-					{#if !fsAccessSupported}
-						<!-- Separator -->
-						<div class="my-4 border-t border-orange-500/[0.08]"></div>
-
-						<!-- Restore from file (Firefox fallback) -->
-						<div
-							class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
-						>
-							<div class="flex items-start gap-4">
+							{#if store.linkedFileStatus === 'active'}
 								<div
-									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-800"
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-green-900"
+								>
+									<svg
+										class="h-6 w-6 text-green-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M3 15a4 4 0 004 4h9a5 5 0 10-.1-9.999 5.002 5.002 0 10-9.78 2.096A4.001 4.001 0 003 15z"
+										/>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M9 12l2 2 4-4"
+										/>
+									</svg>
+								</div>
+							{:else if store.linkedFileStatus === 'reconnect'}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-amber-900"
+								>
+									<svg
+										class="h-6 w-6 text-amber-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-2.694-.833-3.464 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"
+										/>
+									</svg>
+								</div>
+							{:else if store.linkedFileStatus === 'not-found' || store.linkedFileStatus === 'write-error'}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-red-900"
+								>
+									<svg
+										class="h-6 w-6 text-red-400"
+										fill="none"
+										stroke="currentColor"
+										viewBox="0 0 24 24"
+									>
+										<path
+											stroke-linecap="round"
+											stroke-linejoin="round"
+											stroke-width="2"
+											d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+										/>
+									</svg>
+								</div>
+							{:else}
+								<div
+									class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full border border-orange-500/[0.12] bg-orange-500/10"
 								>
 									<svg
 										class="h-6 w-6 text-orange-400"
@@ -1018,100 +1039,124 @@
 											stroke-linecap="round"
 											stroke-linejoin="round"
 											stroke-width="2"
-											d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-										></path>
+											d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+										/>
 									</svg>
 								</div>
-								<div class="flex-1">
-									<h3 class="mb-2 text-lg font-semibold text-slate-100">Restore from file</h3>
-									<p class="mb-4 text-sm text-slate-400">
-										Restore your database from a previously downloaded copy. This replaces all
-										current data.
+							{/if}
+							<div class="flex-1">
+								{#if store.linkedFileStatus === 'none'}
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">
+										Link a File (Bring Your Own Cloud)
+									</h3>
+									<p class="mb-3 text-sm text-slate-400">
+										Save your data to a file on disk. Place it in a cloud-synced folder (Dropbox,
+										iCloud, OneDrive) for cross-device sync with zero server involvement.
 									</p>
-									<input
-										type="file"
-										accept=".yjs,.json"
-										bind:this={fileInput}
-										onchange={handleFileSelect}
-										disabled={isLoadingFile}
-										class="mb-3 block w-full text-sm text-slate-400 file:mr-4 file:rounded-lg file:border-0 file:bg-slate-700 file:px-4 file:py-2 file:text-sm file:font-semibold file:text-orange-400 hover:file:bg-slate-600 disabled:cursor-not-allowed disabled:opacity-50"
-									/>
-									{#if selectedFile && !importResult && !importError}
-										<p class="mb-1 text-xs text-slate-400">
-											Selected file: {selectedFile.name}
+									<div class="flex gap-2">
+										<button
+											onclick={() => linkFile()}
+											disabled={store.dbMode !== 'active'}
+											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
+										>
+											New File...
+										</button>
+										<button
+											onclick={() => linkExistingFile()}
+											disabled={store.dbMode !== 'active'}
+											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
+										>
+											Existing File...
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'active'}
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">
+										Linked: {store.linkedFileName}
+									</h3>
+									{#if lastSavedText}
+										<p class="mb-3 text-sm text-slate-400">
+											{lastSavedText}
 										</p>
 									{/if}
-									{#if importPreview && !importResult}
-										<p class="mb-3 text-xs text-slate-500" data-testid="restore-preview">
-											{importPreview}
+									<p class="mb-4 text-sm text-slate-400">
+										Changes are automatically saved to this file.
+									</p>
+									<div class="flex gap-2">
+										<button
+											onclick={() => saveNow()}
+											disabled={store.linkedFileWriting}
+											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
+										>
+											{store.linkedFileWriting ? 'Saving…' : 'Save Now'}
+										</button>
+										<button onclick={() => changeFile()} class="btn btn-subtle flex-1">
+											Change File...
+										</button>
+										<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
+											Unlink
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'reconnect'}
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">
+										File link needs reconnection
+									</h3>
+									<p class="mb-4 text-sm text-slate-400">
+										The browser needs your permission to access "{store.linkedFileName}" again.
+										Click Reconnect to re-grant access.
+									</p>
+									{#if store.linkedFilePermissionDenied}
+										<p
+											class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
+										>
+											Permission was denied. Reload the page to try again, or grant access in your
+											browser settings.
 										</p>
 									{/if}
-									{#if importResult}
-										{#if importResult.errors === 0}
-											<div
-												class="mb-3 rounded-lg border border-green-800 bg-green-950 p-3 text-sm text-green-400"
-											>
-												Restored {importResult.imported} list{importResult.imported !== 1
-													? 's'
-													: ''} successfully.
-											</div>
-										{:else}
-											<div
-												class="mb-3 rounded-lg border border-amber-800 bg-amber-950 p-3 text-sm text-amber-400"
-											>
-												Restored {importResult.imported}, failed {importResult.errors}.
-											</div>
-										{/if}
-									{/if}
-									{#if importError}
-										<div
+									<div class="flex gap-2">
+										<button
+											onclick={() => reconnectFile()}
+											disabled={store.linkedFilePermissionDenied}
+											class="btn btn-subtle flex-1 disabled:cursor-not-allowed"
+										>
+											Reconnect
+										</button>
+										<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
+											Unlink
+										</button>
+									</div>
+								{:else if store.linkedFileStatus === 'not-found'}
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">Linked file not found</h3>
+									<p class="mb-3 text-sm text-slate-400">
+										File not found — "{store.linkedFileName}" could not be located.
+									</p>
+									<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
+									<button onclick={() => unlinkFile()} class="btn btn-quiet"> Unlink </button>
+								{:else if store.linkedFileStatus === 'write-error'}
+									<h3 class="mb-2 text-lg font-semibold text-slate-100">File write error</h3>
+									{#if store.linkedFileError}
+										<p
 											class="mb-3 rounded-lg border border-red-800 bg-red-950 p-3 text-sm text-red-400"
 										>
-											{importError}
-										</div>
+											{store.linkedFileError}
+										</p>
 									{/if}
-									<button
-										onclick={handleLoadFile}
-										disabled={!selectedFile ||
-											!importPreview ||
-											isLoadingFile ||
-											importResult !== null}
-										class="btn btn-primary flex w-full items-center justify-center gap-2 disabled:cursor-not-allowed"
-									>
-										{#if isLoadingFile}
-											<svg
-												class="h-4 w-4 animate-spin"
-												xmlns="http://www.w3.org/2000/svg"
-												fill="none"
-												viewBox="0 0 24 24"
-											>
-												<circle
-													class="opacity-25"
-													cx="12"
-													cy="12"
-													r="10"
-													stroke="currentColor"
-													stroke-width="4"
-												/>
-												<path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-											</svg>
-											{#if importTotal > 0}
-												Restoring… ({importCurrent}/{importTotal} lists)
-											{:else}
-												Restoring…
-											{/if}
-										{:else}
-											Restore from file
-										{/if}
-									</button>
-								</div>
+									<p class="mb-3 text-sm text-slate-400">
+										Failed to write to "{store.linkedFileName}". The file may be locked or
+										inaccessible.
+									</p>
+									<p class="mb-4 text-sm text-green-400">Your data is safe in the browser.</p>
+									<div class="flex gap-2">
+										<button onclick={() => retryWrite()} class="btn btn-subtle flex-1">
+											Retry
+										</button>
+										<button onclick={() => unlinkFile()} class="btn btn-quiet flex-1">
+											Unlink
+										</button>
+									</div>
+								{/if}
 							</div>
 						</div>
-
-						<p class="mt-4 text-xs text-slate-500">
-							Auto-save to a linked file requires Chrome 86+, Edge 86+, or Safari 15.2+.
-						</p>
-					{/if}
+					</div>
 				{/if}
 
 				<!-- Image Cache Section -->
@@ -1377,6 +1422,48 @@
 						controls.
 					</p>
 				</div>
+			</div>
+		</div>
+	</div>
+{/if}
+
+<!-- Restore Confirmation — only shown when there is data the restore would replace -->
+{#if showRestoreConfirm}
+	<div
+		class="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		onclick={() => (showRestoreConfirm = false)}
+		role="dialog"
+		aria-modal="true"
+		aria-label="Confirm restore"
+	>
+		<div
+			class="panel mx-4 w-full max-w-md rounded-xl p-6 shadow-2xl"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<h3 class="mb-3 text-lg font-bold text-slate-100">Restore over your database?</h3>
+			<p class="mb-3 text-sm text-slate-400">
+				Restoring <strong class="text-red-400">replaces</strong> your
+				{store.savedCardLists.length} card list{store.savedCardLists.length === 1 ? '' : 's'} and
+				{store.uniqueOwnedCards} collection card{store.uniqueOwnedCards === 1 ? '' : 's'} with the contents
+				of this file.
+			</p>
+			{#if importPreview}
+				<p
+					class="mb-3 rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-xs text-slate-400"
+				>
+					{importPreview}
+				</p>
+			{/if}
+			<p class="mb-5 text-sm text-slate-500">
+				This action cannot be undone. Download a copy first if you may want the current data back.
+			</p>
+			<div class="flex gap-3">
+				<button onclick={() => (showRestoreConfirm = false)} class="btn btn-quiet flex-1">
+					Cancel
+				</button>
+				<button onclick={handleLoadFile} class="btn btn-danger flex-1">
+					Replace and Restore
+				</button>
 			</div>
 		</div>
 	</div>
