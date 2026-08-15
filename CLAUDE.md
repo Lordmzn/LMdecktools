@@ -69,6 +69,12 @@ Every write prunes to `MAX_ENTRIES` (100) and `MAX_AGE_DAYS` (30). The journal i
 
 Reporting goes through `buildGitHubIssueUrl()`, which pre-fills GitHub's issue form (body truncated to ~8000 chars). `github.com` is in the `docs/project-vision.md` §5.5 host table for that reason; the /diagnostics page shows the full body before opening the tab, so nothing leaves the device unseen.
 
+### Feedback Colours
+
+Non-chrome colour is tokenised in `src/app.css` under `@theme` and split into two lanes (#40) — an **alarm** lane (`--color-success` / `--color-warning` / `--color-danger`, each with `-surface` / `-edge` / `-solid`) and a **categorical** lane (`--color-cat-*`, six hues at matched OKLCH lightness for compare columns and diagnostics chips). The full rationale, the values, and the rules for picking a lane are in `docs/wireframes.md` § Feedback Colours.
+
+Two things to know before touching any of it: **never reach for a raw Tailwind hue utility** (`text-amber-400`, `bg-sky-500`) — the tokens exist so a retune is one edit, and inline hues are exactly how `sky` / `emerald` / `purple` once ended up in the app with no token behind them. And **every `-solid` fill takes a `text-slate-950` label**, not white or `slate-100`, which fail AA on them. Warning is brass rather than amber on purpose: amber sat 11° from the brand accent in OKLCH and read as a second, wrong primary.
+
 ### Routing
 
 SvelteKit file-based routing. Current routes: `/` (home), `/collection`, `/card-lists`, `/card-lists/compare`, `/diagnostics` (linked from the footer, not the main nav).
