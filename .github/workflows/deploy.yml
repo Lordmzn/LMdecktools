@@ -4,8 +4,11 @@
 # credentials can write anywhere under lordmzn.it — including the main site in
 # /htdocs. Three things keep that from mattering:
 #
-#   1. SERVER_DIR is explicit and scoped to the subdomain folder. The guard step
-#      below refuses to run if it is ever edited to something shallower.
+#   1. SERVER_DIR is explicit and scoped to this app's subfolder. The guard step
+#      below refuses to run if it is ever edited to something shallower. It is a
+#      plain env value rather than a secret or a variable on purpose: changing
+#      the deploy target should require a reviewable diff, not repo-admin access.
+#      See "Configuration surface" in docs/deployment.md.
 #   2. `dangerous-clean-slate` is never set. The action syncs against a manifest
 #      it keeps on the server and only deletes files it previously uploaded, so
 #      it cannot remove anything it did not put there.

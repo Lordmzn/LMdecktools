@@ -160,13 +160,34 @@ on manual dispatch (which offers a `dry-run` checkbox that logs what would be
 uploaded without touching the server — use it after any change to the target
 path).
 
-It needs three repo secrets:
+### Configuration surface
 
-| Secret | Value |
-| --- | --- |
-| `FTP_SERVER` | `ftp.lordmzn.it` |
-| `FTP_USERNAME` | `lordmzn.it` |
-| `FTP_PASSWORD` | set in the Tophost panel |
+Everything the deploy reads, and where each value lives:
+
+| Name | Kind | Where it is set | Value |
+| --- | --- | --- | --- |
+| `FTP_SERVER` | repo secret | GitHub → Settings → Secrets | `ftp.lordmzn.it` |
+| `FTP_USERNAME` | repo secret | GitHub → Settings → Secrets | `lordmzn.it` |
+| `FTP_PASSWORD` | repo secret | GitHub → Settings → Secrets | set in the Tophost panel |
+| `SERVER_DIR` | plain `env:` | `.github/workflows/deploy.yml` | `/htdocs/decktools/` |
+
+**`SERVER_DIR` is deliberately not a secret, and not a repo variable.** Three
+reasons, the last one being the point:
+
+1. It is a path, not a credential — disclosure harms nothing.
+2. GitHub masks secret values in logs, so the guard step's `Deploying to …`
+   line would print `***` and a misdirected deploy would be undiagnosable.
+3. It is the single value standing between a merge and the main website.
+   In the workflow file, changing it requires a pull request and shows up as a
+   diff. As a secret or a variable it could be repointed at `/htdocs` silently,
+   by anyone with repo admin, with no review and no history.
+
+The three credentials are secrets for the opposite reason: they are useless to
+review and harmful to disclose.
+
+Note the FTP account is the same one `Lordmzn/personal-website` uses. Rotating
+the password in the Tophost panel invalidates both; update the secret in each
+repo that still needs it.
 
 ### Why the target directory is guarded
 
