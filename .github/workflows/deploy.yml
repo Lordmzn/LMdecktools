@@ -1,0 +1,75 @@
+# Deploys build/ to decktools.lordmzn.it on Tophost (#25).
+#
+# Tophost offers exactly one FTP account for the whole domain, so these
+# credentials can write anywhere under lordmzn.it — including the main site in
+# /htdocs. Three things keep that from mattering:
+#
+#   1. SERVER_DIR is explicit and scoped to the subdomain folder. The guard step
+#      below refuses to run if it is ever edited to something shallower.
+#   2. `dangerous-clean-slate` is never set. The action syncs against a manifest
+#      it keeps on the server and only deletes files it previously uploaded, so
+#      it cannot remove anything it did not put there.
+#   3. Nothing here has write access to the repo (no `permissions:` block means
+#      read-only for a workflow that never needs a token).
+
+name: Deploy
+
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Log what would be uploaded, upload nothing'
+        type: boolean
+        default: false
+
+# Two deploys overlapping would interleave uploads into one directory. Queue
+# rather than cancel: a half-finished deploy is worse than a slow one.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  # The subdomain's document root. Tophost serves sites out of /htdocs; the
+  # main website is /htdocs itself, so this MUST stay a subfolder of it.
+  SERVER_DIR: /htdocs/decktools/
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache: pnpm
+
+      - run: pnpm install
+      - run: pnpm run build
+
+      # A typo here would point a deleting sync at the main website. Cheap
+      # insurance: require at least one path segment below /htdocs.
+      - name: Guard the target directory
+        run: |
+          case "$SERVER_DIR" in
+            /htdocs/?*/*) ;;
+            *)
+              echo "::error::SERVER_DIR must be a folder under /htdocs, got '$SERVER_DIR'"
+              exit 1
+              ;;
+          esac
+          echo "Deploying to $SERVER_DIR"
+
+      - name: Upload to Tophost
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          # Explicit TLS on port 21. `ftps-legacy` would be implicit TLS on 990.
+          protocol: ftps
+          local-dir: ./build/
+          server-dir: ${{ env.SERVER_DIR }}
+          dry-run: ${{ inputs.dry-run == true }}

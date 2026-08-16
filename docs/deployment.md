@@ -8,8 +8,14 @@ How LM Deck Tools gets from `pnpm run build` onto the public web (#25).
 | --- | --- |
 | URL | `https://decktools.lordmzn.it` |
 | Host | Tophost (shared Apache, `.htaccess` with mod_rewrite + mod_headers) |
-| Transport | FTP / FTPS |
+| Transport | FTPS, explicit TLS, port 21 — `ftp.lordmzn.it` |
+| FTP user | `lordmzn.it` — **one account for the whole domain** |
+| Document root | `/htdocs/decktools/` |
 | Build output | `build/` — ~1 MB across ~60 files, against 200 MB of quota |
+
+The FTP account's home contains `/.htaccess`, `/cgi-bin/`, `/conf/` and
+`/htdocs/`. Sites live under `/htdocs`; the **main website is `/htdocs` itself**,
+and this app is a subfolder of it.
 
 A **subdomain**, not `lordmzn.it/decktools`. A subfolder would force
 `kit.paths.base = '/decktools'`, and that is a build-time constant: the same
@@ -53,8 +59,25 @@ before automating anything.
 
 ```bash
 pnpm run build
-# then upload build/ to the subdomain's document root, _app/ first.
+# then upload the *contents* of build/ into /htdocs/decktools/, _app/ first.
 ```
+
+Two things to confirm in the panel before the first automated run, since a push
+to `master` now triggers one:
+
+- **The subdomain's document root is really `/htdocs/decktools/`.** Whatever
+  folder the panel creates for `decktools.lordmzn.it` is what `SERVER_DIR` in
+  the workflow must say. A mismatch does not damage the main site — the guard
+  and the manifest see to that — but it silently deploys to a folder nothing
+  serves.
+- **FTP is not IP-restricted.** GitHub Actions runners have rotating egress IPs;
+  an allowlist on the account makes the job fail unpredictably.
+
+Also worth checking once the subdomain exists: whether `/htdocs/.htaccess` from
+the main site applies to it. If the subdomain's document root sits *below*
+`/htdocs`, Apache may merge the parent's rules — a catch-all rewrite there would
+break routing here in a way that reproduces on neither `preview` nor a local
+static server.
 
 Verify afterwards:
 
@@ -67,63 +90,62 @@ curl -sI https://decktools.lordmzn.it/_app/immutable/entry/start.*.js \
 curl -s https://decktools.lordmzn.it/sitemap.xml | head -3
 ```
 
-## Automated deploy — blocked, by choice
+## Automated deploy
 
-Not wired up yet, and it should not be until two things are confirmed on the
-Tophost control panel:
+`.github/workflows/deploy.yml` builds and uploads on every push to `master`, and
+on manual dispatch (which offers a `dry-run` checkbox that logs what would be
+uploaded without touching the server — use it after any change to the target
+path).
 
-1. **FTPS (explicit TLS) is available.** Plain FTP sends the password in
-   cleartext on every run. A CI pipeline that does this on every push to `master`
-   is a standing credential leak, not a one-off risk.
-2. **FTP is not IP-restricted.** GitHub Actions runners have rotating egress IPs.
-   An allowlist on the account will make the job fail unpredictably.
+It needs three repo secrets:
 
-Once both hold, add repo secrets `FTP_SERVER`, `FTP_USERNAME`, `FTP_PASSWORD`
-and commit this as `.github/workflows/deploy.yml`:
+| Secret | Value |
+| --- | --- |
+| `FTP_SERVER` | `ftp.lordmzn.it` |
+| `FTP_USERNAME` | `lordmzn.it` |
+| `FTP_PASSWORD` | set in the Tophost panel |
 
-```yaml
-name: Deploy
+### Why the target directory is guarded
 
-on:
-  push:
-    branches: [master]
-  workflow_dispatch:
+Tophost sells one FTP account per domain, so this credential can write anywhere
+under `lordmzn.it` — the main website included. There is no way to scope it down
+at the host, so the scoping lives in the workflow:
 
-concurrency:
-  group: deploy
-  cancel-in-progress: false
+- `SERVER_DIR` is set once, explicitly, to `/htdocs/decktools/`, and a guard step
+  fails the job unless it is at least one level below `/htdocs`. `/htdocs/` and
+  `/` are rejected.
+- **`dangerous-clean-slate` is never set.** The action keeps a
+  `.ftp-deploy-sync-state.json` manifest on the server and deletes only files it
+  previously uploaded; on a first run with no manifest it deletes nothing. That
+  option bypasses all of it and wipes the target directory — it must stay out.
 
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run build
-      - name: Upload to Tophost
-        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
-        with:
-          server: ${{ secrets.FTP_SERVER }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          protocol: ftps
-          local-dir: ./build/
-          server-dir: ./
-```
+Related: `Lordmzn/personal-website` deploys the main site with
+`FTP-Deploy-Action@2.0.0` and `ARGS: --delete` and **no** remote directory, i.e.
+a deleting sync against the login root. It has no recorded runs and its Node 12
+toolchain no longer works, so it is dormant rather than dangerous — but it is
+worth disabling outright rather than leaving it one dependency-bump away from
+running again.
 
-The action keeps a manifest on the server and uploads only changed files, which
-also means it does not guarantee the assets-before-HTML order described above.
-For a site this small the exposure is a few seconds; if it ever bites, split it
-into two upload steps.
+### Credentials
 
-Note this deploys whatever lands on `master`. CI (lint, type-check, unit, E2E)
-runs on the same push but as a separate workflow — it does **not** gate this one.
-Add a `needs:` on the CI job if that matters more than deploy latency.
+The password is not recoverable. GitHub secrets are write-only — encrypted at
+rest and injected only into running jobs — and the Tophost panel resets rather
+than reveals. There is a known trick for making a workflow print its own secret
+to the run log; **do not use it here**, because `personal-website` is a public
+repository and its logs are world-readable. Reset the password instead, and
+update the secret in both repos if the other one is ever revived.
+
+### What it does not do
+
+CI (lint, type-check, unit, E2E) runs on the same push as a **separate**
+workflow and does not gate this one. A failing test therefore still deploys; a
+failing `pnpm run build` does not, since the job stops there. If gating matters
+more than deploy latency, switch the trigger to `workflow_run` on CI completion
+with `conclusion == 'success'`.
+
+The action uploads only changed files and does not guarantee the
+assets-before-HTML order described above. For a site this small the exposure is a
+few seconds; if it ever bites, split it into two upload steps.
 
 ## Privacy note
 
