@@ -5,14 +5,13 @@
 -->
 
 <script lang="ts">
+	import { base } from '$app/paths';
 	import JollyRoger from '$lib/components/JollyRoger.svelte';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 </script>
 
-<svelte:head>
-	<title>{m.home_meta_title()}</title>
-	<meta name="description" content={m.home_meta_description()} />
-</svelte:head>
+<PageMeta title={m.home_meta_title()} description={m.home_meta_description()} />
 
 <!-- HERO -->
 <section
@@ -172,7 +171,7 @@
 		class="fade-up relative mt-10 flex flex-wrap justify-center gap-3"
 		style="animation-delay: 0.5s"
 	>
-		<a href="/card-lists" class="btn btn-primary btn-lg">
+		<a href="{base}/card-lists" class="btn btn-primary btn-lg">
 			<svg
 				width="16"
 				height="16"
@@ -189,7 +188,7 @@
 			</svg>
 			{m.home_cta_card_lists()}
 		</a>
-		<a href="/collection" class="btn btn-ghost btn-lg">
+		<a href="{base}/collection" class="btn btn-ghost btn-lg">
 			<svg
 				width="16"
 				height="16"

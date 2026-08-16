@@ -18,6 +18,8 @@
 		logAppError
 	} from '$lib/store.svelte';
 	import type { ErrorCategory } from '$lib/error-journal';
+	import { base } from '$app/paths';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	/**
@@ -300,6 +302,8 @@
 	});
 </script>
 
+<PageMeta title={m.lists_meta_title()} description={m.lists_meta_description()} />
+
 <NotificationToast bind:show={showNotification} message={notificationMessage} />
 
 <!-- Add Cards Modal -->
@@ -518,7 +522,7 @@
 			</div>
 			<div class="flex items-center gap-2">
 				<a
-					href="/card-lists/compare"
+					href="{base}/card-lists/compare"
 					class="btn btn-quiet {store.savedCardLists.length < 2
 						? 'pointer-events-none opacity-50'
 						: ''}"

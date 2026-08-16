@@ -89,6 +89,8 @@
 	"home_article_4_title": "Codice trasparente.",
 	"home_article_4_body": "Ogni asse di questa nave è a vista. Nessuna stiva segreta.",
 
+	"collection_meta_title": "La mia collezione · LM Deck Tools",
+	"collection_meta_description": "Registra ogni carta di Magic: The Gathering che possiedi, cercane di nuove su Scryfall e tieni in ordine le quantità. La tua stiva resta sul tuo dispositivo.",
 	"collection_eyebrow": "La Stiva",
 	"collection_title": "La mia collezione",
 	"collection_count": "{total} carte ({unique} uniche)",
@@ -140,6 +142,8 @@
 	"card_edit_quantity_title": "Modifica quantità",
 	"card_quantity_label": "Quantità:",
 
+	"lists_meta_title": "Liste di carte · LM Deck Tools",
+	"lists_meta_description": "Costruisci, importa ed esporta mazzi e liste di carte di Magic: The Gathering. Ogni rotta che tracci resta nel tuo browser — niente account, niente server.",
 	"lists_label": "Liste",
 	"lists_none": "Nessuna lista",
 	"lists_delete_button": "Elimina lista",
@@ -181,6 +185,8 @@
 	"linked_toast_merge": "Unisci",
 	"linked_toast_ignore": "Ignora",
 
+	"compare_meta_title": "Confronta liste · LM Deck Tools",
+	"compare_meta_description": "Affianca due liste di carte di Magic: The Gathering e scopri cosa tiene ciascuna da sola e cosa hanno in comune.",
 	"compare_export_modal_title": "Esporta confronto",
 	"compare_need_two_lists": "Servono almeno due liste di carte da confrontare.",
 	"compare_back_to_lists": "Torna alle liste",
@@ -199,6 +205,7 @@
 	"compare_no_cards": "Nessuna carta",
 
 	"diagnostics_meta_title": "Diagnostica · LM Deck Tools",
+	"diagnostics_meta_description": "Gli errori che questa app ha registrato sul tuo dispositivo. Leggili, esportali o apri una segnalazione GitHub precompilata — da qui non parte nulla da solo.",
 	"diagnostics_eyebrow": "Il Giornale di Bordo",
 	"diagnostics_title": "Diagnostica",
 	"diagnostics_intro": "Gli errori in cui questa app è incappata, registrati sul tuo dispositivo e da nessun'altra parte. Nulla di quanto vedi qui viene inviato altrove, a meno che tu non lo esporti o scelga di aprire una segnalazione su GitHub. Il giornale conserva le ultime {maxEntries} voci e scarta tutto ciò che ha più di {maxAgeDays} giorni.",
@@ -391,5 +398,16 @@
 	"time_just_now": "proprio ora",
 	"time_minutes_ago": "{count} min fa",
 	"time_hours_ago": "{count} h fa",
-	"time_days_ago": "{count} g fa"
+	"time_days_ago": "{count} g fa",
+
+	"error_meta_title": "Fuori rotta · LM Deck Tools",
+	"error_meta_description": "Questa pagina non è sulla mappa.",
+	"error_eyebrow": "Fuori rotta",
+	"error_status": "Errore {status}",
+	"error_not_found_title": "Questo porto non è sulla mappa",
+	"error_not_found_body": "L'indirizzo che hai seguito non porta da nessuna parte in questa app. Non hai perso nulla: le tue liste e la tua collezione sono al sicuro nel browser.",
+	"error_generic_title": "Siamo finiti in secca",
+	"error_generic_body": "L'app ha incontrato un errore da cui non è riuscita a riprendersi. Le tue liste e la tua collezione sono salvate nel browser e non sono state toccate.",
+	"error_cta_home": "Torna in porto",
+	"error_cta_diagnostics": "Apri il giornale di bordo"
 }

@@ -3,6 +3,8 @@
 	import { compareCardLists, exportCompareToText, type CompareResult } from '$lib/compare';
 	import type { CardMatching, LanguageMatching } from '$lib/db';
 	import CompareColumn from './CompareColumn.svelte';
+	import { base } from '$app/paths';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	let indexA = $state(0);
@@ -28,6 +30,8 @@
 		showExportModal = true;
 	}
 </script>
+
+<PageMeta title={m.compare_meta_title()} description={m.compare_meta_description()} />
 
 <!-- Export Modal -->
 {#if showExportModal}
@@ -63,14 +67,16 @@
 	{#if lists.length < 2}
 		<div class="surface-card p-8 text-center">
 			<p class="mb-4 text-slate-400">{m.compare_need_two_lists()}</p>
-			<a href="/card-lists" class="btn btn-primary inline-block">{m.compare_back_to_lists()}</a>
+			<a href="{base}/card-lists" class="btn btn-primary inline-block"
+				>{m.compare_back_to_lists()}</a
+			>
 		</div>
 	{:else}
 		<!-- Header panel -->
 		<div class="surface-card mb-6 p-6">
 			<div class="mb-4 flex items-center gap-2">
 				<a
-					href="/card-lists"
+					href="{base}/card-lists"
 					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
 					title={m.compare_back_to_lists()}
 				>

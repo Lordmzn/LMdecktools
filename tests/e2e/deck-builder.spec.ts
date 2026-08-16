@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { appHref } from './base';
 
 // Scryfall API fixture data
 const MOCK_SEARCH_RESPONSE = {
@@ -88,7 +89,7 @@ async function mockScryfallAPI(page: import('@playwright/test').Page) {
 // All subsequent in-app navigation must use spaGoto (not page.goto) to
 // preserve the store module state across routes.
 async function setupWithDB(page: import('@playwright/test').Page) {
-	await page.goto('/');
+	await page.goto('./');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
 			const req = indexedDB.deleteDatabase('LMdecktools');
@@ -96,7 +97,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 			req.onerror = () => resolve();
 		});
 	});
-	await page.goto('/');
+	await page.goto('./');
 	await page.waitForLoadState('networkidle');
 
 	// Create a new DB via the modal
@@ -112,7 +113,10 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 // SPA navigation — clicks the first matching nav link so SvelteKit routes
 // client-side and the store module state (dbMode, savedCardLists, …) is preserved.
 async function spaGoto(page: import('@playwright/test').Page, href: string) {
-	await page.locator(`a[href="${href}"]`).first().click();
+	await page
+		.locator(`a[href="${appHref(href)}"]`)
+		.first()
+		.click();
 }
 
 // Helper: search for a card and add it via evaluate (bypasses the hover-reveal

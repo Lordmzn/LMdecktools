@@ -15,6 +15,7 @@
 		type ErrorCategory,
 		type ErrorEntry
 	} from '$lib/error-journal';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	let entries = $state<ErrorEntry[]>([]);
@@ -116,9 +117,7 @@
 	}
 </script>
 
-<svelte:head>
-	<title>{m.diagnostics_meta_title()}</title>
-</svelte:head>
+<PageMeta title={m.diagnostics_meta_title()} description={m.diagnostics_meta_description()} />
 
 <div class="mx-auto max-w-5xl p-4">
 	<div class="surface-card p-6">

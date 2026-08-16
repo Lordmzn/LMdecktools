@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 const SYNTHETIC_MESSAGE = 'E2E synthetic failure';
 
 test.beforeEach(async ({ page }) => {
-	await page.goto('/');
+	await page.goto('./');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
 			const req = indexedDB.deleteDatabase('LMdecktools');
@@ -14,7 +14,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 async function createDatabase(page: Page) {
-	await page.goto('/');
+	await page.goto('./');
 	await page.waitForLoadState('networkidle');
 	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
@@ -69,7 +69,7 @@ test.describe('Diagnostics', () => {
 
 		await waitForJournalEntry(page, SYNTHETIC_MESSAGE);
 
-		await page.goto('/diagnostics/');
+		await page.goto('./diagnostics/');
 
 		const entry = page.getByTestId('diagnostics-list').getByText(SYNTHETIC_MESSAGE);
 		await expect(entry).toBeVisible();
@@ -83,7 +83,7 @@ test.describe('Diagnostics', () => {
 		}, SYNTHETIC_MESSAGE);
 		await waitForJournalEntry(page, SYNTHETIC_MESSAGE);
 
-		await page.goto('/diagnostics/');
+		await page.goto('./diagnostics/');
 		await expect(page.getByText(SYNTHETIC_MESSAGE)).toBeVisible();
 
 		await page.getByTestId('diagnostics-category').selectOption('scryfall-api');
@@ -101,7 +101,7 @@ test.describe('Diagnostics', () => {
 		}, SYNTHETIC_MESSAGE);
 		await waitForJournalEntry(page, SYNTHETIC_MESSAGE);
 
-		await page.goto('/diagnostics/');
+		await page.goto('./diagnostics/');
 		await page.getByRole('button', { name: 'Clear All' }).click();
 		// Second match is the one inside the confirmation dialog
 		await page.getByRole('button', { name: 'Clear All' }).last().click();
@@ -116,7 +116,7 @@ test.describe('Diagnostics', () => {
 		}, SYNTHETIC_MESSAGE);
 		await waitForJournalEntry(page, SYNTHETIC_MESSAGE);
 
-		await page.goto('/diagnostics/');
+		await page.goto('./diagnostics/');
 		await page.getByRole('checkbox', { name: 'Select error for reporting' }).first().check();
 		await page.getByRole('button', { name: /Report .* on GitHub/ }).click();
 
@@ -126,7 +126,7 @@ test.describe('Diagnostics', () => {
 	});
 
 	test('says so plainly when no database is open', async ({ page }) => {
-		await page.goto('/diagnostics/');
+		await page.goto('./diagnostics/');
 
 		await expect(page.getByText('No database open')).toBeVisible();
 	});

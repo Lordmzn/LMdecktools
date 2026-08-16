@@ -679,6 +679,22 @@ export const home_article_4_body = () => `Ogni asse di questa nave è a vista. N
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const collection_meta_title = () => `La mia collezione · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const collection_meta_description = () => `Registra ogni carta di Magic: The Gathering che possiedi, cercane di nuove su Scryfall e tieni in ordine le quantità. La tua stiva resta sul tuo dispositivo.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const collection_eyebrow = () => `La Stiva`
 
 
@@ -1055,6 +1071,22 @@ export const card_quantity_label = () => `Quantità:`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const lists_meta_title = () => `Liste di carte · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const lists_meta_description = () => `Costruisci, importa ed esporta mazzi e liste di carte di Magic: The Gathering. Ogni rotta che tracci resta nel tuo browser — niente account, niente server.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const lists_label = () => `Liste`
 
 
@@ -1369,6 +1401,22 @@ export const linked_toast_ignore = () => `Ignora`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const compare_meta_title = () => `Confronta liste · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const compare_meta_description = () => `Affianca due liste di carte di Magic: The Gathering e scopri cosa tiene ciascuna da sola e cosa hanno in comune.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const compare_export_modal_title = () => `Esporta confronto`
 
 
@@ -1498,6 +1546,14 @@ export const compare_no_cards = () => `Nessuna carta`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const diagnostics_meta_title = () => `Diagnostica · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const diagnostics_meta_description = () => `Gli errori che questa app ha registrato sul tuo dispositivo. Leggili, esportali o apri una segnalazione GitHub precompilata — da qui non parte nulla da solo.`
 
 
 /**
@@ -2973,3 +3029,83 @@ export const time_hours_ago = (params) => `${params.count} h fa`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const time_days_ago = (params) => `${params.count} g fa`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_meta_title = () => `Fuori rotta · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_meta_description = () => `Questa pagina non è sulla mappa.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_eyebrow = () => `Fuori rotta`
+
+
+/**
+ * @param {{ status: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_status = (params) => `Errore ${params.status}`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_not_found_title = () => `Questo porto non è sulla mappa`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_not_found_body = () => `L'indirizzo che hai seguito non porta da nessuna parte in questa app. Non hai perso nulla: le tue liste e la tua collezione sono al sicuro nel browser.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_generic_title = () => `Siamo finiti in secca`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_generic_body = () => `L'app ha incontrato un errore da cui non è riuscita a riprendersi. Le tue liste e la tua collezione sono salvate nel browser e non sono state toccate.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_cta_home = () => `Torna in porto`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_cta_diagnostics = () => `Apri il giornale di bordo`

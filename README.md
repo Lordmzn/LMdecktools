@@ -114,12 +114,26 @@ messages/
 
 ## Routes
 
-| Path                  | Description                       |
-| --------------------- | --------------------------------- |
-| `/`                   | Home / landing page               |
-| `/collection`         | Collection management             |
-| `/card-lists`         | Card list manager                 |
-| `/card-lists/compare` | Side-by-side card list comparison |
+| Path                  | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `/`                   | Home / landing page                          |
+| `/collection`         | Collection management                        |
+| `/card-lists`         | Card list manager                            |
+| `/card-lists/compare` | Side-by-side card list comparison            |
+| `/diagnostics`        | Local error journal (linked from the footer) |
+
+Each route is prerendered to real HTML in both English (`/`) and Italian (`/it-it/`).
+
+## Deployment
+
+The build is a folder of static files — any file server will do. It is deployed
+to `https://www.lordmzn.it/decktools/`, EU-hosted, with no CDN or third-party
+edge in the serving path.
+
+Note that this means the app is served from a **base path**, which `pnpm run dev`
+and `pnpm run preview` reproduce — the local app lives at `/decktools/` too, and
+internal links must be written `href="{base}/..."`. See
+[`docs/deployment.md`](docs/deployment.md).
 
 ## Built With
 

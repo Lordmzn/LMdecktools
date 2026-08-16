@@ -679,6 +679,22 @@ export const home_article_4_body = () => `Every plank of this ship is visible. N
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const collection_meta_title = () => `My Collection · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const collection_meta_description = () => `Log every Magic: The Gathering card you own, search Scryfall for new ones, and keep quantities straight. Your hold is stored on your own device.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const collection_eyebrow = () => `The Hold`
 
 
@@ -1055,6 +1071,22 @@ export const card_quantity_label = () => `Quantity:`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const lists_meta_title = () => `Card Lists · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const lists_meta_description = () => `Build, import and export Magic: The Gathering decks and card lists. Every chart you draw stays in your browser — no account, no server.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const lists_label = () => `Lists`
 
 
@@ -1369,6 +1401,22 @@ export const linked_toast_ignore = () => `Ignore`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const compare_meta_title = () => `Compare Lists · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const compare_meta_description = () => `Lay two Magic: The Gathering card lists side by side and see what each one holds alone and what they share.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const compare_export_modal_title = () => `Export Comparison`
 
 
@@ -1498,6 +1546,14 @@ export const compare_no_cards = () => `No cards`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const diagnostics_meta_title = () => `Diagnostics · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const diagnostics_meta_description = () => `Errors this app recorded on your device. Read them, export them, or open a pre-filled GitHub issue — nothing leaves your device on its own.`
 
 
 /**
@@ -2973,3 +3029,83 @@ export const time_hours_ago = (params) => `${params.count}h ago`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const time_days_ago = (params) => `${params.count}d ago`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_meta_title = () => `Off the charts · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_meta_description = () => `This page is not on the map.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_eyebrow = () => `Off the charts`
+
+
+/**
+ * @param {{ status: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_status = (params) => `Error ${params.status}`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_not_found_title = () => `This port isn't on the map`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_not_found_body = () => `The address you followed doesn't lead anywhere in this app. Nothing was lost — your lists and collection live in your browser, untouched.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_generic_title = () => `Something ran aground`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_generic_body = () => `The app hit an error it couldn't recover from. Your lists and collection are stored in your browser and were not affected.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_cta_home = () => `Back to port`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const error_cta_diagnostics = () => `Open the log book`

@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Helper: wipe IndexedDB and land on a page with no database at all
 async function resetDB(page: import('@playwright/test').Page) {
-	await page.goto('/');
+	await page.goto('./');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
 			const req = indexedDB.deleteDatabase('LMdecktools');
@@ -10,7 +10,7 @@ async function resetDB(page: import('@playwright/test').Page) {
 			req.onerror = () => resolve();
 		});
 	});
-	await page.goto('/');
+	await page.goto('./');
 	await page.waitForLoadState('networkidle');
 }
 
