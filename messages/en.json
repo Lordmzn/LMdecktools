@@ -89,6 +89,8 @@
 	"home_article_4_title": "Transparent code.",
 	"home_article_4_body": "Every plank of this ship is visible. No hidden compartments.",
 
+	"collection_meta_title": "My Collection · LM Deck Tools",
+	"collection_meta_description": "Log every Magic: The Gathering card you own, search Scryfall for new ones, and keep quantities straight. Your hold is stored on your own device.",
 	"collection_eyebrow": "The Hold",
 	"collection_title": "My Collection",
 	"collection_count": "{total} cards ({unique} unique)",
@@ -140,6 +142,8 @@
 	"card_edit_quantity_title": "Edit Quantity",
 	"card_quantity_label": "Quantity:",
 
+	"lists_meta_title": "Card Lists · LM Deck Tools",
+	"lists_meta_description": "Build, import and export Magic: The Gathering decks and card lists. Every chart you draw stays in your browser — no account, no server.",
 	"lists_label": "Lists",
 	"lists_none": "No lists",
 	"lists_delete_button": "Delete List",
@@ -181,6 +185,8 @@
 	"linked_toast_merge": "Merge",
 	"linked_toast_ignore": "Ignore",
 
+	"compare_meta_title": "Compare Lists · LM Deck Tools",
+	"compare_meta_description": "Lay two Magic: The Gathering card lists side by side and see what each one holds alone and what they share.",
 	"compare_export_modal_title": "Export Comparison",
 	"compare_need_two_lists": "You need at least two card lists to compare.",
 	"compare_back_to_lists": "Back to Card Lists",
@@ -199,6 +205,7 @@
 	"compare_no_cards": "No cards",
 
 	"diagnostics_meta_title": "Diagnostics · LM Deck Tools",
+	"diagnostics_meta_description": "Errors this app recorded on your device. Read them, export them, or open a pre-filled GitHub issue — nothing leaves your device on its own.",
 	"diagnostics_eyebrow": "The Log Book",
 	"diagnostics_title": "Diagnostics",
 	"diagnostics_intro": "Errors this app ran into, recorded on your device and nowhere else. Nothing here is sent anywhere unless you export it or choose to open a GitHub issue. The journal keeps the last {maxEntries} entries and drops anything older than {maxAgeDays} days.",
@@ -391,5 +398,16 @@
 	"time_just_now": "just now",
 	"time_minutes_ago": "{count} min ago",
 	"time_hours_ago": "{count}h ago",
-	"time_days_ago": "{count}d ago"
+	"time_days_ago": "{count}d ago",
+
+	"error_meta_title": "Off the charts · LM Deck Tools",
+	"error_meta_description": "This page is not on the map.",
+	"error_eyebrow": "Off the charts",
+	"error_status": "Error {status}",
+	"error_not_found_title": "This port isn't on the map",
+	"error_not_found_body": "The address you followed doesn't lead anywhere in this app. Nothing was lost — your lists and collection live in your browser, untouched.",
+	"error_generic_title": "Something ran aground",
+	"error_generic_body": "The app hit an error it couldn't recover from. Your lists and collection are stored in your browser and were not affected.",
+	"error_cta_home": "Back to port",
+	"error_cta_diagnostics": "Open the log book"
 }

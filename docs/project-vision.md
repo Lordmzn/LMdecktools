@@ -128,4 +128,6 @@ Absolute Privacy is a claim about *where data goes*, so the set of hosts this ap
 
 Collection contents, card lists, and the linked file are never transmitted to any of them — a card name leaves the device only because resolving it is the whole point of the request. No analytics, no automatic error reporting, no fonts or scripts from a CDN: the build is fully self-hosted and static. The error journal behind /diagnostics (#30) is written to local IndexedDB and stays there; reporting one is a navigation the user initiates, having read exactly what it carries, not a background upload.
 
+One honest footnote, since "no server" invites a stronger reading than is true: the site is *served* from a static host (see `docs/deployment.md`), and that host's web server writes ordinary access logs — visitor IP, requested path — as every web server does. That is infrastructure logging outside the app's control, not collection by LM Deck Tools, and nothing about it puts collection data, card lists, or the linked file anywhere but the device. No analytics, no cookies, no third-party scripts are added on top of it.
+
 Adding a host to this table is a deliberate decision, not an implementation detail. Anything that would fetch in the background, rather than in direct response to a user action, does not belong here at all.

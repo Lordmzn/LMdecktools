@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+
+# The app holds no user data server-side, so there is nothing to hide from a
+# crawler — but the build assets are noise in an index.
+Disallow: /_app/
+
+Sitemap: https://decktools.lordmzn.it/sitemap.xml

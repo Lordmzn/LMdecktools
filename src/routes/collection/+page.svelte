@@ -11,6 +11,7 @@
 		logAppError
 	} from '$lib/store.svelte';
 	import type { ErrorCategory } from '$lib/error-journal';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	/**
@@ -168,6 +169,8 @@
 		}, 3000);
 	}
 </script>
+
+<PageMeta title={m.collection_meta_title()} description={m.collection_meta_description()} />
 
 <NotificationToast bind:show={showNotification} message={notificationMessage} />
 

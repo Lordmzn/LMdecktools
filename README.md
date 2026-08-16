@@ -114,12 +114,21 @@ messages/
 
 ## Routes
 
-| Path                  | Description                       |
-| --------------------- | --------------------------------- |
-| `/`                   | Home / landing page               |
-| `/collection`         | Collection management             |
-| `/card-lists`         | Card list manager                 |
-| `/card-lists/compare` | Side-by-side card list comparison |
+| Path                  | Description                                  |
+| --------------------- | -------------------------------------------- |
+| `/`                   | Home / landing page                          |
+| `/collection`         | Collection management                        |
+| `/card-lists`         | Card list manager                            |
+| `/card-lists/compare` | Side-by-side card list comparison            |
+| `/diagnostics`        | Local error journal (linked from the footer) |
+
+Each route is prerendered to real HTML in both English (`/`) and Italian (`/it-it/`).
+
+## Deployment
+
+The build is a folder of static files — any file server will do. See
+[`docs/deployment.md`](docs/deployment.md) for the target host, the `.htaccess`
+that ships with the build, and how to verify a deploy.
 
 ## Built With
 

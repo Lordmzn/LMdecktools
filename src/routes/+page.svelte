@@ -6,13 +6,11 @@
 
 <script lang="ts">
 	import JollyRoger from '$lib/components/JollyRoger.svelte';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 </script>
 
-<svelte:head>
-	<title>{m.home_meta_title()}</title>
-	<meta name="description" content={m.home_meta_description()} />
-</svelte:head>
+<PageMeta title={m.home_meta_title()} description={m.home_meta_description()} />
 
 <!-- HERO -->
 <section

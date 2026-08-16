@@ -3,6 +3,7 @@
 	import { compareCardLists, exportCompareToText, type CompareResult } from '$lib/compare';
 	import type { CardMatching, LanguageMatching } from '$lib/db';
 	import CompareColumn from './CompareColumn.svelte';
+	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	let indexA = $state(0);
@@ -28,6 +29,8 @@
 		showExportModal = true;
 	}
 </script>
+
+<PageMeta title={m.compare_meta_title()} description={m.compare_meta_description()} />
 
 <!-- Export Modal -->
 {#if showExportModal}
