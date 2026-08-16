@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { base } from '$app/paths';
 	import LanguageSwitcher from '$lib/components/LanguageSwitcher.svelte';
 	import * as m from '$lib/paraglide/messages';
 </script>
@@ -45,7 +46,7 @@
 				<ul class="flex flex-wrap items-center gap-x-6 gap-y-2">
 					<li>
 						<a
-							href="/diagnostics/"
+							href="{base}/diagnostics/"
 							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
 							>{m.footer_diagnostics()}</a
 						>

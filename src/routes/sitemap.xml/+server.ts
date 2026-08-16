@@ -1,4 +1,4 @@
-import { SITE_URL } from '$lib/site';
+import { SITE_URL, BASE_PATH } from '$lib/site';
 import type { RequestHandler } from './$types';
 
 export const prerender = true;
@@ -25,8 +25,9 @@ const ROUTES: { path: string; priority: string }[] = [
 /** Locale → URL prefix. English is served at the root, Italian under /it-it. */
 const LOCALE_PREFIXES: Record<string, string> = { en: '', 'it-it': '/it-it' };
 
+/** Base first, then locale — the order SvelteKit and Paraglide serialise them in. */
 function localisedUrl(locale: string, path: string): string {
-	return `${SITE_URL}${LOCALE_PREFIXES[locale]}${path}`;
+	return `${SITE_URL}${BASE_PATH}${LOCALE_PREFIXES[locale]}${path}`;
 }
 
 export const GET: RequestHandler = () => {

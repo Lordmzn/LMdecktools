@@ -1,9 +1,14 @@
 <script lang="ts">
 	import { page } from '$app/stores';
+	import { base } from '$app/paths';
 	import BrandMark from '$lib/components/BrandMark.svelte';
+	import { i18n } from '$lib/i18n';
+	import { appRoute } from '$lib/site';
 	import * as m from '$lib/paraglide/messages';
 
-	let currentPath = $derived($page.url.pathname);
+	// The live pathname carries a base path, a locale prefix and a trailing
+	// slash; none of those belong in a comparison against `/collection`.
+	let currentPath = $derived(appRoute(i18n.route($page.url.pathname), base));
 	let isHomeActive = $derived(currentPath === '/');
 	let isCardListsActive = $derived(currentPath.startsWith('/card-lists'));
 	let isCollectionActive = $derived(currentPath === '/collection');
@@ -17,14 +22,14 @@
 <!-- Brand mark + tab navigation -->
 <nav class="flex min-w-0 items-center gap-0.5">
 	<!-- Skull-and-tricorn brand mark -->
-	<a href="/" class="mr-2 flex shrink-0 items-center gap-2 sm:mr-4">
+	<a href="{base}/" class="mr-2 flex shrink-0 items-center gap-2 sm:mr-4">
 		<BrandMark class="h-7 w-7" />
 		<span class="hidden text-[0.95rem] font-bold tracking-tight text-orange-50 sm:inline"
 			>LM Deck Tools</span
 		>
 	</a>
 
-	<a href="/" class="{linkBase} {isHomeActive ? linkActive : linkIdle}">
+	<a href="{base}/" class="{linkBase} {isHomeActive ? linkActive : linkIdle}">
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			width="16"
@@ -43,7 +48,7 @@
 		<span class="sr-only sm:not-sr-only">{m.nav_home()}</span>
 	</a>
 
-	<a href="/collection" class="{linkBase} {isCollectionActive ? linkActive : linkIdle}">
+	<a href="{base}/collection" class="{linkBase} {isCollectionActive ? linkActive : linkIdle}">
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			width="16"
@@ -62,7 +67,7 @@
 		<span class="sr-only sm:not-sr-only">{m.nav_collection()}</span>
 	</a>
 
-	<a href="/card-lists" class="{linkBase} {isCardListsActive ? linkActive : linkIdle}">
+	<a href="{base}/card-lists" class="{linkBase} {isCardListsActive ? linkActive : linkIdle}">
 		<svg
 			xmlns="http://www.w3.org/2000/svg"
 			width="16"

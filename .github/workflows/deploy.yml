@@ -1,4 +1,4 @@
-# Deploys build/ to decktools.lordmzn.it on Tophost (#25).
+# Deploys build/ to https://www.lordmzn.it/decktools/ on Tophost (#25).
 #
 # Tophost offers exactly one FTP account for the whole domain, so these
 # credentials can write anywhere under lordmzn.it — including the main site in

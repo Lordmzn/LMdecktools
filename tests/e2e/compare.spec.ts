@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { appHref } from './base';
 
 // Two Lightning Bolt printings with different Scryfall IDs but same name.
 // Generic matching groups by name → "in both".
@@ -63,7 +64,7 @@ async function mockScryfallAPI(page: import('@playwright/test').Page) {
 }
 
 async function setupWithDB(page: import('@playwright/test').Page) {
-	await page.goto('/');
+	await page.goto('./');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
 			const req = indexedDB.deleteDatabase('LMdecktools');
@@ -71,7 +72,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 			req.onerror = () => resolve();
 		});
 	});
-	await page.goto('/');
+	await page.goto('./');
 	await page.waitForLoadState('networkidle');
 
 	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
@@ -84,7 +85,10 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 }
 
 async function spaGoto(page: import('@playwright/test').Page, href: string) {
-	await page.locator(`a[href="${href}"]`).first().click();
+	await page
+		.locator(`a[href="${appHref(href)}"]`)
+		.first()
+		.click();
 }
 
 async function waitForToastGone(page: import('@playwright/test').Page) {

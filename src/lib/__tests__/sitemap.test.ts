@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
-import { SITE_URL } from '../site';
+import { SITE_URL, BASE_PATH, appRoute } from '../site';
 import { GET } from '../../routes/sitemap.xml/+server';
 import { availableLanguageTags } from '../paraglide/runtime';
 
@@ -43,7 +43,7 @@ describe('sitemap', () => {
 
 		for (const route of filesystemRoutes()) {
 			expect(xml, `${route} is missing from ROUTES in sitemap.xml/+server.ts`).toContain(
-				`<loc>${SITE_URL}${route}</loc>`
+				`<loc>${SITE_URL}${BASE_PATH}${route}</loc>`
 			);
 		}
 	});
@@ -61,7 +61,7 @@ describe('sitemap', () => {
 
 		expect(urls.length).toBeGreaterThan(0);
 		for (const url of urls) {
-			expect(url.startsWith(`${SITE_URL}/`)).toBe(true);
+			expect(url.startsWith(`${SITE_URL}${BASE_PATH}/`)).toBe(true);
 		}
 	});
 
@@ -98,5 +98,34 @@ describe('site origin', () => {
 		const config = await import('../../../svelte.config.js');
 
 		expect(config.default.kit?.prerender?.origin).toBe(SITE_URL);
+	});
+
+	it('agrees with kit.paths.base', async () => {
+		// Same hazard one level down: SvelteKit resolves every internal link
+		// against kit.paths.base, while the sitemap and OG tags use BASE_PATH.
+		// If they disagree, the site links to itself correctly and tells search
+		// engines and social scrapers to look somewhere that does not exist.
+		const config = await import('../../../svelte.config.js');
+
+		expect(config.default.kit?.paths?.base).toBe(BASE_PATH);
+	});
+});
+
+describe('appRoute', () => {
+	it('strips base, and the trailing slash trailingSlash forces', () => {
+		expect(appRoute('/decktools/collection/', '/decktools')).toBe('/collection');
+		expect(appRoute('/decktools/card-lists/compare/', '/decktools')).toBe('/card-lists/compare');
+	});
+
+	it('reduces the app root to "/" however it is spelled', () => {
+		// i18n.route() drops the path segment entirely at the root, so the base
+		// arrives with no trailing slash at all.
+		expect(appRoute('/decktools', '/decktools')).toBe('/');
+		expect(appRoute('/decktools/', '/decktools')).toBe('/');
+	});
+
+	it('is a no-op when no base is configured', () => {
+		expect(appRoute('/collection/', '')).toBe('/collection');
+		expect(appRoute('/', '')).toBe('/');
 	});
 });

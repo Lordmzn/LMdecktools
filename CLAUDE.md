@@ -85,9 +85,20 @@ The one page that is _not_ prerendered is `404.html`, produced by `adapter({ fal
 
 ### Deployment & Page Metadata
 
-Target is `https://decktools.lordmzn.it` on Tophost (shared Apache). The full procedure, the FTPS preconditions on automating it, and the cache-header rationale are in **`docs/deployment.md`** — read that before touching `static/.htaccess` or wiring a deploy workflow.
+Target is `https://www.lordmzn.it/decktools/` on Tophost (shared Apache) — a **subfolder of the main website**, not a subdomain, because Tophost issues certificates for the registered domain only and a subdomain gets the shared node's default certificate. HTTP was not an option: `caches`, `showSaveFilePicker` and `navigator.clipboard` are all secure-context only, so three features would vanish. Full rationale, the parent-`.htaccess` interaction, and the deploy procedure are in **`docs/deployment.md`** — read it before touching `static/.htaccess` or the deploy workflow.
 
-Two build-time constants name the origin and **must stay in sync**: `SITE_URL` in `src/lib/site.ts` (used by the sitemap, canonical, and OG tags) and `kit.prerender.origin` in `svelte.config.js`. The second is not optional decoration: prerendering has no request to read a host from, so `url.origin` falls back to the placeholder `http://sveltekit-prerender`, and Paraglide's absolute alternate-language links were shipping it into every page's `<head>` (#25).
+**The app is served from a base path.** `pnpm run dev` and `pnpm run preview` serve it at `/decktools/` too, so that is not a deploy-only concern:
+
+- Every internal link must be `href="{base}/..."` with `base` from `$app/paths`. A bare `href="/collection"` falls outside the base, and Paraglide then treats it as external and leaves it untranslated — it would land on the main site.
+- `kit.paths.relative` is set to **`false`**, against SvelteKit's default. With the default, `base` is a relative string (`../..`) whose depth is measured from the localised URL, while Paraglide resolves links against the locale-stripped one — a segment shallower. Every Italian nav link went to the English page. Don't remove it.
+- To compare the current path against a literal route, use `appRoute(i18n.route($page.url.pathname), base)` from `src/lib/site.ts`. It strips the base, the locale prefix, and the forced trailing slash — all three of which sit between `$page.url.pathname` and `/collection`.
+- E2E specs navigate with **relative** targets (`./collection`); `playwright.config.ts` puts the base in `baseURL`. Anything matching a rendered `href` uses `appHref()` from `tests/e2e/base.ts`.
+
+Three build-time constants **must stay in sync**, and `sitemap.test.ts` fails if they drift: `SITE_URL` + `BASE_PATH` in `src/lib/site.ts` (sitemap, canonical, OG tags), `kit.prerender.origin` and `kit.paths.base` in `svelte.config.js`. The `prerender.origin` one is not optional decoration: prerendering has no request to read a host from, so `url.origin` falls back to the placeholder `http://sveltekit-prerender`, and Paraglide's absolute alternate-language links were shipping it into every page's `<head>` (#25).
+
+Absolute URLs for scrapers come from `absoluteUrl()` in `site.ts`, never from `` `${SITE_URL}${base}` `` — `base` from `$app/paths` is not an absolute path, and concatenating the two produced `https://www.lordmzn.it../../og-image.jpg`.
+
+`static/robots.txt` deploys to `/decktools/robots.txt`, which **no crawler reads** — robots.txt is a domain-root file. It is kept as documentation; the live rules have to go in the main site's `robots.txt`.
 
 Per-page metadata goes through `src/lib/components/PageMeta.svelte` — every route renders one, passing a translated title and description; it emits `<title>`, the description, and the `og:`/`twitter:` mirrors of both. Site-wide tags (canonical, `og:image`, `og:locale`, `twitter:card`) live in `+layout.svelte` instead, and `<link rel="alternate" hreflang>` is emitted by ParaglideJS itself — don't hand-roll those. **A new route needs three things**: a `PageMeta`, a `*_meta_title` / `*_meta_description` pair in _both_ catalogues, and an entry in `ROUTES` in `src/routes/sitemap.xml/+server.ts`. The sitemap is a prerendered endpoint rather than a file in `static/` precisely so it cannot drift from `SITE_URL`, but the route list is still manual.
 

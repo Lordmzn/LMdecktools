@@ -1,9 +1,17 @@
 # LM Deck Tools — Apache configuration for the static build (#25).
 #
 # Copied verbatim into build/ by the static adapter (dotfiles in static/ are
-# included). Every route already resolves without rewrite rules because
-# `trailingSlash = 'always'` emits collection/index.html rather than
-# collection.html — nothing here is load-bearing for routing.
+# included), and deployed to /htdocs/decktools/. Every route already resolves
+# without rewrite rules because `trailingSlash = 'always'` emits
+# collection/index.html rather than collection.html — nothing here is
+# load-bearing for routing.
+#
+# This directory sits inside the main site's document root, so /htdocs/.htaccess
+# applies here too. It contributes an HTTPS redirect (which is why none is
+# repeated below), an `ErrorDocument 403`, and a PHP handler. Its mod_rewrite
+# rules survive because this file declares no `RewriteEngine` of its own —
+# adding one here would replace the parent's rules rather than extend them, and
+# would silently drop the HTTPS redirect.
 #
 # Note: Tophost runs PHP in CGI mode, so mod_headers directives do not apply to
 # PHP responses. Irrelevant here — every file this serves is static.
@@ -13,7 +21,11 @@
 # ---------------------------------------------------------------------------
 # 404.html is the adapter's client-rendered shell; the router fails to match the
 # unknown path and renders +error.svelte.
-ErrorDocument 404 /404.html
+#
+# The path is document-root-relative, and the document root is the *main site* —
+# so it must carry /decktools. A bare /404.html would serve the main site's
+# error page, or nothing.
+ErrorDocument 404 /decktools/404.html
 
 # ---------------------------------------------------------------------------
 # Caching

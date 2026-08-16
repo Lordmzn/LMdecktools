@@ -6,21 +6,44 @@ How LM Deck Tools gets from `pnpm run build` onto the public web (#25).
 
 | | |
 | --- | --- |
-| URL | `https://decktools.lordmzn.it` |
+| URL | `https://www.lordmzn.it/decktools/` |
 | Host | Tophost (shared Apache, `.htaccess` with mod_rewrite + mod_headers) |
 | Transport | FTPS, explicit TLS, port 21 — `ftp.lordmzn.it` |
 | FTP user | `lordmzn.it` — **one account for the whole domain** |
-| Document root | `/htdocs/decktools/` |
+| Upload target | `/htdocs/decktools/` |
 | Build output | `build/` — ~1 MB across ~60 files, against 200 MB of quota |
+| DNS | nothing to do — `www.lordmzn.it` already resolves |
 
 The FTP account's home contains `/.htaccess`, `/cgi-bin/`, `/conf/` and
 `/htdocs/`. Sites live under `/htdocs`; the **main website is `/htdocs` itself**,
 and this app is a subfolder of it.
 
-A **subdomain**, not `lordmzn.it/decktools`. A subfolder would force
-`kit.paths.base = '/decktools'`, and that is a build-time constant: the same
-artifact would stop working anywhere else, local preview included. Serving from
-a domain root keeps the build portable and the config empty.
+### Why a subfolder and not `decktools.lordmzn.it`
+
+Tophost issues TLS certificates for the registered domain only. Verified against
+their server: the certificate presented for `www.lordmzn.it` carries exactly one
+SAN and no wildcard, and a TLS request for `decktools.lordmzn.it` is answered
+with **another tenant's certificate** from the shared node. A browser gets a hard
+name mismatch.
+
+Plain HTTP is not a fallback, because three features are secure-context only and
+vanish outside HTTPS:
+
+| API | Module | What stops working |
+| --- | --- | --- |
+| `caches` | `src/lib/image-cache.ts` | the whole Scryfall image cache |
+| `showSaveFilePicker` / `showOpenFilePicker` | `src/lib/linked-file.ts` | the linked-file feature |
+| `navigator.clipboard` | DB modal, compare, card lists | every copy-to-clipboard export |
+
+`caches` is simply `undefined` there, so it throws rather than degrades. Hence
+the subfolder, which costs a base path but keeps the certificate.
+
+`www` and not the apex: the certificate has no SAN for `lordmzn.it`, and the
+apex has no A record at all — only `www` resolves.
+
+The trade-off accepted: **`kit.paths.base` is a build-time constant.** A build
+made here cannot be served from any other path, local preview included, and
+`pnpm run dev` serves the app at `/decktools/` too.
 
 ## What makes the build servable without server config
 
@@ -39,6 +62,36 @@ Three things, all already in the repo:
   dotfiles). It sets cache headers, the error document, and compression. Nothing
   in it is load-bearing for routing — if the host ignored it entirely, every URL
   would still resolve.
+- **`kit.paths.base`** and, less obviously, **`kit.paths.relative = false`**.
+  SvelteKit defaults `relative` to `true`, which makes `base` a relative string
+  like `../..`. Paraglide computes nothing itself — it resolves each link against
+  the *locale-stripped* URL, which is one segment shallower than the localised
+  one the relative base was measured from. The `../..` then overshoots the base,
+  Paraglide reads the target as external and leaves it untranslated, and every
+  Italian nav link lands on the English page. Absolute paths remove the ambiguity.
+
+### The parent `.htaccess`
+
+`/htdocs/.htaccess` belongs to the main site and Apache applies it here too:
+
+```apache
+ErrorDocument 403 /__tmp/topweb.shtml
+AddHandler php7.1-script .php
+RewriteEngine On
+RewriteCond %{HTTP:X-Forwarded-Proto} !https
+RewriteCond %{HTTPS} off
+RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301,NE]
+```
+
+Benign, and useful: no catch-all rewrite to fight, and it forces HTTPS so this
+app does not have to. Two consequences encoded in `static/.htaccess`:
+
+- **It declares no `RewriteEngine` of its own.** mod_rewrite does not merge
+  per-directory configurations — a `RewriteEngine On` in the child *replaces* the
+  parent's rules rather than extending them, silently dropping the HTTPS redirect.
+- **`ErrorDocument` paths are document-root-relative, and the document root is
+  the main site.** So it reads `/decktools/404.html`; a bare `/404.html` would
+  serve the main site's error page.
 
 ## Caching
 
@@ -62,33 +115,43 @@ pnpm run build
 # then upload the *contents* of build/ into /htdocs/decktools/, _app/ first.
 ```
 
-Two things to confirm in the panel before the first automated run, since a push
-to `master` now triggers one:
+No panel step creates this folder — it is an ordinary directory inside the main
+site, so the first upload brings it into existence. One thing left to confirm
+before the first automated run, since a push to `master` now triggers one:
 
-- **The subdomain's document root is really `/htdocs/decktools/`.** Whatever
-  folder the panel creates for `decktools.lordmzn.it` is what `SERVER_DIR` in
-  the workflow must say. A mismatch does not damage the main site — the guard
-  and the manifest see to that — but it silently deploys to a folder nothing
-  serves.
 - **FTP is not IP-restricted.** GitHub Actions runners have rotating egress IPs;
   an allowlist on the account makes the job fail unpredictably.
-
-Also worth checking once the subdomain exists: whether `/htdocs/.htaccess` from
-the main site applies to it. If the subdomain's document root sits *below*
-`/htdocs`, Apache may merge the parent's rules — a catch-all rewrite there would
-break routing here in a way that reproduces on neither `preview` nor a local
-static server.
 
 Verify afterwards:
 
 ```bash
-curl -sI https://decktools.lordmzn.it/collection/ | head -1          # 200
-curl -sI https://decktools.lordmzn.it/it-it/card-lists/ | head -1    # 200
-curl -sI https://decktools.lordmzn.it/nope/ | head -1                # 404, branded
-curl -sI https://decktools.lordmzn.it/_app/immutable/entry/start.*.js \
-  | grep -i cache-control                                            # immutable
-curl -s https://decktools.lordmzn.it/sitemap.xml | head -3
+curl -sI https://www.lordmzn.it/decktools/collection/ | head -1        # 200
+curl -sI https://www.lordmzn.it/decktools/it-it/card-lists/ | head -1  # 200
+curl -sI https://www.lordmzn.it/decktools/nope/ | head -1              # 404, branded
+curl -s https://www.lordmzn.it/decktools/sitemap.xml | head -3
 ```
+
+And the one thing no local test can prove — that the main site still works:
+
+```bash
+curl -sI https://www.lordmzn.it/ | head -1                             # 200
+```
+
+### Local verification of the real layout
+
+`pnpm run preview` serves the app at its base path, but not *inside* a parent
+site. To reproduce that:
+
+```bash
+pnpm run build
+mkdir -p /tmp/htdocs && cp -R build /tmp/htdocs/decktools
+python3 -m http.server 8899 --directory /tmp/htdocs
+# then browse http://localhost:8899/decktools/
+```
+
+This is what catches base-path mistakes: a link that escapes to `/collection/`
+instead of `/decktools/collection/` 404s here and would land on the main site in
+production.
 
 ## Automated deploy
 
@@ -119,12 +182,13 @@ at the host, so the scoping lives in the workflow:
   previously uploaded; on a first run with no manifest it deletes nothing. That
   option bypasses all of it and wipes the target directory — it must stay out.
 
-Related: `Lordmzn/personal-website` deploys the main site with
-`FTP-Deploy-Action@2.0.0` and `ARGS: --delete` and **no** remote directory, i.e.
-a deleting sync against the login root. It has no recorded runs and its Node 12
-toolchain no longer works, so it is dormant rather than dangerous — but it is
-worth disabling outright rather than leaving it one dependency-bump away from
-running again.
+**`Lordmzn/personal-website` must be disabled.** It deploys the main site with
+`FTP-Deploy-Action@2.0.0`, `ARGS: --delete` and **no** remote directory — a
+deleting sync against the login root. Now that this app lives *inside* that
+tree at `/htdocs/decktools/`, a successful run there would delete it. The
+workflow has no recorded runs and its Node 12 toolchain no longer works on
+current runners, so it is dormant today; that is a reason to disable it, not a
+reason to leave it.
 
 ### Credentials
 
@@ -159,17 +223,26 @@ logging outside the app's control, not data collection by LM Deck Tools, and no
 analytics, cookies, or third-party scripts are added. Worth stating plainly
 rather than letting "no server" imply "no server ever sees a request".
 
-## Local verification
+Choosing Tophost over a CDN-backed static host (GitHub Pages, Cloudflare Pages)
+was deliberate on the same grounds. Those would have solved the certificate
+problem and cost nothing, but both put a US company in the serving path, able to
+join visitor IPs against a far larger identity graph and subject to the CLOUD
+Act. Seeweb, Tophost's operator, is Italian and holds nothing else about the
+visitor. The base path in this config is the price of that choice.
 
-To reproduce what a plain static host does, without Apache:
+## robots.txt is inert here
 
-```bash
-pnpm run build
-python3 -m http.server 8899 --directory build
+Crawlers read `/robots.txt` at the **domain root** only, so the file that
+deploys to `/decktools/robots.txt` is never fetched. It is kept as the record of
+what the rules should be. To make them apply, add these to the main site's
+`/htdocs/robots.txt`:
+
+```
+Disallow: /decktools/_app/
+Sitemap: https://www.lordmzn.it/decktools/sitemap.xml
 ```
 
-`.htaccess` is ignored by that server, so cache headers and the branded 404 will
-not appear — routing and page content will.
+The sitemap itself works fine where it is — submit it directly in Search Console.
 
 ## Regenerating the social preview image
 

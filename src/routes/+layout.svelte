@@ -8,7 +8,7 @@
 	import { store, mergeFromFile, tryAutoLoadDB, logAppError } from '$lib/store.svelte';
 	import { page } from '$app/stores';
 	import { languageTag } from '$lib/paraglide/runtime';
-	import { SITE_URL } from '$lib/site';
+	import { absoluteUrl } from '$lib/site';
 	import '../app.css';
 	import type { LayoutProps } from './$types';
 
@@ -23,6 +23,10 @@
 	 * `http://sveltekit-prerender`.
 	 */
 	const OG_LOCALES: Record<string, string> = { en: 'en_US', 'it-it': 'it_IT' };
+
+	// Built from the BASE_PATH constant rather than `base` from $app/paths:
+	// scrapers need an absolute URL, and $app/paths' value is not one.
+	const ogImage = absoluteUrl('/og-image.jpg');
 
 	let canonical = $derived($page.url.href);
 	let ogLocale = $derived(OG_LOCALES[languageTag()] ?? 'en_US');
@@ -71,7 +75,7 @@
 	<meta property="og:site_name" content="LM Deck Tools" />
 	<meta property="og:type" content="website" />
 	<meta property="og:url" content={canonical} />
-	<meta property="og:image" content="{SITE_URL}/og-image.jpg" />
+	<meta property="og:image" content={ogImage} />
 	<meta property="og:image:type" content="image/jpeg" />
 	<meta property="og:image:width" content="1200" />
 	<meta property="og:image:height" content="630" />
@@ -81,7 +85,7 @@
 		<meta property="og:locale:alternate" content={locale} />
 	{/each}
 	<meta name="twitter:card" content="summary_large_image" />
-	<meta name="twitter:image" content="{SITE_URL}/og-image.jpg" />
+	<meta name="twitter:image" content={ogImage} />
 </svelte:head>
 
 <ParaglideJS {i18n}>

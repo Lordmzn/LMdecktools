@@ -7,6 +7,7 @@
 	visitor's address being wrong, anything else is ours.
 -->
 <script lang="ts">
+	import { base } from '$app/paths';
 	import { page } from '$app/stores';
 	import PageMeta from '$lib/components/PageMeta.svelte';
 	import * as m from '$lib/paraglide/messages';
@@ -33,9 +34,9 @@
 		</p>
 
 		<div class="mt-8 flex flex-wrap items-center justify-center gap-3">
-			<a href="/" class="btn btn-primary">{m.error_cta_home()}</a>
+			<a href="{base}/" class="btn btn-primary">{m.error_cta_home()}</a>
 			{#if !notFound}
-				<a href="/diagnostics" class="btn btn-ghost">{m.error_cta_diagnostics()}</a>
+				<a href="{base}/diagnostics" class="btn btn-ghost">{m.error_cta_diagnostics()}</a>
 			{/if}
 		</div>
 	</div>

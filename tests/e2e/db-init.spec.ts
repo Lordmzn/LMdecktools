@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 // Clear IndexedDB before each test to ensure clean state
 test.beforeEach(async ({ page }) => {
-	await page.goto('/');
+	await page.goto('./');
 	await page.evaluate(() => {
 		return new Promise<void>((resolve) => {
 			const req = indexedDB.deleteDatabase('LMdecktools');
@@ -24,7 +24,7 @@ async function openDBModal(page: import('@playwright/test').Page) {
 
 test.describe('Database Initialization', () => {
 	test('DB modal shows options when opened', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await openDBModal(page);
 
 		await expect(page.getByRole('button', { name: 'In-browser DB', exact: true })).toBeVisible();
@@ -35,7 +35,7 @@ test.describe('Database Initialization', () => {
 	});
 
 	test('creating a new database dismisses modal and loads DB', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await openDBModal(page);
 
 		// Click "Create New Database"
@@ -51,7 +51,7 @@ test.describe('Database Initialization', () => {
 	});
 
 	test('image cache reports a byte size alongside the image count', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 		await openDBModal(page);
 		await page.getByRole('button', { name: 'Cache', exact: true }).click();
 
@@ -62,7 +62,7 @@ test.describe('Database Initialization', () => {
 	});
 
 	test('home page renders correctly', async ({ page }) => {
-		await page.goto('/');
+		await page.goto('./');
 
 		await expect(page.getByRole('heading', { name: /Chart Your Own Course/i })).toBeVisible();
 		await expect(page.getByText('Manage Card Lists')).toBeVisible();

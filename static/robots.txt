@@ -1,8 +1,13 @@
+# NOTE: crawlers only ever read /robots.txt at the domain root, so this file —
+# which deploys to /decktools/robots.txt — is inert. It is kept as the record of
+# what the rules should be; to make them apply, merge these lines into the main
+# site's /htdocs/robots.txt. See docs/deployment.md.
+
 User-agent: *
 Allow: /
 
 # The app holds no user data server-side, so there is nothing to hide from a
 # crawler — but the build assets are noise in an index.
-Disallow: /_app/
+Disallow: /decktools/_app/
 
-Sitemap: https://decktools.lordmzn.it/sitemap.xml
+Sitemap: https://www.lordmzn.it/decktools/sitemap.xml

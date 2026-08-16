@@ -126,9 +126,14 @@ Each route is prerendered to real HTML in both English (`/`) and Italian (`/it-i
 
 ## Deployment
 
-The build is a folder of static files — any file server will do. See
-[`docs/deployment.md`](docs/deployment.md) for the target host, the `.htaccess`
-that ships with the build, and how to verify a deploy.
+The build is a folder of static files — any file server will do. It is deployed
+to `https://www.lordmzn.it/decktools/`, EU-hosted, with no CDN or third-party
+edge in the serving path.
+
+Note that this means the app is served from a **base path**, which `pnpm run dev`
+and `pnpm run preview` reproduce — the local app lives at `/decktools/` too, and
+internal links must be written `href="{base}/..."`. See
+[`docs/deployment.md`](docs/deployment.md).
 
 ## Built With
 

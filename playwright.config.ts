@@ -8,7 +8,10 @@ export default defineConfig({
 		reuseExistingServer: !process.env.CI
 	},
 	use: {
-		baseURL: 'http://localhost:4173'
+		// Includes kit.paths.base — the dev server serves the app under it too,
+		// so a test navigating to the origin root gets a 404. Specs use relative
+		// targets (`./`, `./collection`) so they resolve against this.
+		baseURL: 'http://localhost:4173/decktools/'
 	},
 	projects: [
 		{

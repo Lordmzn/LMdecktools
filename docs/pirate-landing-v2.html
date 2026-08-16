@@ -1,0 +1,948 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+		<title>LM Deck Tools — Pirate Theme v2</title>
+		<link
+			href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap"
+			rel="stylesheet"
+		/>
+		<style>
+			:root {
+				--orange-50: #fff7ed;
+				--orange-100: #ffedd5;
+				--orange-200: #fed7aa;
+				--orange-300: #fdba74;
+				--orange-400: #fb923c;
+				--orange-500: #f97316;
+				--orange-600: #ea580c;
+				--orange-700: #c2410c;
+				--orange-800: #9a3412;
+				--orange-900: #7c2d12;
+				--slate-950: #0a0c10;
+				--slate-900: #0f1218;
+				--slate-800: #1a1d26;
+				--slate-700: #272b36;
+				--slate-600: #3a3f4d;
+				--slate-500: #636878;
+				--slate-400: #8b90a0;
+				--slate-300: #b0b4c0;
+				--amber: #f59e0b;
+			}
+
+			* {
+				margin: 0;
+				padding: 0;
+				box-sizing: border-box;
+			}
+
+			body {
+				background: var(--slate-950);
+				color: var(--slate-300);
+				font-family:
+					'Outfit',
+					-apple-system,
+					sans-serif;
+				overflow-x: hidden;
+				min-height: 100vh;
+			}
+
+			/* Grain overlay */
+			body::after {
+				content: '';
+				position: fixed;
+				inset: 0;
+				background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+				pointer-events: none;
+				z-index: 1;
+			}
+
+			/* === NAV === */
+			nav {
+				position: sticky;
+				top: 0;
+				z-index: 100;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 0 2rem;
+				height: 60px;
+				background: rgba(10, 12, 16, 0.8);
+				backdrop-filter: blur(20px) saturate(1.2);
+				border-bottom: 1px solid rgba(249, 115, 22, 0.08);
+			}
+
+			.nav-brand {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-weight: 700;
+				font-size: 0.95rem;
+				color: var(--orange-50);
+				letter-spacing: -0.01em;
+				text-decoration: none;
+			}
+
+			.nav-brand svg {
+				color: var(--orange-500);
+			}
+
+			.nav-links {
+				display: flex;
+				gap: 0.2rem;
+				list-style: none;
+			}
+
+			.nav-links a {
+				display: flex;
+				align-items: center;
+				gap: 0.35rem;
+				padding: 0.4rem 0.85rem;
+				color: var(--slate-400);
+				text-decoration: none;
+				font-size: 0.82rem;
+				font-weight: 500;
+				border-radius: 8px;
+				transition: all 0.2s;
+			}
+
+			.nav-links a:hover {
+				color: var(--orange-300);
+				background: rgba(249, 115, 22, 0.06);
+			}
+			.nav-links a.active {
+				color: var(--orange-400);
+				background: rgba(249, 115, 22, 0.1);
+			}
+
+			/* === HERO === */
+			.hero {
+				position: relative;
+				z-index: 2;
+				text-align: center;
+				padding: 7rem 2rem 5rem;
+				overflow: hidden;
+			}
+
+			/* Ambient glow */
+			.hero::before {
+				content: '';
+				position: absolute;
+				top: -200px;
+				left: 50%;
+				transform: translateX(-50%);
+				width: 900px;
+				height: 600px;
+				background: radial-gradient(
+					ellipse,
+					rgba(249, 115, 22, 0.1) 0%,
+					rgba(249, 115, 22, 0.03) 40%,
+					transparent 70%
+				);
+				pointer-events: none;
+			}
+
+			/* Compass rose */
+			.compass-container {
+				position: absolute;
+				top: 50%;
+				left: 50%;
+				transform: translate(-50%, -50%);
+				width: 520px;
+				height: 520px;
+				pointer-events: none;
+			}
+
+			.compass-rose {
+				width: 100%;
+				height: 100%;
+				animation: compassSpin 180s linear infinite;
+				color: var(--orange-500);
+			}
+
+			@keyframes compassSpin {
+				to {
+					transform: rotate(360deg);
+				}
+			}
+
+			.hero-tag {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				padding: 0.35rem 1rem;
+				background: rgba(249, 115, 22, 0.08);
+				border: 1px solid rgba(249, 115, 22, 0.15);
+				border-radius: 100px;
+				font-family: 'Space Mono', monospace;
+				font-size: 0.65rem;
+				letter-spacing: 0.12em;
+				text-transform: uppercase;
+				color: var(--orange-400);
+				margin-bottom: 2rem;
+			}
+
+			.hero-tag .dot {
+				width: 5px;
+				height: 5px;
+				border-radius: 50%;
+				background: var(--orange-500);
+				animation: pulse 2s ease-in-out infinite;
+			}
+
+			@keyframes pulse {
+				0%,
+				100% {
+					opacity: 0.4;
+				}
+				50% {
+					opacity: 1;
+				}
+			}
+
+			.hero h1 {
+				font-weight: 900;
+				font-size: clamp(3rem, 7vw, 5rem);
+				line-height: 1.05;
+				letter-spacing: -0.03em;
+				color: #fff;
+				margin-bottom: 1.2rem;
+				position: relative;
+			}
+
+			.hero h1 .accent {
+				background: linear-gradient(135deg, var(--orange-400), var(--orange-600));
+				-webkit-background-clip: text;
+				-webkit-text-fill-color: transparent;
+				background-clip: text;
+			}
+
+			.hero-sub {
+				font-size: 1.15rem;
+				font-weight: 400;
+				color: var(--slate-400);
+				max-width: 480px;
+				margin: 0 auto;
+				line-height: 1.65;
+			}
+
+			.hero-ctas {
+				display: flex;
+				justify-content: center;
+				gap: 0.75rem;
+				margin-top: 2.5rem;
+				flex-wrap: wrap;
+				position: relative;
+			}
+
+			.btn {
+				display: inline-flex;
+				align-items: center;
+				gap: 0.5rem;
+				padding: 0.75rem 1.6rem;
+				font-family: 'Outfit', sans-serif;
+				font-weight: 600;
+				font-size: 0.88rem;
+				border-radius: 10px;
+				text-decoration: none;
+				transition: all 0.25s ease;
+				cursor: pointer;
+				border: none;
+				letter-spacing: -0.01em;
+			}
+
+			.btn-primary {
+				background: var(--orange-500);
+				color: #fff;
+				box-shadow:
+					0 2px 16px rgba(249, 115, 22, 0.3),
+					0 0 0 1px rgba(249, 115, 22, 0.1);
+			}
+			.btn-primary:hover {
+				background: var(--orange-600);
+				transform: translateY(-1px);
+				box-shadow:
+					0 6px 28px rgba(249, 115, 22, 0.4),
+					0 0 0 1px rgba(249, 115, 22, 0.2);
+			}
+
+			.btn-ghost {
+				background: transparent;
+				color: var(--orange-300);
+				border: 1px solid rgba(249, 115, 22, 0.2);
+			}
+			.btn-ghost:hover {
+				background: rgba(249, 115, 22, 0.06);
+				border-color: rgba(249, 115, 22, 0.35);
+				transform: translateY(-1px);
+			}
+
+			/* === PRINCIPLES BAR === */
+			.principles {
+				position: relative;
+				z-index: 2;
+				display: flex;
+				justify-content: center;
+				gap: 2rem;
+				flex-wrap: wrap;
+				padding: 0 2rem 4rem;
+			}
+
+			.principle {
+				display: flex;
+				align-items: center;
+				gap: 0.5rem;
+				font-family: 'Space Mono', monospace;
+				font-size: 0.68rem;
+				letter-spacing: 0.06em;
+				text-transform: uppercase;
+				color: var(--slate-500);
+			}
+
+			.principle svg {
+				color: var(--orange-700);
+				flex-shrink: 0;
+			}
+
+			/* === FEATURES === */
+			.features {
+				position: relative;
+				z-index: 2;
+				max-width: 1080px;
+				margin: 0 auto;
+				padding: 0 2rem 5rem;
+			}
+
+			.features-grid {
+				display: grid;
+				grid-template-columns: repeat(3, 1fr);
+				gap: 1px;
+				background: rgba(249, 115, 22, 0.06);
+				border-radius: 16px;
+				overflow: hidden;
+				border: 1px solid rgba(249, 115, 22, 0.08);
+			}
+
+			@media (max-width: 768px) {
+				.features-grid {
+					grid-template-columns: 1fr;
+				}
+			}
+
+			.feature-card {
+				background: var(--slate-900);
+				padding: 2.5rem 2rem;
+				transition: all 0.3s ease;
+				position: relative;
+			}
+
+			.feature-card:hover {
+				background: var(--slate-800);
+			}
+
+			.feature-card::after {
+				content: '';
+				position: absolute;
+				bottom: 0;
+				left: 2rem;
+				right: 2rem;
+				height: 1px;
+				background: linear-gradient(90deg, transparent, rgba(249, 115, 22, 0.15), transparent);
+				opacity: 0;
+				transition: opacity 0.3s;
+			}
+
+			.feature-card:hover::after {
+				opacity: 1;
+			}
+
+			.feature-icon {
+				width: 44px;
+				height: 44px;
+				display: flex;
+				align-items: center;
+				justify-content: center;
+				background: rgba(249, 115, 22, 0.08);
+				border-radius: 10px;
+				margin-bottom: 1.5rem;
+				color: var(--orange-400);
+				border: 1px solid rgba(249, 115, 22, 0.1);
+			}
+
+			.feature-card h3 {
+				font-weight: 700;
+				font-size: 1.1rem;
+				color: var(--orange-50);
+				margin-bottom: 0.5rem;
+				letter-spacing: -0.01em;
+			}
+
+			.feature-card p {
+				font-size: 0.9rem;
+				line-height: 1.65;
+				color: var(--slate-400);
+				font-weight: 400;
+			}
+
+			/* === GETTING STARTED === */
+			.getting-started {
+				position: relative;
+				z-index: 2;
+				max-width: 1080px;
+				margin: 0 auto;
+				padding: 0 2rem 6rem;
+			}
+
+			.section-header {
+				text-align: center;
+				margin-bottom: 3rem;
+			}
+
+			.section-tag {
+				font-family: 'Space Mono', monospace;
+				font-size: 0.62rem;
+				letter-spacing: 0.18em;
+				text-transform: uppercase;
+				color: var(--orange-600);
+				margin-bottom: 0.5rem;
+			}
+
+			.section-title {
+				font-weight: 800;
+				font-size: 2rem;
+				color: #fff;
+				letter-spacing: -0.02em;
+			}
+
+			.steps {
+				display: grid;
+				grid-template-columns: repeat(4, 1fr);
+				gap: 1.25rem;
+			}
+
+			@media (max-width: 900px) {
+				.steps {
+					grid-template-columns: repeat(2, 1fr);
+				}
+			}
+
+			.step {
+				position: relative;
+				background: var(--slate-900);
+				border: 1px solid rgba(249, 115, 22, 0.06);
+				border-radius: 14px;
+				padding: 2rem 1.5rem 1.75rem;
+				transition: all 0.3s;
+			}
+
+			.step:hover {
+				border-color: rgba(249, 115, 22, 0.15);
+				transform: translateY(-3px);
+				box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+			}
+
+			.step-num {
+				font-family: 'Space Mono', monospace;
+				font-size: 0.62rem;
+				font-weight: 700;
+				letter-spacing: 0.08em;
+				color: var(--orange-500);
+				background: rgba(249, 115, 22, 0.08);
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				width: 28px;
+				height: 28px;
+				border-radius: 8px;
+				margin-bottom: 1rem;
+				border: 1px solid rgba(249, 115, 22, 0.12);
+			}
+
+			.step h4 {
+				font-weight: 700;
+				font-size: 0.95rem;
+				color: var(--orange-100);
+				margin-bottom: 0.4rem;
+				letter-spacing: -0.01em;
+			}
+
+			.step p {
+				font-size: 0.85rem;
+				line-height: 1.6;
+				color: var(--slate-400);
+				font-weight: 400;
+			}
+
+			/* === MANIFESTO === */
+			.manifesto {
+				position: relative;
+				z-index: 2;
+				max-width: 640px;
+				margin: 0 auto;
+				padding: 0 2rem 5rem;
+			}
+
+			.manifesto-card {
+				position: relative;
+				background: linear-gradient(
+					135deg,
+					rgba(249, 115, 22, 0.04) 0%,
+					rgba(15, 18, 24, 0.8) 100%
+				);
+				border: 1px solid rgba(249, 115, 22, 0.1);
+				border-radius: 16px;
+				padding: 3rem 2.5rem;
+				text-align: center;
+			}
+
+			.manifesto-card .icon {
+				width: 40px;
+				height: 40px;
+				margin: 0 auto 1.5rem;
+				color: var(--orange-500);
+				opacity: 0.6;
+			}
+
+			.manifesto-card blockquote {
+				font-size: 1.05rem;
+				line-height: 1.7;
+				color: var(--slate-300);
+				margin-bottom: 1.25rem;
+				font-weight: 400;
+			}
+
+			.manifesto-card blockquote strong {
+				color: var(--orange-300);
+				font-weight: 600;
+			}
+
+			.manifesto-card cite {
+				font-family: 'Space Mono', monospace;
+				font-size: 0.62rem;
+				letter-spacing: 0.15em;
+				text-transform: uppercase;
+				color: var(--slate-500);
+				font-style: normal;
+			}
+
+			/* === FOOTER === */
+			footer {
+				position: relative;
+				z-index: 2;
+				text-align: center;
+				padding: 2rem;
+				border-top: 1px solid rgba(249, 115, 22, 0.05);
+				font-family: 'Space Mono', monospace;
+				font-size: 0.6rem;
+				letter-spacing: 0.08em;
+				color: var(--slate-600);
+				text-transform: uppercase;
+			}
+
+			/* === ANIMATIONS === */
+			@keyframes fadeUp {
+				from {
+					opacity: 0;
+					transform: translateY(24px);
+				}
+				to {
+					opacity: 1;
+					transform: translateY(0);
+				}
+			}
+
+			.hero-tag {
+				animation: fadeUp 0.7s ease both 0.1s;
+			}
+			.hero h1 {
+				animation: fadeUp 0.7s ease both 0.2s;
+			}
+			.hero-sub {
+				animation: fadeUp 0.7s ease both 0.3s;
+			}
+			.hero-ctas {
+				animation: fadeUp 0.7s ease both 0.4s;
+			}
+			.principles {
+				animation: fadeUp 0.7s ease both 0.5s;
+			}
+			.feature-card:nth-child(1) {
+				animation: fadeUp 0.5s ease both 0.55s;
+			}
+			.feature-card:nth-child(2) {
+				animation: fadeUp 0.5s ease both 0.65s;
+			}
+			.feature-card:nth-child(3) {
+				animation: fadeUp 0.5s ease both 0.75s;
+			}
+		</style>
+	</head>
+	<body>
+		<!-- NAV -->
+		<nav>
+			<a href="/" class="nav-brand">
+				<svg
+					width="20"
+					height="20"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M12 2L2 7l10 5 10-5-10-5z" />
+					<path d="M2 17l10 5 10-5" />
+					<path d="M2 12l10 5 10-5" />
+				</svg>
+				LM Deck Tools
+			</a>
+			<ul class="nav-links">
+				<li><a href="/" class="active">Home</a></li>
+				<li><a href="/collection">Collection</a></li>
+				<li><a href="/decks">Lists</a></li>
+			</ul>
+		</nav>
+
+		<!-- HERO -->
+		<section class="hero">
+			<div class="compass-container">
+				<svg
+					class="compass-rose"
+					viewBox="0 0 400 400"
+					fill="none"
+					xmlns="http://www.w3.org/2000/svg"
+				>
+					<!-- Outer ring -->
+					<circle
+						cx="200"
+						cy="200"
+						r="190"
+						stroke="currentColor"
+						stroke-width="0.5"
+						opacity="0.12"
+					/>
+					<circle
+						cx="200"
+						cy="200"
+						r="160"
+						stroke="currentColor"
+						stroke-width="0.3"
+						opacity="0.08"
+					/>
+					<circle
+						cx="200"
+						cy="200"
+						r="120"
+						stroke="currentColor"
+						stroke-width="0.3"
+						opacity="0.06"
+					/>
+					<circle
+						cx="200"
+						cy="200"
+						r="80"
+						stroke="currentColor"
+						stroke-width="0.3"
+						opacity="0.04"
+					/>
+
+					<!-- Cardinal lines -->
+					<line
+						x1="200"
+						y1="8"
+						x2="200"
+						y2="392"
+						stroke="currentColor"
+						stroke-width="0.5"
+						opacity="0.1"
+					/>
+					<line
+						x1="8"
+						y1="200"
+						x2="392"
+						y2="200"
+						stroke="currentColor"
+						stroke-width="0.5"
+						opacity="0.1"
+					/>
+
+					<!-- Diagonal lines -->
+					<line
+						x1="55"
+						y1="55"
+						x2="345"
+						y2="345"
+						stroke="currentColor"
+						stroke-width="0.3"
+						opacity="0.06"
+					/>
+					<line
+						x1="345"
+						y1="55"
+						x2="55"
+						y2="345"
+						stroke="currentColor"
+						stroke-width="0.3"
+						opacity="0.06"
+					/>
+
+					<!-- North pointer (prominent) -->
+					<polygon points="200,12 208,80 200,60 192,80" fill="currentColor" opacity="0.15" />
+					<!-- South pointer -->
+					<polygon points="200,388 208,320 200,340 192,320" fill="currentColor" opacity="0.06" />
+					<!-- East pointer -->
+					<polygon points="388,200 320,192 340,200 320,208" fill="currentColor" opacity="0.06" />
+					<!-- West pointer -->
+					<polygon points="12,200 80,192 60,200 80,208" fill="currentColor" opacity="0.06" />
+
+					<!-- Star burst inner -->
+					<polygon points="200,40 212,170 200,140 188,170" fill="currentColor" opacity="0.05" />
+					<polygon points="200,360 212,230 200,260 188,230" fill="currentColor" opacity="0.03" />
+					<polygon points="40,200 170,188 140,200 170,212" fill="currentColor" opacity="0.03" />
+					<polygon points="360,200 230,188 260,200 230,212" fill="currentColor" opacity="0.03" />
+
+					<!-- Tick marks around outer ring -->
+					<g opacity="0.08" stroke="currentColor" stroke-width="0.5">
+						<line x1="200" y1="8" x2="200" y2="20" />
+						<line x1="200" y1="380" x2="200" y2="392" />
+						<line x1="8" y1="200" x2="20" y2="200" />
+						<line x1="380" y1="200" x2="392" y2="200" />
+						<!-- 45 deg ticks -->
+						<line x1="334" y1="66" x2="340" y2="60" />
+						<line x1="66" y1="334" x2="60" y2="340" />
+						<line x1="334" y1="334" x2="340" y2="340" />
+						<line x1="66" y1="66" x2="60" y2="60" />
+					</g>
+
+					<!-- Inner decorative circle with dots -->
+					<circle cx="200" cy="200" r="6" fill="currentColor" opacity="0.08" />
+					<circle cx="200" cy="200" r="2" fill="currentColor" opacity="0.12" />
+				</svg>
+			</div>
+
+			<div class="hero-tag">
+				<span class="dot"></span>
+				No backend · No authority · Your data
+			</div>
+
+			<h1>
+				Chart Your Own<br />
+				<span class="accent">Course</span>
+			</h1>
+
+			<p class="hero-sub">
+				Manage your Magic: The Gathering card lists and collection. All data stays on your device.
+			</p>
+
+			<div class="hero-ctas">
+				<a href="/decks" class="btn btn-primary">
+					<svg
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<path d="M3 3v18h18" />
+						<path d="m19 9-5 5-4-4-3 3" />
+					</svg>
+					Manage Card Lists
+				</a>
+				<a href="/collection" class="btn btn-ghost">
+					<svg
+						width="16"
+						height="16"
+						viewBox="0 0 24 24"
+						fill="none"
+						stroke="currentColor"
+						stroke-width="2"
+					>
+						<rect x="3" y="3" width="18" height="18" rx="2" />
+						<path d="M3 9h18" />
+					</svg>
+					Manage Collection
+				</a>
+			</div>
+		</section>
+
+		<!-- PRINCIPLES -->
+		<div class="principles">
+			<div class="principle">
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+				</svg>
+				Local-first
+			</div>
+			<div class="principle">
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+					<circle cx="12" cy="12" r="3" />
+				</svg>
+				Zero tracking
+			</div>
+			<div class="principle">
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+					<polyline points="14 2 14 8 20 8" />
+				</svg>
+				Open format
+			</div>
+			<div class="principle">
+				<svg
+					width="14"
+					height="14"
+					viewBox="0 0 24 24"
+					fill="none"
+					stroke="currentColor"
+					stroke-width="2"
+				>
+					<rect x="3" y="11" width="18" height="11" rx="2" />
+					<path d="M7 11V7a5 5 0 0110 0v4" />
+				</svg>
+				No account
+			</div>
+		</div>
+
+		<!-- FEATURES -->
+		<section class="features">
+			<div class="features-grid">
+				<div class="feature-card">
+					<div class="feature-icon">
+						<svg
+							width="22"
+							height="22"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<rect x="2" y="3" width="8" height="10" rx="1" />
+							<rect x="14" y="3" width="8" height="10" rx="1" />
+							<rect x="8" y="11" width="8" height="10" rx="1" />
+						</svg>
+					</div>
+					<h3>Card Lists</h3>
+					<p>
+						Create and manage named card lists. Search Scryfall's full database and cross-reference
+						against your collection.
+					</p>
+				</div>
+
+				<div class="feature-card">
+					<div class="feature-icon">
+						<svg
+							width="22"
+							height="22"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<rect x="2" y="3" width="20" height="18" rx="2" />
+							<path d="M2 9h20" />
+							<path d="M10 9v12" />
+						</svg>
+					</div>
+					<h3>Track Collection</h3>
+					<p>
+						Keep an inventory of every card you own. See at a glance what you have and what you need
+						to complete your lists.
+					</p>
+				</div>
+
+				<div class="feature-card">
+					<div class="feature-icon">
+						<svg
+							width="22"
+							height="22"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="1.5"
+						>
+							<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4" />
+							<polyline points="17 8 12 3 7 8" />
+							<line x1="12" y1="3" x2="12" y2="15" />
+						</svg>
+					</div>
+					<h3>Import & Export</h3>
+					<p>
+						Move data freely. Import and export lists and collection as plain text — share with
+						crewmates or backup your data.
+					</p>
+				</div>
+			</div>
+		</section>
+
+		<!-- GETTING STARTED -->
+		<section class="getting-started">
+			<div class="section-header">
+				<div class="section-tag">Set Sail</div>
+				<h2 class="section-title">Getting Started</h2>
+			</div>
+
+			<div class="steps">
+				<div class="step">
+					<div class="step-num">01</div>
+					<h4>Log Your Hoard</h4>
+					<p>Add the cards you own to your collection. Search by name or import a bulk list.</p>
+				</div>
+				<div class="step">
+					<div class="step-num">02</div>
+					<h4>Chart Card Lists</h4>
+					<p>Build lists by searching Scryfall. The tool shows which cards you already own.</p>
+				</div>
+				<div class="step">
+					<div class="step-num">03</div>
+					<h4>Track the Gap</h4>
+					<p>See which lists are complete and which cards you still need to acquire.</p>
+				</div>
+				<div class="step">
+					<div class="step-num">04</div>
+					<h4>Share Freely</h4>
+					<p>Export as plain text to share, trade, or backup. Your data, your rules.</p>
+				</div>
+			</div>
+		</section>
+
+		<!-- MANIFESTO -->
+		<section class="manifesto">
+			<div class="manifesto-card">
+				<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+					<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+				</svg>
+				<blockquote>
+					Your data never leaves your device.
+					<strong>No accounts, no servers, no central authority.</strong>
+					Transparent rules, shared purpose, individual sovereignty.
+				</blockquote>
+				<cite>The LM Deck Tools Compact</cite>
+			</div>
+		</section>
+
+		<!-- FOOTER -->
+		<footer>LM Deck Tools · Local-first · Built for the community</footer>
+	</body>
+</html>
