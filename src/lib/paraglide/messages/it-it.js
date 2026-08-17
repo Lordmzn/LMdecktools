@@ -1401,6 +1401,142 @@ export const linked_toast_ignore = () => `Ignora`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_aria = () => `Controlla cosa porterà l'unione`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_title = () => `Unisci dal file`
+
+
+/**
+ * @param {{ name: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_intro = (params) => `Unire "${params.name}" a questo dispositivo porta:`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_loading = () => `Lettura del file…`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_error = () => `Non è stato possibile leggere il file collegato.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_unchanged = () => `Questo file non contiene nulla che manchi al tuo database. Non c'è niente da unire.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_additive = () => `Non verrà rimosso nulla. Le carte che hai e che il file non ha restano dove sono.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_collection = () => `Collezione`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_confirm = () => `Unisci`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_close = () => `Chiudi`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_added_one = (params) => `${params.count} carta aggiunta`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_added_other = (params) => `${params.count} carte aggiunte`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_new = (params) => `(${params.count} nuove)`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_all_copies = () => `(tutte copie in più)`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_new_list_one = (params) => `nuova lista, ${params.count} carta`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_new_list_other = (params) => `nuova lista, ${params.count} carte`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_settings = () => `impostazioni di corrispondenza aggiornate`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const compare_meta_title = () => `Confronta liste · LM Deck Tools`
 
 

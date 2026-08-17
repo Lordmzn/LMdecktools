@@ -239,3 +239,128 @@ describe('mergeCollections', () => {
 		expect(changed).toEqual([]);
 	});
 });
+
+/**
+ * The preview shown before a merge is committed (#77) reads these counts, so
+ * they have to say what actually arrives — in card *copies*, since a deck is
+ * read as "4 Lightning Bolt" rather than as one row.
+ */
+describe('merge deltas', () => {
+	it('counts a new card by its whole quantity and a top-up by the difference', () => {
+		const { delta } = mergeListCards(
+			[{ id: 'bolt', name: 'Bolt', LM_quantity: 1 }],
+			[
+				{ id: 'bolt', name: 'Bolt', LM_quantity: 2 },
+				{ id: 'counter', name: 'Counterspell', LM_quantity: 3 }
+			]
+		);
+
+		// 1 copy of Bolt (1 -> 2) plus 3 copies of a card not held at all
+		expect(delta).toEqual({ added: 4, fromNewCards: 3 });
+	});
+
+	it('reports nothing for a snapshot that is behind or identical', () => {
+		const identical = mergeListCards(
+			[{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }],
+			[{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }]
+		);
+		expect(identical.delta).toEqual({ added: 0, fromNewCards: 0 });
+
+		const behind = mergeListCards(
+			[{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }],
+			[{ id: 'bolt', name: 'Bolt', LM_quantity: 1 }]
+		);
+		expect(behind.delta).toEqual({ added: 0, fromNewCards: 0 });
+	});
+
+	it('counts collection copies the same way', () => {
+		const { delta } = mergeCollections(
+			[{ id: 'bolt', name: 'Bolt', quantity_owned: 2 }],
+			[
+				{ id: 'bolt', name: 'Bolt', quantity_owned: 5 },
+				{ id: 'counter', name: 'Counterspell', quantity_owned: 1 }
+			]
+		);
+
+		expect(delta).toEqual({ added: 4, fromNewCards: 1 });
+	});
+
+	it('marks a remote-only list as added and counts every copy in it as new', () => {
+		const { details } = mergeCardListSets(
+			[],
+			[
+				makeCardList({
+					name: 'Modern Burn',
+					cards: [
+						{ id: 'bolt', name: 'Bolt', LM_quantity: 4 },
+						{ id: 'guide', name: 'Goblin Guide', LM_quantity: 4 }
+					]
+				})
+			]
+		);
+
+		expect(details).toEqual([
+			{
+				name: 'Modern Burn',
+				status: 'added',
+				delta: { added: 8, fromNewCards: 8 },
+				settingsChanged: false
+			}
+		]);
+	});
+
+	it('marks a list both sides hold as updated, with only its own delta', () => {
+		const { details } = mergeCardListSets(
+			[
+				makeCardList({
+					name: 'Atraxa',
+					cards: [{ id: 'bolt', name: 'Bolt', LM_quantity: 1 }]
+				})
+			],
+			[
+				makeCardList({
+					name: 'Atraxa',
+					cards: [
+						{ id: 'bolt', name: 'Bolt', LM_quantity: 2 },
+						{ id: 'counter', name: 'Counterspell', LM_quantity: 3 }
+					]
+				})
+			]
+		);
+
+		expect(details).toEqual([
+			{
+				name: 'Atraxa',
+				status: 'updated',
+				delta: { added: 4, fromNewCards: 3 },
+				settingsChanged: false
+			}
+		]);
+	});
+
+	it('reports a settings-only change, which moves no cards at all', () => {
+		const { details } = mergeCardListSets(
+			[makeCardList({ name: 'Atraxa', cardMatching: 'generic', updated_at: 1000 })],
+			[makeCardList({ name: 'Atraxa', cardMatching: 'specific', updated_at: 5000 })]
+		);
+
+		expect(details).toEqual([
+			{
+				name: 'Atraxa',
+				status: 'updated',
+				delta: { added: 0, fromNewCards: 0 },
+				settingsChanged: true
+			}
+		]);
+	});
+
+	it('lists nothing when the snapshot brings nothing', () => {
+		const { details, delta } = mergeCardListSets(
+			[makeCardList({ name: 'Atraxa', cards: [{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }] })],
+			[makeCardList({ name: 'Atraxa', cards: [{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }] })]
+		);
+
+		expect(details).toEqual([]);
+		expect(delta).toEqual({ added: 0, fromNewCards: 0 });
+	});
+});

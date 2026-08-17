@@ -25,9 +25,8 @@ vi.mock('../linked-file', async (importOriginal) => {
 	};
 });
 
-const { initDB, closeDB, linkFile, unlinkFile, mergeFromFile, store } = await import(
-	'../store.svelte'
-);
+const { initDB, closeDB, linkFile, unlinkFile, mergeFromFile, previewMergeFromFile, store } =
+	await import('../store.svelte');
 const { openDatabase, saveCardList, saveCollectionCard } = await import('../db');
 const { exportWithMetadata } = await import('../yjs-integration');
 
@@ -106,8 +105,8 @@ describe('mergeFromFile', () => {
 		});
 	});
 
-	/** Seed local state, link a file holding the remote snapshot, then merge. */
-	async function mergeInto(
+	/** Seed local state and link a file holding the remote snapshot, without merging. */
+	async function linkWith(
 		local: { lists: CardList[]; collection: CollectionCard[] },
 		remote: { lists: CardList[]; collection: CollectionCard[] }
 	): Promise<void> {
@@ -116,7 +115,14 @@ describe('mergeFromFile', () => {
 
 		mockPickAndLinkNewFile.mockResolvedValue(makeHandle(snapshot(remote.lists, remote.collection)));
 		await linkFile();
+	}
 
+	/** Seed local state, link a file holding the remote snapshot, then merge. */
+	async function mergeInto(
+		local: { lists: CardList[]; collection: CollectionCard[] },
+		remote: { lists: CardList[]; collection: CollectionCard[] }
+	): Promise<void> {
+		await linkWith(local, remote);
 		await mergeFromFile();
 	}
 
@@ -219,6 +225,99 @@ describe('mergeFromFile', () => {
 		expect(listByName('Deck A').id).toBe(1);
 		expect(listByName('Remote Deck').id).toBeTypeOf('number');
 		expect(listByName('Remote Deck').id).not.toBe(1);
+	});
+
+	/**
+	 * The dry run behind the preview modal (#77). It has to describe the same
+	 * merge the commit will perform, and it has to leave the database alone.
+	 */
+	describe('previewMergeFromFile', () => {
+		it('describes the collection and each affected list without writing anything', async () => {
+			await linkWith(
+				{
+					lists: [
+						makeCardList({
+							name: 'Atraxa',
+							cards: [{ id: 'bolt', name: 'Bolt', LM_quantity: 1 }]
+						})
+					],
+					collection: [{ id: 'bolt', name: 'Bolt', quantity_owned: 2 }]
+				},
+				{
+					lists: [
+						makeCardList({
+							name: 'Atraxa',
+							cards: [
+								{ id: 'bolt', name: 'Bolt', LM_quantity: 2 },
+								{ id: 'counter', name: 'Counterspell', LM_quantity: 3 }
+							]
+						}),
+						makeCardList({
+							name: 'Modern Burn',
+							cards: [{ id: 'guide', name: 'Goblin Guide', LM_quantity: 4 }]
+						})
+					],
+					collection: [
+						{ id: 'bolt', name: 'Bolt', quantity_owned: 5 },
+						{ id: 'counter', name: 'Counterspell', quantity_owned: 1 }
+					]
+				}
+			);
+
+			const preview = await previewMergeFromFile();
+
+			expect(preview).toEqual({
+				collection: { added: 4, fromNewCards: 1 },
+				lists: [
+					{
+						name: 'Atraxa',
+						status: 'updated',
+						delta: { added: 4, fromNewCards: 3 },
+						settingsChanged: false
+					},
+					{
+						name: 'Modern Burn',
+						status: 'added',
+						delta: { added: 4, fromNewCards: 4 },
+						settingsChanged: false
+					}
+				],
+				unchanged: false
+			});
+
+			// The dry run must not have touched the database it just described
+			expect(store.savedCardLists.map((l) => l.name)).toEqual(['Atraxa']);
+			expect(listByName('Atraxa').cards).toHaveLength(1);
+			expect(ownedQuantity('bolt')).toBe(2);
+		});
+
+		it('reports a snapshot that holds nothing new as unchanged', async () => {
+			await linkWith(
+				{
+					lists: [
+						makeCardList({ name: 'Atraxa', cards: [{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }] })
+					],
+					collection: [{ id: 'bolt', name: 'Bolt', quantity_owned: 4 }]
+				},
+				{
+					lists: [
+						makeCardList({ name: 'Atraxa', cards: [{ id: 'bolt', name: 'Bolt', LM_quantity: 1 }] })
+					],
+					collection: [{ id: 'bolt', name: 'Bolt', quantity_owned: 1 }]
+				}
+			);
+
+			expect(await previewMergeFromFile()).toEqual({
+				collection: { added: 0, fromNewCards: 0 },
+				lists: [],
+				unchanged: true
+			});
+		});
+
+		it('returns null when no file is linked', async () => {
+			await initDB();
+			expect(await previewMergeFromFile()).toBeNull();
+		});
 	});
 
 	it('clears the external-change flag once the merge is written back', async () => {
