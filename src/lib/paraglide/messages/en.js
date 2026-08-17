@@ -1401,6 +1401,142 @@ export const linked_toast_ignore = () => `Ignore`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_aria = () => `Review what the merge will bring in`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_title = () => `Merge from file`
+
+
+/**
+ * @param {{ name: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_intro = (params) => `Merging "${params.name}" into this device brings in:`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_loading = () => `Reading the file…`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_error = () => `The linked file could not be read.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_unchanged = () => `This file holds nothing your database is missing. There is nothing to merge.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_additive = () => `Nothing will be removed. Cards you hold and the file does not stay where they are.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_collection = () => `Collection`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_confirm = () => `Merge`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_close = () => `Close`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_added_one = (params) => `${params.count} card added`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_added_other = (params) => `${params.count} cards added`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_new = (params) => `(${params.count} new)`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_all_copies = () => `(all extra copies)`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_new_list_one = (params) => `new list, ${params.count} card`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_new_list_other = (params) => `new list, ${params.count} cards`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_settings = () => `matching settings updated`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const compare_meta_title = () => `Compare Lists · LM Deck Tools`
 
 

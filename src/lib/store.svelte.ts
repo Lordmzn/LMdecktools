@@ -28,6 +28,7 @@ import {
 } from './error-journal';
 import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
+import type { CardsDelta, ListMergeDetail } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
 import {
 	formatCollectionAsCSV,
@@ -520,6 +521,47 @@ export async function reconnectFile(): Promise<void> {
 	} else {
 		store.linkedFilePermissionDenied = true;
 	}
+}
+
+/** What a merge would bring in, rendered by the preview modal before the user commits (#77). */
+export interface MergePreview {
+	/** The collection delta. Rendered first, ahead of every list. */
+	collection: CardsDelta;
+	/** One entry per list the merge would touch, in merge order. */
+	lists: ListMergeDetail[];
+	/** True when the snapshot holds nothing the local database is missing. */
+	unchanged: boolean;
+}
+
+/**
+ * Run the merge without writing anything, to show what it would bring in.
+ *
+ * `mergeCardListSets` / `mergeCollections` are pure, so this costs one file
+ * read and one DB read and touches neither IndexedDB nor the store. The commit
+ * path re-reads the file rather than reusing this result: the file could have
+ * changed again while the modal was open, and merging the newer snapshot is
+ * both cheap and the safer of the two outcomes — the merge is additive either
+ * way, so a stale preview can only understate what arrives.
+ */
+export async function previewMergeFromFile(): Promise<MergePreview | null> {
+	if (!linkedHandle || !db) return null;
+
+	const fileData = await readFileData(linkedHandle);
+	const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
+
+	const [localLists, localCollection] = await Promise.all([
+		loadAllCardLists(db),
+		dbLoadCollection(db)
+	]);
+
+	const lists = mergeCardListSets(localLists, remoteLists);
+	const collection = mergeCollections(localCollection, remoteCollection);
+
+	return {
+		collection: collection.delta,
+		lists: lists.details,
+		unchanged: lists.details.length === 0 && collection.changed.length === 0
+	};
 }
 
 export async function mergeFromFile(): Promise<void> {

@@ -25,6 +25,42 @@ export interface MergeResult<T> {
 	merged: T[];
 	/** The subset of `merged` that differs from local and must be written back. */
 	changed: T[];
+	/** What the merge would add, for the preview shown before committing (#77). */
+	delta: CardsDelta;
+}
+
+/**
+ * What a merge adds to one target, counted in card *copies* rather than
+ * entries — a deck is read as "4 Lightning Bolt", so four copies arriving is
+ * four cards however many rows they occupy.
+ */
+export interface CardsDelta {
+	/** Copies gained: every quantity increase, plus the whole quantity of each card new to the target. */
+	added: number;
+	/** The subset of `added` contributed by cards the target did not hold at all. */
+	fromNewCards: number;
+}
+
+/** Per-list breakdown of {@link mergeCardListSets}, one entry per list the merge touches. */
+export interface ListMergeDetail {
+	name: string;
+	/** `added` for a list that exists only in the snapshot, `updated` for one both sides hold. */
+	status: 'added' | 'updated';
+	delta: CardsDelta;
+	/** True when the snapshot is newer and hands over different matching settings. */
+	settingsChanged: boolean;
+}
+
+export interface CardListMergeResult extends MergeResult<CardList> {
+	details: ListMergeDetail[];
+}
+
+function emptyDelta(): CardsDelta {
+	return { added: 0, fromNewCards: 0 };
+}
+
+function countCopies(cards: { LM_quantity: number }[]): number {
+	return cards.reduce((total, card) => total + card.LM_quantity, 0);
 }
 
 /**
@@ -37,6 +73,7 @@ export function mergeListCards(local: Card[], remote: Card[]): MergeResult<Card>
 	merged.forEach((card, i) => indexById.set(card.id, i));
 
 	const changed: Card[] = [];
+	const delta = emptyDelta();
 
 	for (const remoteCard of remote) {
 		const index = indexById.get(remoteCard.id);
@@ -46,6 +83,8 @@ export function mergeListCards(local: Card[], remote: Card[]): MergeResult<Card>
 			const added = { ...remoteCard };
 			merged.push(added);
 			changed.push(added);
+			delta.added += added.LM_quantity;
+			delta.fromNewCards += added.LM_quantity;
 			continue;
 		}
 
@@ -55,10 +94,11 @@ export function mergeListCards(local: Card[], remote: Card[]): MergeResult<Card>
 			const updated = { ...localCard, LM_quantity: quantity };
 			merged[index] = updated;
 			changed.push(updated);
+			delta.added += quantity - localCard.LM_quantity;
 		}
 	}
 
-	return { merged, changed };
+	return { merged, changed, delta };
 }
 
 /**
@@ -68,12 +108,14 @@ export function mergeListCards(local: Card[], remote: Card[]): MergeResult<Card>
  * the remote `id` stripped so IndexedDB assigns a fresh key) and local lists
  * whose cards or matching settings the merge actually altered.
  */
-export function mergeCardListSets(local: CardList[], remote: CardList[]): MergeResult<CardList> {
+export function mergeCardListSets(local: CardList[], remote: CardList[]): CardListMergeResult {
 	const merged = local.map((list) => ({ ...list, cards: list.cards.map((card) => ({ ...card })) }));
 	const byName = new Map<string, CardList>();
 	for (const list of merged) byName.set(list.name, list);
 
 	const changed: CardList[] = [];
+	const details: ListMergeDetail[] = [];
+	const delta = emptyDelta();
 
 	for (const remoteList of remote) {
 		const localList = byName.get(remoteList.name);
@@ -89,6 +131,18 @@ export function mergeCardListSets(local: CardList[], remote: CardList[]): MergeR
 			merged.push(added);
 			byName.set(added.name, added);
 			changed.push(added);
+
+			// A list the local database has never seen arrives whole, so every copy
+			// in it is new.
+			const copies = countCopies(added.cards);
+			details.push({
+				name: added.name,
+				status: 'added',
+				delta: { added: copies, fromNewCards: copies },
+				settingsChanged: false
+			});
+			delta.added += copies;
+			delta.fromNewCards += copies;
 			continue;
 		}
 
@@ -110,10 +164,20 @@ export function mergeCardListSets(local: CardList[], remote: CardList[]): MergeR
 		localList.created_at = Math.min(localList.created_at, remoteList.created_at);
 		localList.updated_at = Math.max(localList.updated_at, remoteList.updated_at);
 
-		if (cards.changed.length > 0 || settingsChanged) changed.push(localList);
+		if (cards.changed.length > 0 || settingsChanged) {
+			changed.push(localList);
+			details.push({
+				name: localList.name,
+				status: 'updated',
+				delta: cards.delta,
+				settingsChanged
+			});
+			delta.added += cards.delta.added;
+			delta.fromNewCards += cards.delta.fromNewCards;
+		}
 	}
 
-	return { merged, changed };
+	return { merged, changed, details, delta };
 }
 
 /**
@@ -129,6 +193,7 @@ export function mergeCollections(
 	merged.forEach((card, i) => indexById.set(card.id, i));
 
 	const changed: CollectionCard[] = [];
+	const delta = emptyDelta();
 
 	for (const remoteCard of remote) {
 		const index = indexById.get(remoteCard.id);
@@ -138,6 +203,8 @@ export function mergeCollections(
 			const added = { ...remoteCard };
 			merged.push(added);
 			changed.push(added);
+			delta.added += added.quantity_owned;
+			delta.fromNewCards += added.quantity_owned;
 			continue;
 		}
 
@@ -147,8 +214,9 @@ export function mergeCollections(
 			const updated = { ...localCard, quantity_owned: quantity };
 			merged[index] = updated;
 			changed.push(updated);
+			delta.added += quantity - localCard.quantity_owned;
 		}
 	}
 
-	return { merged, changed };
+	return { merged, changed, delta };
 }

@@ -3,9 +3,18 @@
 	import Header from '$lib/components/Header.svelte';
 	import Footer from '$lib/components/Footer.svelte';
 	import LinkedFileToast from '$lib/components/LinkedFileToast.svelte';
+	import MergePreviewModal from '$lib/components/MergePreviewModal.svelte';
 	import { i18n } from '$lib/i18n';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
-	import { store, mergeFromFile, tryAutoLoadDB, logAppError } from '$lib/store.svelte';
+	import {
+		store,
+		mergeFromFile,
+		previewMergeFromFile,
+		tryAutoLoadDB,
+		logAppError
+	} from '$lib/store.svelte';
+	import type { MergePreview } from '$lib/store.svelte';
+	import * as m from '$lib/paraglide/messages';
 	import { page } from '$app/stores';
 	import { languageTag } from '$lib/paraglide/runtime';
 	import { absoluteUrl } from '$lib/site';
@@ -37,6 +46,10 @@
 	);
 
 	let showLinkedFileToast = $state(false);
+	let showMergePreview = $state(false);
+	let mergePreview = $state<MergePreview | null>(null);
+	let mergePreviewLoading = $state(false);
+	let mergePreviewError = $state<string | null>(null);
 
 	onMount(() => {
 		tryAutoLoadDB();
@@ -59,9 +72,43 @@
 		}
 	});
 
-	function handleMerge() {
-		mergeFromFile();
+	/**
+	 * The toast's Merge does not merge — it opens the preview, and the merge is
+	 * only committed from there (#77).
+	 */
+	async function handleMerge() {
 		showLinkedFileToast = false;
+		showMergePreview = true;
+		mergePreviewLoading = true;
+		mergePreview = null;
+		mergePreviewError = null;
+		try {
+			mergePreview = await previewMergeFromFile();
+		} catch (e) {
+			logAppError('import', e, { operation: 'previewMergeFromFile' });
+			mergePreviewError = m.merge_preview_error();
+		} finally {
+			mergePreviewLoading = false;
+		}
+	}
+
+	async function handleMergeConfirm() {
+		showMergePreview = false;
+		try {
+			await mergeFromFile();
+		} catch (e) {
+			logAppError('import', e, { operation: 'mergeFromFile' });
+		}
+	}
+
+	/**
+	 * Dismissing the preview leaves the file as it was and does not clear the
+	 * external-change flag, so the toast can come back rather than the change
+	 * being silently forgotten.
+	 */
+	function handleMergeCancel() {
+		showMergePreview = false;
+		mergePreview = null;
 	}
 
 	function handleIgnore() {
@@ -105,5 +152,15 @@
 		fileName={store.linkedFileName ?? ''}
 		onmerge={handleMerge}
 		onignore={handleIgnore}
+	/>
+
+	<MergePreviewModal
+		bind:show={showMergePreview}
+		fileName={store.linkedFileName ?? ''}
+		preview={mergePreview}
+		loading={mergePreviewLoading}
+		error={mergePreviewError}
+		onconfirm={handleMergeConfirm}
+		oncancel={handleMergeCancel}
 	/>
 </ParaglideJS>
