@@ -480,15 +480,19 @@
 
 <div class="mx-auto max-w-7xl p-4">
 	<!-- Header -->
-	<div class="surface-card mb-6 p-6">
-		<!-- Row 1: Lists label + dropdown + New List button -->
-		<div class="mb-4 flex flex-wrap items-center justify-between gap-4">
-			<div class="flex items-center gap-3">
+	<div class="surface-card mb-6 p-4 sm:p-6">
+		<!-- Row 1: Lists label + dropdown + New List button.
+		     The inner group used to be a non-wrapping `flex` around a 200px-wide
+		     select, which is what pushed the layout viewport to 457px on a 390px
+		     phone and put Delete List past the right edge (#76). Everything here
+		     wraps now, and the select gives up its fixed width below `sm`. -->
+		<div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+			<div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
 				<span class="text-lg font-semibold text-slate-400">{m.lists_label()}</span>
 				<select
 					onchange={(e) => handleSwitchList(parseInt((e.currentTarget as HTMLSelectElement).value))}
 					disabled={!store.dbLoaded || store.savedCardLists.length === 0}
-					class="field min-w-[200px] disabled:cursor-not-allowed disabled:opacity-50"
+					class="field min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[200px] sm:flex-none"
 				>
 					{#if store.savedCardLists.length === 0}
 						<option value={-1}>{m.lists_none()}</option>
@@ -520,10 +524,10 @@
 					{m.lists_delete_button()}
 				</button>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex w-full items-center gap-2 sm:w-auto">
 				<a
 					href="{base}/card-lists/compare"
-					class="btn btn-quiet {store.savedCardLists.length < 2
+					class="btn btn-quiet flex-1 sm:flex-none {store.savedCardLists.length < 2
 						? 'pointer-events-none opacity-50'
 						: ''}"
 					aria-disabled={store.savedCardLists.length < 2}
@@ -547,7 +551,7 @@
 				<button
 					onclick={handleCreateList}
 					disabled={store.dbMode === 'none'}
-					class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+					class="btn btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:flex-none"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -568,7 +572,7 @@
 	</div>
 
 	<!-- Card Panel -->
-	<div class="surface-card p-6">
+	<div class="surface-card p-4 sm:p-6">
 		<!-- List name + card count | Filter + Sort + Action buttons -->
 		<div class="mb-4 flex flex-wrap items-center justify-between gap-4">
 			<div>
@@ -613,72 +617,85 @@
 					{/if}
 				</p>
 			</div>
-			<div class="flex flex-wrap items-center gap-2">
-				<input
-					type="text"
-					disabled={!store.dbLoaded}
-					bind:value={filterText}
-					placeholder={m.common_filter_placeholder()}
-					class="field disabled:opacity-50"
-				/>
-				<select bind:value={sortBy} disabled={!store.dbLoaded} class="field disabled:opacity-50">
-					<option value="name">{m.common_sort_by_name()}</option>
-					<option value="quantity">{m.common_sort_by_quantity()}</option>
-					<option value="set">{m.common_sort_by_set()}</option>
-				</select>
-				<button
-					onclick={handleAddAllToCollection}
-					disabled={store.isReadOnly || store.listCards.length === 0}
-					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
-					title={m.lists_add_all_to_collection_title()}
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
+			<!-- Four buttons plus a filter and a sort, each landing on its own
+			     partial row at 390px, put ~40% of the screen between the top of the
+			     page and the first card. Below `md` they take a deliberate shape
+			     instead: filter and sort share one row, the actions form a 2×2
+			     grid (#76). -->
+			<div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
+				<div class="flex w-full gap-2 md:w-auto">
+					<input
+						type="text"
+						disabled={!store.dbLoaded}
+						bind:value={filterText}
+						placeholder={m.common_filter_placeholder()}
+						class="field min-w-0 flex-1 disabled:opacity-50 md:flex-none"
+					/>
+					<select
+						bind:value={sortBy}
+						disabled={!store.dbLoaded}
+						class="field shrink-0 disabled:opacity-50"
 					>
-						<path d="M5 12h14" />
-						<path d="M12 5v14" />
-					</svg>
-					{m.lists_add_all_to_collection()}
-				</button>
-				<button
-					onclick={() => (showAddCardsModal = true)}
-					disabled={store.dbMode === 'none'}
-					class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					<svg
-						xmlns="http://www.w3.org/2000/svg"
-						width="18"
-						height="18"
-						viewBox="0 0 24 24"
-						fill="none"
-						stroke="currentColor"
-						stroke-width="2"
+						<option value="name">{m.common_sort_by_name()}</option>
+						<option value="quantity">{m.common_sort_by_quantity()}</option>
+						<option value="set">{m.common_sort_by_set()}</option>
+					</select>
+				</div>
+				<div class="grid w-full grid-cols-2 gap-2 md:flex md:w-auto md:flex-wrap md:items-center">
+					<button
+						onclick={handleAddAllToCollection}
+						disabled={store.isReadOnly || store.listCards.length === 0}
+						class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
+						title={m.lists_add_all_to_collection_title()}
 					>
-						<path d="M5 12h14" />
-						<path d="M12 5v14" />
-					</svg>
-					{m.common_add_cards()}
-				</button>
-				<button
-					onclick={() => (showImportModal = true)}
-					disabled={store.dbMode === 'none'}
-					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					{m.common_import()}
-				</button>
-				<button
-					onclick={handleExport}
-					disabled={!store.dbLoaded || store.listCards.length === 0}
-					class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
-				>
-					{m.common_export()}
-				</button>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M5 12h14" />
+							<path d="M12 5v14" />
+						</svg>
+						{m.lists_add_all_to_collection()}
+					</button>
+					<button
+						onclick={() => (showAddCardsModal = true)}
+						disabled={store.dbMode === 'none'}
+						class="btn btn-primary disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="18"
+							height="18"
+							viewBox="0 0 24 24"
+							fill="none"
+							stroke="currentColor"
+							stroke-width="2"
+						>
+							<path d="M5 12h14" />
+							<path d="M12 5v14" />
+						</svg>
+						{m.common_add_cards()}
+					</button>
+					<button
+						onclick={() => (showImportModal = true)}
+						disabled={store.dbMode === 'none'}
+						class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						{m.common_import()}
+					</button>
+					<button
+						onclick={handleExport}
+						disabled={!store.dbLoaded || store.listCards.length === 0}
+						class="btn btn-quiet disabled:cursor-not-allowed disabled:opacity-50"
+					>
+						{m.common_export()}
+					</button>
+				</div>
 			</div>
 		</div>
 

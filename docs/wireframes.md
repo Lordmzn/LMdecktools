@@ -133,6 +133,69 @@ retune of the alarm lane, and a maritime signal-flag palette — are in issue #4
 
 ---
 
+## Pointer & Touch
+
+The app has two input models and the layouts above describe the mouse one. The
+second is not a smaller version of it — it is a different set of affordances,
+selected by a media query rather than a breakpoint (#76).
+
+**`touch:` is the variant, `(hover: none)` is the query.** Both are declared at
+the top of `src/app.css`. `pointer: coarse` is the wrong test: the hazard being
+guarded against is a control revealed by `:hover`, and what matters is whether
+the primary input can hover at all. Tailwind v4 already wraps `hover:` and
+`group-hover:` in `(hover: hover)`, so `touch:` is the other half of that pair —
+**every hover-revealed control needs a `touch:` branch, or it does not exist on
+a phone.** It also converges the platforms: iOS Safari synthesises a `:hover`
+on first tap but still reports `(hover: none)`, so iPhone and Android take the
+same branch instead of two different broken ones.
+
+**Hidden is not the same as unreachable.** `opacity: 0` does not disable
+hit-testing. Every card action in the app was once invisible *and still
+tappable*, so a tap meant to inspect a card silently removed a copy from the
+collection. Prefer making a control permanently visible over any tap-to-reveal
+scheme: a visible control cannot be tapped blind, which fixes the hazard by
+construction rather than by a state machine.
+
+**Card overlays become static bars.** `CollectionCard`, `CardListCard` and
+`Card` each render *one* control group that is `absolute inset-0` with a
+gradient on a mouse and `static` under the art on touch. One DOM node, two
+positions — duplicating the buttons per pointer type is how the two copies drift
+apart. The collection card's three buttons are laid out as a stepper
+(`−` / `2× ✎` / `+`) because a `−` and `+` flanking a live quantity are
+self-describing, which two loose icon buttons are not.
+
+**`title` is not a label.** A tooltip needs a hover to exist, so on touch it is
+nothing at all. Anything whose meaning lived only in `title` carries either
+visible text on touch or an `aria-label`, usually both. Two `+` buttons 40px
+apart meaning "add a copy to this list" and "add this card to the collection"
+was the case that forced the rule.
+
+**44×44 on coarse pointers.** WCAG 2.5.5. Applied at the component classes
+(`.btn`, `.seg`, `.field`) and via `.tap-target` for icon buttons and tabs, not
+per call site, so a new control inherits it. `.btn-sm` is included — "small" is
+a density choice for a mouse, and no fingertip is small enough to earn an
+exception. The exemption the spec grants and this app uses is *inline*: the
+footer's three links inside disclaimer sentences are sized by the line-height
+of the prose around them and cannot grow without breaking the paragraph.
+
+**`.field` goes to 16px on touch.** Not a sizing choice: below 16px iOS Safari
+zooms the whole page on focus and leaves the user panned sideways in a layout
+that had no horizontal overflow a moment earlier.
+
+**`dvh`, not `vh`, for anything that must fit the screen.** Mobile Safari's `vh`
+is the *expanded* viewport, taller than what is on screen while the URL bar
+shows. The DB modal is a bounded flex column (`max-h-[calc(100dvh-2rem)]`,
+`shrink-0` chrome, `min-h-0 flex-1` body) rather than a bounded body under an
+unbounded header, which is what used to push it past both ends of an iPhone SE.
+
+**Testing.** None of this is reachable from the default Playwright context.
+`tests/e2e/mobile.spec.ts` runs under the `mobile` project (iPhone 13,
+`hasTouch`) and opens with an assertion that the context really reports
+`(hover: none)` — without it every touch assertion in the file would pass
+vacuously.
+
+---
+
 ## Homepage (`/`)
 
 ```

@@ -52,12 +52,25 @@
 </script>
 
 <div class="flex flex-col rounded-xl border {colorClasses.border} {colorClasses.bg} p-4">
-	<h3 class="mb-3 text-sm font-semibold tracking-wide uppercase {colorClasses.text}">
+	<h3 class="mb-1 text-sm font-semibold tracking-wide uppercase {colorClasses.text}">
 		{title}
 		<span class="ml-1 rounded-full {colorClasses.badge} px-2 py-0.5 text-xs text-slate-950">
 			{cards.length}
 		</span>
 	</h3>
+
+	<!-- Which number is which list, said once at the top of the column rather
+	     than in a `title` on every row — a tooltip needs a hover, and a phone has
+	     no hover to give it (#76). -->
+	{#if showBothQuantities && cards.length > 0}
+		<p class="mb-2 font-mono text-[0.65rem] tracking-wider text-slate-400 uppercase">
+			<span class="text-cat-parchment">{nameA}</span>
+			/
+			<span class="text-cat-steel">{nameB}</span>
+		</p>
+	{:else}
+		<div class="mb-2"></div>
+	{/if}
 
 	{#if cards.length === 0}
 		<p class="py-6 text-center text-sm text-slate-500">{m.compare_no_cards()}</p>
@@ -78,6 +91,7 @@
 								img.dataset.flipped = String(!isFlipped);
 							}}
 							class="shrink-0 cursor-pointer"
+							aria-label={m.common_flip_card()}
 							title={m.common_flip_card()}
 						>
 							<img
@@ -100,7 +114,7 @@
 
 					<!-- Quantity badge(s) -->
 					{#if showBothQuantities}
-						<span class="text-xs text-slate-400" title="{nameA} / {nameB}">
+						<span class="font-mono text-xs text-slate-400">
 							<span class="text-cat-parchment">{quantityA}</span>
 							/
 							<span class="text-cat-steel">{quantityB}</span>

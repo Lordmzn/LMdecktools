@@ -190,7 +190,8 @@
 				</h2>
 				<button
 					onclick={() => (showSearchModal = false)}
-					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
+					class="tap-target rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
+					aria-label={m.common_close()}
 					title={m.common_close()}
 				>
 					<svg
@@ -219,7 +220,7 @@
 
 <div class="mx-auto max-w-7xl p-4">
 	<!-- Header + Collection Grid -->
-	<div class="surface-card p-6">
+	<div class="surface-card p-4 sm:p-6">
 		<div class="mb-6 flex flex-wrap items-center justify-between gap-4">
 			<div>
 				<div class="eyebrow mb-1">{m.collection_eyebrow()}</div>
@@ -234,27 +235,31 @@
 				{/if}
 			</div>
 
-			<div class="flex flex-wrap items-center gap-2">
-				<!-- Filter -->
-				<input
-					type="text"
-					disabled={!store.dbLoaded}
-					bind:value={filterText}
-					placeholder={m.common_filter_placeholder()}
-					class="field"
-				/>
+			<!-- Filter and sort share a row below `md`, with Add Cards under them —
+			     the same wrap strategy as the card-lists toolbar (#76). -->
+			<div class="flex w-full flex-wrap items-center gap-2 md:w-auto">
+				<div class="flex w-full gap-2 md:w-auto">
+					<!-- Filter -->
+					<input
+						type="text"
+						disabled={!store.dbLoaded}
+						bind:value={filterText}
+						placeholder={m.common_filter_placeholder()}
+						class="field min-w-0 flex-1 md:flex-none"
+					/>
 
-				<!-- Sort -->
-				<select bind:value={sortBy} disabled={!store.dbLoaded} class="field">
-					<option value="name">{m.common_sort_by_name()}</option>
-					<option value="quantity">{m.common_sort_by_quantity()}</option>
-					<option value="set">{m.common_sort_by_set()}</option>
-				</select>
+					<!-- Sort -->
+					<select bind:value={sortBy} disabled={!store.dbLoaded} class="field shrink-0">
+						<option value="name">{m.common_sort_by_name()}</option>
+						<option value="quantity">{m.common_sort_by_quantity()}</option>
+						<option value="set">{m.common_sort_by_set()}</option>
+					</select>
+				</div>
 
 				<button
 					onclick={() => (showSearchModal = true)}
 					disabled={store.dbMode === 'none'}
-					class="btn btn-primary"
+					class="btn btn-primary w-full md:w-auto"
 				>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"

@@ -28,7 +28,8 @@
 			data-sveltekit-reload
 			aria-label={LABELS[tag]}
 			aria-current={tag === languageTag() ? 'true' : undefined}
-			class="font-mono text-xs tracking-wider uppercase transition-colors {tag === languageTag()
+			class="tap-target font-mono text-xs tracking-wider uppercase transition-colors {tag ===
+			languageTag()
 				? 'text-orange-300'
 				: 'text-slate-400 hover:text-orange-300'}"
 		>

@@ -8,6 +8,19 @@
 @plugin '@tailwindcss/forms';
 @plugin '@tailwindcss/typography';
 
+/* ── Pointer variants (#76) ───────────────────────────────────────────────────
+   `hover: none` is the signal that matters here, not `pointer: coarse`: the
+   hazard being guarded against is a control revealed by :hover, and a device
+   that cannot hover never reveals it. Tailwind v4 already wraps `hover:` and
+   `group-hover:` in `(hover: hover)`, so those rules are simply not emitted on
+   a phone — which is exactly why the card overlays sat at opacity 0 and stayed
+   tappable. `touch:` is the other half of every such pair.
+   Note iOS Safari synthesises a :hover on first tap for elements carrying hover
+   styles, but still reports `(hover: none)`, so it lands in the touch branch
+   too — the iPhone and Android behaviours converge rather than diverge. */
+@custom-variant touch (@media (hover: none));
+@custom-variant fine (@media (hover: hover));
+
 /* ── Design tokens ────────────────────────────────────────────────────────────
    Mirrors .claude/skills/LM Deck Tools Design System/tokens/*.css.
    The slate scale is the design system's own — deliberately NOT Tailwind's
@@ -413,6 +426,52 @@ body::after {
 	.field:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
+	}
+
+	/* ── Coarse-pointer sizing (#76) ─────────────────────────────────────────
+	   A fingertip is not a cursor. WCAG 2.5.5 asks for 44×44 CSS px; the desktop
+	   layout is built around a denser scale, so the two sizes live side by side
+	   rather than one replacing the other. Applied at the component classes, not
+	   per call site, so a new button inherits it without anyone remembering.
+
+	   The 16px font on `.field` is not a sizing choice: below 16px, iOS Safari
+	   zooms the whole page on focus and leaves the user panned sideways in a
+	   layout that had no horizontal overflow a moment earlier. */
+	@media (hover: none) {
+		/* `.btn-sm` included deliberately — "small" is a density choice for a
+		   mouse, and there is no fingertip small enough to earn an exception. */
+		.btn,
+		.seg {
+			min-height: 44px;
+		}
+
+		.btn-sm {
+			font-size: 0.85rem;
+		}
+
+		.seg {
+			padding-inline: 1rem;
+		}
+
+		.field {
+			min-height: 44px;
+			font-size: 1rem;
+		}
+	}
+
+	/* Minimum touch target for controls that are not `.btn` — icon buttons,
+	   footer links, tabs. Inert on a mouse, where the visual size is the size. */
+	.tap-target {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	@media (hover: none) {
+		.tap-target {
+			min-width: 44px;
+			min-height: 44px;
+		}
 	}
 }
 

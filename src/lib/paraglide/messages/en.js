@@ -1015,6 +1015,30 @@ export const card_add_to_collection = () => `Add to collection`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const card_action_to_collection = () => `To collection`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const card_remove_card = () => `Remove card`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const card_action_remove = () => `Remove`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const card_owned = () => `✓ Owned`
 
 
