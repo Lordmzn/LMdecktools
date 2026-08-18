@@ -208,12 +208,15 @@ test.describe('Card Lists', () => {
 			page.locator('[data-testid="list-cards"]').getByAltText('Lightning Bolt')
 		).toBeVisible();
 
-		// The decrement button (−) doubles as "Remove from list" at qty=1.
-		// Use evaluate to bypass CSS overlay issues.
+		// The decrement button (−) doubles as "Remove from list" at qty=1, which is
+		// now also its accessible name — the glyph alone was a tooltip-only label,
+		// and a tooltip is not a label a phone or a screen reader ever sees (#76).
+		// Still via evaluate: on a hover-capable pointer this stepper is the small
+		// pill floating on the card art.
 		await page
 			.locator('[data-testid="list-cards"] div.group')
 			.first()
-			.getByRole('button', { name: '−' })
+			.getByRole('button', { name: 'Remove from list' })
 			.evaluate((btn) => (btn as HTMLElement).click());
 
 		await expect(page.getByText('No cards in list yet')).toBeVisible();

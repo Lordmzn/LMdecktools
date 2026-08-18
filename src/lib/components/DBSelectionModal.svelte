@@ -451,7 +451,7 @@
 
 {#if show}
 	<div
-		class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm transition-opacity duration-300"
+		class="fixed inset-0 z-50 flex items-end justify-center overflow-y-auto bg-black/50 py-4 backdrop-blur-sm transition-opacity duration-300 sm:items-center"
 		role="button"
 		tabindex="0"
 		onclick={(e) => e.target === e.currentTarget && closeModal()}
@@ -464,32 +464,48 @@
 			}
 		}}
 	>
+		<!--
+			The panel is a bounded flex column, not a bounded body under an unbounded
+			header. It used to cap only the content at 60vh while the header and the
+			5-tab strip grew freely above it, so on an iPhone 13 the modal was a
+			398px window onto 954px of content nested inside the page scroll, and on
+			a 568px-tall iPhone SE the panel outgrew an `items-center` overlay and
+			lost 12px off each end with no way to reach them (#76). `dvh`, not `vh`:
+			mobile Safari's `vh` is the *expanded* viewport, which is taller than
+			what is actually on screen while the URL bar is showing.
+		-->
 		<div
-			class="panel mx-4 w-full max-w-2xl transform overflow-hidden rounded-2xl shadow-2xl transition-all duration-300"
+			class="panel mx-4 flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl transform flex-col overflow-hidden rounded-2xl shadow-2xl transition-all duration-300"
 			class:scale-100={show}
 			class:scale-95={!show}
 		>
 			<!-- Header -->
 			<div
-				class="flex items-center gap-4 border-b border-orange-500/[0.12] bg-gradient-to-br from-orange-500/[0.12] to-transparent px-6 py-5"
+				class="flex shrink-0 items-center gap-3 border-b border-orange-500/[0.12] bg-gradient-to-br from-orange-500/[0.12] to-transparent px-4 py-4 sm:gap-4 sm:px-6 sm:py-5"
 			>
 				<!-- The brand mark, same art as the site header (#66) -->
-				<BrandMark class="h-10 w-10 shrink-0" />
-				<div>
-					<h2 class="text-2xl font-extrabold tracking-tight text-white">{m.db_modal_title()}</h2>
+				<BrandMark class="h-9 w-9 shrink-0 sm:h-10 sm:w-10" />
+				<div class="min-w-0">
+					<h2 class="text-xl font-extrabold tracking-tight text-white sm:text-2xl">
+						{m.db_modal_title()}
+					</h2>
 					<p class="mt-0.5 text-sm text-slate-400">{m.db_modal_subtitle()}</p>
 				</div>
 			</div>
 
-			<!-- Toolbar -->
-			<div class="flex gap-1 border-b border-orange-500/[0.08] bg-slate-900 px-4 py-2">
+			<!-- Toolbar — five tabs that wrapped "In-browser DB" onto three lines at
+			     390px. `whitespace-nowrap` keeps each tab one line tall and the strip
+			     scrolls sideways if the five of them still do not fit. -->
+			<div
+				class="flex shrink-0 gap-1 overflow-x-auto border-b border-orange-500/[0.08] bg-slate-900 px-2 py-2 sm:px-4"
+			>
 				<button
 					onclick={() => {
 						toggleSection('localdb');
 						exportBackupSuccess = false;
 					}}
 					aria-expanded={activeSection === 'localdb'}
-					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+					class="flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[0.7rem] whitespace-nowrap transition-colors sm:px-3 sm:text-xs
 						{activeSection === 'localdb'
 						? 'bg-orange-500/10 text-orange-400'
 						: 'text-slate-400 hover:text-orange-300'}"
@@ -511,7 +527,7 @@
 						onclick={() => toggleSection('link')}
 						disabled={store.dbMode !== 'active'}
 						aria-expanded={activeSection === 'link'}
-						class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+						class="flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[0.7rem] whitespace-nowrap transition-colors sm:px-3 sm:text-xs
 							{activeSection === 'link'
 							? 'bg-orange-500/10 text-orange-400'
 							: 'text-slate-400 hover:text-orange-300'}
@@ -531,7 +547,7 @@
 				<button
 					onclick={() => toggleSection('cache')}
 					aria-expanded={activeSection === 'cache'}
-					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+					class="flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[0.7rem] whitespace-nowrap transition-colors sm:px-3 sm:text-xs
 						{activeSection === 'cache'
 						? 'bg-orange-500/10 text-orange-400'
 						: 'text-slate-400 hover:text-orange-300'}"
@@ -553,7 +569,7 @@
 					}}
 					disabled={store.dbMode !== 'active'}
 					aria-expanded={activeSection === 'import'}
-					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+					class="flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[0.7rem] whitespace-nowrap transition-colors sm:px-3 sm:text-xs
 						{activeSection === 'import'
 						? 'bg-orange-500/10 text-orange-400'
 						: 'text-slate-400 hover:text-orange-300'}
@@ -573,7 +589,7 @@
 					onclick={() => toggleSection('export')}
 					disabled={store.dbMode !== 'active'}
 					aria-expanded={activeSection === 'export'}
-					class="flex flex-col items-center gap-1 rounded-lg px-3 py-2 text-xs transition-colors
+					class="flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[0.7rem] whitespace-nowrap transition-colors sm:px-3 sm:text-xs
 						{activeSection === 'export'
 						? 'bg-orange-500/10 text-orange-400'
 						: 'text-slate-400 hover:text-orange-300'}
@@ -592,7 +608,7 @@
 			</div>
 
 			<!-- Content -->
-			<div class="max-h-[60vh] overflow-y-auto p-6">
+			<div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
 				<!-- Local DB Section (merged: connect + import + create) -->
 				{#if activeSection === 'localdb'}
 					<!-- Connect to existing local DB (only if DB exists but not active) -->

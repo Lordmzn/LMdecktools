@@ -46,7 +46,8 @@
 		{#if isDFC}
 			<button
 				onclick={() => (flipped = !flipped)}
-				class="absolute top-2 left-2 rounded-full bg-slate-800/80 p-1.5 text-slate-100 shadow-lg transition hover:bg-slate-700"
+				class="tap-target absolute top-2 left-2 rounded-full bg-slate-800/80 p-1.5 text-slate-100 shadow-lg transition hover:bg-slate-700"
+				aria-label={m.common_flip_card()}
 				title={m.common_flip_card()}
 			>
 				<svg
@@ -68,14 +69,15 @@
 			</button>
 		{/if}
 
-		<!-- Overlay on Hover -->
+		<!-- Overlay on Hover — and a plain button under the art on touch, where
+		     "hover" is not an input a user has (#76). -->
 		<div
-			class="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
+			class="touch:static touch:bg-slate-900 touch:bg-none touch:p-0 touch:opacity-100 absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
 		>
 			<button
 				data-testid="card-add-btn"
 				onclick={handleAdd}
-				class="flex translate-y-4 transform items-center gap-2 rounded-lg bg-slate-100 px-4 py-2 font-semibold text-slate-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-white {isAdding
+				class="touch:h-11 touch:w-full touch:translate-y-0 touch:rounded-none touch:px-2 touch:text-[0.7rem] touch:shadow-none flex translate-y-4 transform items-center justify-center gap-2 rounded-lg bg-slate-100 px-4 py-2 font-semibold text-slate-900 shadow-lg transition-all group-hover:translate-y-0 hover:bg-white {isAdding
 					? 'scale-110'
 					: ''}"
 			>
@@ -89,7 +91,7 @@
 					stroke-width="2"
 					stroke-linecap="round"
 					stroke-linejoin="round"
-					class="transition-transform {isAdding ? 'rotate-90' : ''}"
+					class="touch:h-4 touch:w-4 shrink-0 transition-transform {isAdding ? 'rotate-90' : ''}"
 				>
 					<circle cx="12" cy="12" r="10" />
 					<path d="M8 12h8" />

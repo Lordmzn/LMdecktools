@@ -47,14 +47,14 @@
 					<li>
 						<a
 							href="{base}/diagnostics/"
-							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
+							class="tap-target text-sm text-slate-400 transition-colors hover:text-orange-300"
 							>{m.footer_diagnostics()}</a
 						>
 					</li>
 					<li>
 						<a
 							href="https://github.com/Lordmzn/LMdecktools"
-							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
+							class="tap-target text-sm text-slate-400 transition-colors hover:text-orange-300"
 							target="_blank"
 							rel="noopener noreferrer">GitHub</a
 						>
@@ -62,7 +62,7 @@
 					<li>
 						<a
 							href="https://github.com/Lordmzn/LMdecktools/issues"
-							class="text-sm text-slate-400 transition-colors hover:text-orange-300"
+							class="tap-target text-sm text-slate-400 transition-colors hover:text-orange-300"
 							target="_blank"
 							rel="noopener noreferrer">{m.footer_contribute()}</a
 						>
@@ -85,14 +85,14 @@
 					<span>{m.footer_support()}</span>
 					<a
 						href="https://github.com/sponsors/Lordmzn"
-						class="transition-colors hover:text-orange-300"
+						class="tap-target transition-colors hover:text-orange-300"
 						target="_blank"
 						rel="noopener noreferrer">GitHub Sponsors</a
 					>
 					<span class="text-slate-600">&middot;</span>
 					<a
 						href="https://ko-fi.com/lordmzn"
-						class="transition-colors hover:text-orange-300"
+						class="tap-target transition-colors hover:text-orange-300"
 						target="_blank"
 						rel="noopener noreferrer">Ko-fi</a
 					>

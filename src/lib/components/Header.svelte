@@ -19,7 +19,7 @@
 		<!-- DB Status Button -->
 		<button
 			onclick={() => (showStartupModal = !showStartupModal)}
-			class="relative inline-flex shrink-0 items-center gap-2 rounded-lg px-3 py-1.5 text-[0.82rem] font-semibold tracking-tight transition-all duration-200 {store.dbMode ===
+			class="relative inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg px-2.5 py-1.5 text-[0.82rem] font-semibold tracking-tight transition-all duration-200 sm:min-h-0 sm:px-3 {store.dbMode ===
 			'active'
 				? 'bg-orange-500 text-slate-950 shadow-[0_2px_16px_rgba(249,115,22,0.3)] hover:bg-orange-600'
 				: store.dbMode === 'peek'

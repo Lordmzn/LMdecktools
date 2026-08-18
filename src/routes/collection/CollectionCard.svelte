@@ -50,9 +50,10 @@
 			<img src={cachedUrl} alt={card.name} class="h-auto w-full" />
 		{/await}
 
-		<!-- Quantity Badge -->
+		<!-- Quantity Badge — redundant on touch, where the stepper below carries
+		     the same number as its own centre label. -->
 		<div
-			class="absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 font-mono text-xs font-bold text-slate-950 shadow-[0_2px_12px_rgba(249,115,22,0.4)]"
+			class="touch:hidden absolute top-10 right-4 rounded-full bg-orange-500 px-2 py-1 font-mono text-xs font-bold text-slate-950 shadow-[0_2px_12px_rgba(249,115,22,0.4)]"
 		>
 			{card.quantity_owned}×
 		</div>
@@ -61,7 +62,8 @@
 		{#if isDFC}
 			<button
 				onclick={() => (flipped = !flipped)}
-				class="absolute top-2 left-2 rounded-full bg-slate-900/85 p-1.5 text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-orange-500 hover:text-slate-950"
+				class="tap-target absolute top-2 left-2 rounded-full bg-slate-900/85 p-1.5 text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-orange-500 hover:text-slate-950"
+				aria-label={m.common_flip_card()}
 				title={m.common_flip_card()}
 			>
 				<svg
@@ -83,14 +85,23 @@
 			</button>
 		{/if}
 
-		<!-- Controls Overlay -->
+		<!-- Controls Overlay — a hover reveal on a mouse, a permanently visible
+		     stepper welded to the bottom of the art on touch. Same three buttons
+		     either way: `opacity: 0` never stopped hit-testing, so on a phone
+		     these were tappable without ever being drawn (#76). The three read as
+		     one stepper rather than three loose glyphs — `−` and `+` flanking the
+		     live quantity say what they do without a label, which a bare pair of
+		     icon buttons does not. -->
 		<div
-			class="absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
+			class="touch:static touch:bg-slate-900 touch:bg-none touch:p-0 touch:opacity-100 absolute inset-0 flex items-end justify-center bg-gradient-to-t from-black/80 via-black/40 to-transparent p-4 opacity-0 transition-all duration-300 group-hover:opacity-100"
 		>
-			<div class="flex translate-y-4 transform gap-2 transition-all group-hover:translate-y-0">
+			<div
+				class="touch:w-full touch:translate-y-0 touch:gap-px flex translate-y-4 transform gap-2 transition-all group-hover:translate-y-0"
+			>
 				<button
 					onclick={handleRemove}
-					class="bg-danger-solid hover:bg-danger rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition"
+					class="bg-danger-solid hover:bg-danger touch:h-11 touch:flex-1 touch:rounded-none touch:shadow-none flex items-center justify-center rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition"
+					aria-label={m.card_remove_single()}
 					title={m.card_remove_single()}
 				>
 					<svg
@@ -108,9 +119,13 @@
 
 				<button
 					onclick={startEdit}
-					class="rounded-lg bg-slate-800/90 p-2 font-semibold text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-slate-700"
+					class="touch:h-11 touch:flex-1 touch:rounded-none touch:shadow-none flex items-center justify-center gap-1.5 rounded-lg bg-slate-800/90 p-2 font-semibold text-slate-100 shadow-lg backdrop-blur-sm transition hover:bg-slate-700"
+					aria-label={m.card_edit_quantity()}
 					title={m.card_edit_quantity()}
 				>
+					<!-- The quantity doubles as this button's label on touch, which is
+					     what makes the row legible as a stepper. -->
+					<span class="touch:inline hidden font-mono text-sm">{card.quantity_owned}×</span>
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
 						width="20"
@@ -119,6 +134,7 @@
 						fill="none"
 						stroke="currentColor"
 						stroke-width="2"
+						class="touch:h-4 touch:w-4"
 					>
 						<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
 					</svg>
@@ -126,7 +142,8 @@
 
 				<button
 					onclick={handleAdd}
-					class="bg-success-solid hover:bg-success rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition"
+					class="bg-success-solid hover:bg-success touch:h-11 touch:flex-1 touch:rounded-none touch:shadow-none flex items-center justify-center rounded-lg p-2 font-semibold text-slate-950 shadow-lg transition"
+					aria-label={m.card_add_single()}
 					title={m.card_add_single()}
 				>
 					<svg

@@ -73,11 +73,12 @@
 		</div>
 	{:else}
 		<!-- Header panel -->
-		<div class="surface-card mb-6 p-6">
+		<div class="surface-card mb-6 p-4 sm:p-6">
 			<div class="mb-4 flex items-center gap-2">
 				<a
 					href="{base}/card-lists"
-					class="rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
+					class="tap-target rounded-lg p-2 text-slate-400 transition hover:bg-orange-500/[0.08] hover:text-orange-300"
+					aria-label={m.compare_back_to_lists()}
 					title={m.compare_back_to_lists()}
 				>
 					<svg
@@ -100,17 +101,17 @@
 
 			<!-- List selectors -->
 			<div class="mb-4 flex flex-wrap items-center gap-4">
-				<div class="flex items-center gap-2">
+				<div class="flex w-full items-center gap-2 sm:w-auto">
 					<span class="text-cat-parchment text-sm font-medium">{m.compare_list_a()}</span>
-					<select bind:value={indexA} class="field min-w-[160px]">
+					<select bind:value={indexA} class="field min-w-0 flex-1 sm:min-w-[160px] sm:flex-none">
 						{#each lists as list, i (list.id ?? i)}
 							<option value={i}>{list.name}</option>
 						{/each}
 					</select>
 				</div>
-				<div class="flex items-center gap-2">
+				<div class="flex w-full items-center gap-2 sm:w-auto">
 					<span class="text-cat-steel text-sm font-medium">{m.compare_list_b()}</span>
-					<select bind:value={indexB} class="field min-w-[160px]">
+					<select bind:value={indexB} class="field min-w-0 flex-1 sm:min-w-[160px] sm:flex-none">
 						{#each lists as list, i (list.id ?? i)}
 							<option value={i}>{list.name}</option>
 						{/each}
@@ -213,7 +214,7 @@
 			<div class="mb-4 flex rounded-lg border border-slate-700 bg-slate-800 text-sm">
 				<button
 					onclick={() => (activeTab = 'onlyA')}
-					class="flex-1 rounded-l-lg px-3 py-2 transition {activeTab === 'onlyA'
+					class="min-h-11 flex-1 rounded-l-lg px-2 py-2 transition {activeTab === 'onlyA'
 						? 'bg-cat-parchment-solid text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
@@ -221,7 +222,8 @@
 				</button>
 				<button
 					onclick={() => (activeTab = 'both')}
-					class="flex-1 border-x border-slate-700 px-3 py-2 transition {activeTab === 'both'
+					class="min-h-11 flex-1 border-x border-slate-700 px-2 py-2 transition {activeTab ===
+					'both'
 						? 'bg-cat-sea-solid text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
@@ -229,7 +231,7 @@
 				</button>
 				<button
 					onclick={() => (activeTab = 'onlyB')}
-					class="flex-1 rounded-r-lg px-3 py-2 transition {activeTab === 'onlyB'
+					class="min-h-11 flex-1 rounded-r-lg px-2 py-2 transition {activeTab === 'onlyB'
 						? 'bg-cat-steel-solid text-slate-950'
 						: 'text-slate-300 hover:bg-slate-700'}"
 				>
