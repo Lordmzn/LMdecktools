@@ -180,8 +180,32 @@ promises a feature there that cannot exist.
 
 **The phone half only became possible in January 2025**, with Chrome Android 132.
 That is newer than §4.2, which is why it reads as though mobile were out of scope.
-On Android this flow is now buildable; on iOS it is not, and no reformulation of
-#11 changes that, because every iOS browser is WebKit.
+On Android the file-based flow is now buildable; on iOS it is not, and no amount
+of care with file handling changes that, because every iOS browser is WebKit.
+
+### The inversion that makes #11 and #47 one decision
+
+That last point cuts the other way too, and it is the sharpest thing this
+analysis found:
+
+| | serves iOS? | needs Yjs? |
+| --- | --- | --- |
+| Weak #11 — QR pairs a second device to the same cloud file | **no**, ever | no |
+| Full #11 — QR opens a WebRTC channel | **yes** | yes |
+
+`RTCPeerConnection` has worked in Safari and on iOS since Safari 11. The File
+System Access API never has. So the *heavier* option is the only one that can
+ever reach an iPhone, and the *lighter* one is permanently desktop-and-Android.
+
+That makes #11 and #47 a single coupled decision rather than two, and the axis is
+not really technical:
+
+- **Serving iPhone users matters** → full WebRTC #11, and Yjs earns its keep,
+  because a live channel needs incremental deltas and nothing else provides them.
+- **Desktop and Android are enough** → weak pairing #11, and Yjs is complexity
+  bought for a capability the product declined to use.
+
+Deciding #47 without deciding that is deciding it by accident.
 
 **One thing this analysis cannot settle from a desktop.** On Android, cloud clients
 expose files through the Storage Access Framework as on-demand document providers,
