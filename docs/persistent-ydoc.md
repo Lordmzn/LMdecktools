@@ -118,6 +118,32 @@ renders them as name-and-quantity until it can reach Scryfall. That is why
 a readable list and to re-resolve the card later, not enough to render the
 image.
 
+### How much the payload actually costs
+
+Measured against 350 real Scryfall cards (MH3 + BLB), whose median serialised
+size is **5,184 bytes** each — against 131 bytes for the same card whitelisted.
+Run through the real `exportWithMetadata()`, not a reconstruction of it:
+
+| Document | Today's payload | Whitelisted | |
+| --- | --- | --- | --- |
+| 1,000 collection cards + 5 decks × 60 | **7.1 MB** | 320 KB | 22× |
+| 5,000 collection cards + 20 decks × 60 | **33.7 MB** | 1.5 MB | 22× |
+
+Two things follow, and the second is the more urgent.
+
+**This is not a future problem.** `exportWithMetadata()` is what the linked-file
+autosave writes today, debounced at 500 ms, rewriting the file whole. A user with
+a 1,000-card collection is writing 7 MB to disk on every single card they add or
+remove, and spends 76 ms of main-thread time just building the update before the
+write starts (288 ms at 5,000 cards). That is a shipped defect in the current
+`.yjs` path, independent of anything in this document.
+
+**And the fix is separable from this design.** Stripping the payload to the
+whitelist plus a card-facts cache is a change to what gets written; it needs no
+CRDT, no migration and no new dependency. It can ship on its own, ahead of #47,
+and it is where essentially all of the size win lives. Filed as #84 for exactly
+that reason — it should not wait behind a large redesign.
+
 ### Identity: lists keyed by id, not name
 
 `cardListsToYDoc()` keys lists by name (`yCardLists.set(cardList.name, yList)`),
@@ -227,6 +253,33 @@ the common one, and its failure mode (a number is stale) is recoverable by
 looking at the shelf, while the counter's failure mode (a number is fabricated)
 is not.
 
+**"Last-writer-wins" is a misnomer for half of this, and the half it misnames is
+the one that matters.** Measured on `yjs@13.6`:
+
+```
+two replicas that have never seen each other both set the same key
+
+  lower clientID writes first   ->  from-HIGH
+  higher clientID writes first  ->  from-HIGH
+
+one replica sees the other's write, then overwrites it
+
+  causally ordered              ->  the later edit, regardless of clientID
+```
+
+For *causally ordered* writes Yjs is genuinely last-writer-wins. For *concurrent*
+writes it is not time-based at all: the higher clientID wins, wall-clock order is
+irrelevant, and since a clientID is a random `uint32` minted per session, the
+winner is arbitrary — deterministic and identical on every replica, which is what
+convergence requires, but not "the most recent edit".
+
+That does not overturn the decision — an arbitrary pick between two assertions
+about one shelf is still an assertion about that shelf, and the recovery is still
+to look at the shelf. It does mean the UI must never describe sync as "the newest
+change wins", because for the case users will actually notice it is untrue. It
+also raises the value of a live channel considerably: with one, edits become
+causally ordered and the intuitive rule holds. See Decision 2.
+
 Two supports make this liveable:
 
 - **The union merge stays available** as an explicit, user-invoked action with
@@ -261,15 +314,41 @@ three places that currently assume one database — `checkLocalDatabase()`
 reports as "a database exists". All three need to account for both.
 
 The hand-rolled `db.ts` does not disappear: it keeps `metadata` (auto-load
-preference, linked-file handle, device clientID, document guid) and
-`error_journal`. Those are device-local, must not sync, and have no business in
-a CRDT.
+preference, linked-file handle, document guid) and `error_journal`. Those are
+device-local, must not sync, and have no business in a CRDT.
 
-Unverified, and the first thing the spike should establish: whether
-`y-indexeddb` propagates updates between two tabs of the same origin, or whether
-that needs a `BroadcastChannel` provider alongside it. Two tabs open on the same
-database is an ordinary thing for a user to do, and today it more or less works
-because every write goes to IndexedDB and reads re-read it.
+### It needs a BroadcastChannel provider beside it, and that is not cosmetic
+
+`y-indexeddb` has **no cross-tab mechanism at all**. Its source (`9.0.12`)
+contains no `BroadcastChannel`, no `storage` listener and no polling: it reads
+every stored update once at construction, emits `synced`, and thereafter only
+appends. A second tab learns nothing until it is reloaded.
+
+Confirmed in Chrome with two real tabs against one IndexedDB database:
+
+| Step | Tab A | Tab B |
+| --- | --- | --- |
+| both loaded | clientID 26298 | clientID 59558 — distinct, as expected |
+| A adds two entries | 2 entries | **0 entries**, 4.5 s later, log shows only `synced` |
+| B adds its own + writes key `bolt` | 3 entries | 2 entries — fully forked |
+| both reloaded | 4 entries | 4 entries — **identical** |
+
+The good news is the second half of that table. The fork is safe: every disjoint
+write from both tabs survived, and both tabs converged to byte-identical state
+once storage replayed both sides. That is the CRDT doing its job, and it is
+strictly better than the current code, where two tabs race on whole-row writes.
+
+The bad news is the key both tabs wrote. It resolved to one side, silently, by
+the arbitrary rule from Decision 1 — because without a live channel the two
+writes are *concurrent*, not ordered. A `BroadcastChannel` provider makes them
+causally ordered, at which point the later edit wins and the behaviour matches
+what the user expects. So the provider is not a nicety for live-updating a second
+tab; it is what converts an arbitrary conflict into an intuitive one, and it
+belongs in phase 2 rather than "later".
+
+Worth stating plainly: **two tabs mean the user is exercising the sync path on
+day one**, long before #11 ships. Whatever guarantees P2P sync will need, multi-tab
+needs first, and multi-tab is free to test.
 
 ## Decision 3 — growth is bounded by tombstones and replicas; compaction is explicit and breaks lineage
 
@@ -429,11 +508,16 @@ phase is what makes this safe to do at all.
 
 | Phase | Content | Ends when |
 | --- | --- | --- |
-| 0 | Spike: `y-indexeddb` behaviour, multi-tab, real document sizes with and without the whitelist | The three unknowns below are answered |
-| 1 | Document module, schema, stable guid + clientID, seed migration. Document is written but **nothing reads it** — a shadow of IndexedDB | Tests assert the document and the stores agree after every operation |
-| 2 | Flip reads: runes derive from the document, mutators write to it. IndexedDB card stores become legacy | The app runs entirely off the document |
+| 0 | Spike: `y-indexeddb` behaviour, multi-tab, real document sizes | **Done** — see the measurements throughout this document |
+| 0.5 | Strip the Scryfall payload to the whitelist + card-facts cache (#84). **Independent of everything below**, ships on its own | `.yjs` files shrink ~22×; autosave stops writing megabytes |
+| 1 | Document module, schema, stable guid, seed migration. Document is written but **nothing reads it** — a shadow of IndexedDB | Tests assert the document and the stores agree after every operation |
+| 2 | Flip reads: runes derive from the document, mutators write to it. `BroadcastChannel` provider alongside `y-indexeddb`. IndexedDB card stores become legacy | The app runs entirely off the document, and two tabs stay in step |
 | 3 | File path writes the real document; import guard learns the three-way classification; union path kept and labelled | A file round-trips with lineage intact and deletions propagate |
 | 4 | DB v6 drops the legacy stores | — |
+
+Phase 0.5 is new, and it is the one to do first regardless of whether the rest of
+this document is ever built. It carries most of the practical benefit, none of
+the risk, and it is currently a live defect.
 
 Phase 1's "shadow" is the whole safety argument: the migration and the document
 model get exercised against real user data for a release without being able to
@@ -459,21 +543,43 @@ break anything, because nothing reads them yet.
 
 ## Open questions for the spike
 
-1. Does `y-indexeddb` propagate between two tabs of the same origin, or is a
-   `BroadcastChannel` provider needed alongside it? This is sharper than it
-   looks: two tabs are two replicas with two clientIDs (see "Replica identity"),
-   so without a live channel they genuinely fork and only reconverge when
-   storage replays both sides. That is correct CRDT behaviour, but it means a
-   user with two tabs open is exercising the sync path on day one, before #11
-   ships.
-2. What does a realistic document weigh — 5,000 collection cards and 20 decks?
-   The measurement below puts the whitelisted floor at roughly 200 B per card;
-   the open part is what the unwhitelisted payload costs by comparison, which
-   decides whether the card-facts cache must land in phase 1 or can wait.
-3. ~~Can `doc.clientID` be assigned reliably after construction?~~ Answered: yes,
-   and it must not be. See "Replica identity: persist the guid, never the
-   clientID".
+All three are answered; the section is kept so the answers are findable next to
+the questions that produced them.
+
+1. ~~Does `y-indexeddb` propagate between two tabs?~~ **No** — it has no
+   cross-tab mechanism whatsoever, confirmed by source and by two real tabs in
+   Chrome. Tabs fork and reconverge on reload with no data lost, but concurrent
+   writes to one key resolve arbitrarily. A `BroadcastChannel` provider is
+   required, in phase 2. See Decision 2.
+2. ~~What does a realistic document weigh?~~ **7.1 MB at 1,000 cards, 33.7 MB at
+   5,000** with today's payload, against 320 KB and 1.5 MB whitelisted — 22×
+   either way, measured through the real `exportWithMetadata()`. It does not
+   "decide whether the card-facts cache can wait": it is a current defect in the
+   shipped autosave path and became phase 0.5. See "How much the payload actually
+   costs".
+3. ~~Can `doc.clientID` be assigned reliably after construction?~~ **Yes, and it
+   must not be.** See "Replica identity: persist the guid, never the clientID".
 
 Everything else in this document is a decision, not a question. If one of them
 turns out to be wrong, amend it here with the reason — the value of writing this
 down is lost if the reasoning drifts back into commit messages.
+
+## Reproducing the measurements
+
+Every number above came from throwaway scripts against `yjs@13.6` /
+`y-indexeddb@9.0.12` and 350 real Scryfall cards, not from estimates. They are
+not checked in — the method is short enough to restate, and a stale benchmark in
+the tree is worse than none:
+
+- **Document weight**: fetch two set searches from `api.scryfall.com`, synthesise
+  N cards by cycling them with unique ids, feed a `{ collection, savedCardLists }`
+  shape straight into the real `exportWithMetadata()`, and compare `byteLength`
+  with and without the field whitelist.
+- **Client count**: build one document by applying updates from N throwaway docs
+  writing disjoint keys; compare `Y.encodeStateAsUpdate` and
+  `Y.encodeStateVector` byte lengths across N.
+- **Conflict rule**: two docs with fixed clientIDs, same key, applied in both
+  orders — then the same test with one doc applying the other's update first.
+- **Multi-tab**: a page holding `IndexeddbPersistence('spike-doc', doc)` and a
+  button that writes a uniquely-keyed entry, opened in two tabs, with a reload at
+  the end.
