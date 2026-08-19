@@ -63,7 +63,7 @@ The one UX constraint this feature imposes: browsers require a **user gesture** 
 
 The DB modal shows a status panel with the link state, the **filename**, the time of the last successful save, and any error conditions. It deliberately does not show a filesystem path: the File System Access API exposes only `handle.name` to the page, by design — the browser never tells the app where the file lives. That opacity is a privacy feature, not a gap to close.
 
-Browser support caveat: the File System Access API is available in Chrome 86+, Edge 86+, and Safari 15.2+. Firefox does not support it as of mid-2025. The feature will degrade gracefully — users on unsupported browsers will not see the linking controls.
+Browser support caveat, corrected against MDN's browser-compat-data: the File System Access API is available in **Chrome and Edge 86+ on desktop, and Chrome Android 132+** (January 2025). **Safari has never supported it** — `showOpenFilePicker`, `showSaveFilePicker` and `showDirectoryPicker` are all unimplemented on macOS and iOS alike, so every iOS browser is excluded, since they are all WebKit. Firefox does not support it either. An earlier version of this section claimed "Safari 15.2+", which was wrong. The feature degrades gracefully — users on unsupported browsers will not see the linking controls — but the practical shape of "Bring Your Own Cloud" is: desktop Chrome/Edge and Android Chrome, no Apple devices.
 
 ### 4.3 P2P QR Sync (experimental)
 

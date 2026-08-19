@@ -123,6 +123,73 @@ either way, because the design below needs one too.
 That decision is the author's to make, and everything below assumes it went the
 Yjs way. The measurements are in `## Reproducing the measurements`.
 
+### The weaker #11, and what it settles
+
+A reformulation worth recording: instead of a WebRTC data channel, the QR code
+carries only enough for a second device to **link the same cloud file** — pairing,
+not transport. Data keeps moving as whole files through the user's own cloud
+folder.
+
+Three facts constrain what that can be.
+
+**A QR cannot carry the file handle.** `FileSystemFileHandle` is deliberately
+opaque: origin-bound, device-bound, not serialisable, and the browser never
+exposes a path (§4.2 already notes that opacity as a privacy feature). The second
+device must open its own picker regardless. Nothing can change this.
+
+**A QR cannot carry the data either.** The format tops out around 2,953 bytes
+(version 40, error-correction level L, byte mode). A single 60-card deck is
+roughly 8 KB whitelisted; a 1,000-card collection is 218 KB. Not close, in any
+encoding.
+
+**So the QR is a pairing hint and a verification token** — on the order of 100–200
+bytes: a lineage id, the expected filename, a folder hint, the schema version.
+That is a small feature, and a genuinely useful one. It converts "did I pick the
+right file?" from a guess into a checkable fact, which matters because restore is
+destructive and merge is silent. Scanning needs no dependency: `BarcodeDetector`
+is available on every platform where the file API works (Chrome Android 83,
+desktop Chrome 88, Safari 17).
+
+**And it settles the Yjs question.** The weak #11 has no live peer channel — every
+exchange is still a whole file through a cloud folder. The 28-byte incremental
+delta, which is the *only* place Yjs wins decisively, buys exactly nothing here.
+Under this reformulation the recommendation above is no longer conditional:
+**extend `merge.ts` with tombstones and an HLC, and drop Yjs.**
+
+The lineage id the QR needs is the one piece of the Yjs design that survives — and
+it gets cheaper. With Yjs, lineage is a *correctness* requirement (applying a
+foreign document's update is wrong, hence the three-way import classification).
+With JSON and LWW, merging a foreign file is merely a union, so the lineage id is
+*advisory*: one field, used to warn the user, not a classification system.
+
+### Platform reality, which is narrower than §4.2 claims
+
+Checked against MDN's browser-compat-data rather than assumed:
+
+| | Chrome / Edge desktop | Chrome Android | Safari macOS | any iOS browser | Firefox |
+| --- | --- | --- | --- | --- | --- |
+| `showOpenFilePicker` / `showSaveFilePicker` | 86 | **132** | **never** | **never** | never |
+| `BarcodeDetector` | 88 | 83 | 17 | 17 | no |
+
+Two corrections follow.
+
+**`project-vision.md` §4.2 is wrong about Safari.** It lists "Chrome 86+, Edge 86+,
+and Safari 15.2+". Safari has never implemented the File System Access API —
+`version_added: false` for all three pickers, on macOS and iOS alike. The app
+promises a feature there that cannot exist.
+
+**The phone half only became possible in January 2025**, with Chrome Android 132.
+That is newer than §4.2, which is why it reads as though mobile were out of scope.
+On Android this flow is now buildable; on iOS it is not, and no reformulation of
+#11 changes that, because every iOS browser is WebKit.
+
+**One thing this analysis cannot settle from a desktop.** On Android, cloud clients
+expose files through the Storage Access Framework as on-demand document providers,
+not as a true synced local folder the way the desktop clients do. Whether a handle
+obtained that way survives a session, writes back, and actually re-syncs to the
+cloud is a real-device question. It is the make-or-break for the weaker #11 and it
+needs a phone, a Dropbox account and an afternoon — not a simulation.
+
 ## Target model
 
 ### Document topology
