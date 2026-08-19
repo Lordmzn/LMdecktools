@@ -35,6 +35,94 @@ shared document history to attach it to. P2P sync is not a feature that can be
 added on top of this representation — it needs the representation changed
 first.
 
+## Does this need Yjs at all?
+
+Asked after the design below was written, and it deserves a straight answer,
+because the honest one is **probably not — unless #11 is a real commitment.**
+
+The four scenarios that describe what users actually do were run through two
+engines: a persistent `Y.Doc`, and ~43 lines of hand-rolled last-writer-wins
+with tombstones ordered by a hybrid logical clock. Same scenarios, same script
+structure, no dependency in the second.
+
+| Scenario | Persistent `Y.Doc` | LWW + tombstones |
+| --- | --- | --- |
+| PC → cloud file → phone edits + deletes → PC reopens | correct, deletion propagates | correct, deletion propagates |
+| Both edited offline (add here, delete there), then sync | converges, nothing lost | converges, nothing lost |
+| Delete vs concurrent edit of the same card | converges — the edit resurrects the card | converges — the later edit wins |
+| Both write the cloud file, one clobbers the other | self-heals on the next round | self-heals on the next round |
+
+Identical outcomes on every scenario the product has. The third row differs in
+*rule* but not in quality: Yjs resurrects the card because a `set` creates a new
+item the delete never covered; LWW picks whichever happened later. If anything
+the LWW rule is easier to explain.
+
+### Where Yjs genuinely wins
+
+One place, and it is not small:
+
+```
+one quantity edit, sent to a peer that is already up to date
+
+  Yjs incremental delta        28 B
+  JSON whole-state        218,235 B
+                            7,794x
+```
+
+Yjs can compute "what you are missing" from a state vector. A JSON snapshot
+cannot, short of building a delta protocol — which is most of what Yjs is. For
+real-time P2P (#11) that gap is decisive; you cannot run a live channel on
+whole-state exchange. For a file in a Dropbox folder it is worth nothing,
+because both engines rewrite the file whole either way.
+
+Yjs is also immune to clock skew (it orders causally, never by wall clock),
+where LWW depends on device clocks being roughly right. An HLC bounds the damage
+and keeps convergence guaranteed, but a device with a badly wrong clock will
+systematically win or lose conflicts. Real, rare, and recoverable by editing
+again.
+
+### What Yjs costs here
+
+- **A whole layer of lineage management that exists only because of it.** Document
+  guids, foreign-lineage detection, the three-way import classification, "compaction
+  destroys lineage" — three sections of this document. With JSON, any two files
+  merge, always, and none of it needs to exist.
+- **An opaque binary file**, which sits awkwardly against Principle 3. The vision
+  doc sells the `.yjs` file as making data "tangible, portable, and easy to back
+  up"; a JSON file is greppable, diffable, hand-repairable and readable in a
+  decade. A Yjs blob is readable by this app and nothing else.
+- **Arbitrary conflict resolution.** Concurrent writes resolve by higher clientID,
+  not by recency (measured; see Decision 1). LWW by HLC gives the intuitive rule.
+- **1.16× the bytes raw, 1.53× gzipped** for the same 1,000-card collection.
+- **Conceptual surface** — clientIDs, tombstones, GC, lineage — carried
+  permanently by a solo maintainer.
+
+### The part that tips it
+
+**The app already contains most of the alternative.** `merge.ts` performs an
+explicit union and already computes the per-list, per-card delta that #77 shows
+in the merge preview. What it lacks is exactly two things: tombstones, so
+deletions propagate, and a timestamp rule instead of `max()`, so quantity edits
+reconcile rather than accumulate. Both are additions to tested code.
+
+The Yjs path, by contrast, is a ground-up replacement of the storage layer, and
+the phase table below is honest about how much it touches.
+
+### Recommendation
+
+**If #11 (P2P QR sync) is a real commitment, keep Yjs** — the 28-byte delta is
+not reachable any other way, and adopting the CRDT later means migrating twice.
+
+**If #11 is what §4.3 currently says it is** — "experimental", "may support",
+"development will not begin until…" — then this document describes a large amount
+of accidental complexity bought to solve a problem the product does not have.
+Ship tombstones and an HLC on top of `merge.ts` instead, keep the file as JSON,
+and adopt Yjs if and when P2P becomes real. The format migration is a sunk cost
+either way, because the design below needs one too.
+
+That decision is the author's to make, and everything below assumes it went the
+Yjs way. The measurements are in `## Reproducing the measurements`.
+
 ## Target model
 
 ### Document topology
@@ -501,6 +589,89 @@ are getting.
 document: a synced error journal would carry one device's stack traces to
 another, which is both useless and a privacy regression.
 
+## Multi-device, verified end to end
+
+The two flows that matter were run rather than assumed. Both work with a
+persistent document; neither works today.
+
+### PC → cloud file → phone → cloud file → PC
+
+Each device holds a long-lived doc; the file in the synced folder is read with
+`Y.applyUpdate` and written with `Y.encodeStateAsUpdate`.
+
+```
+PC creates Deck 1        {"bolt":4,"brainstorm":2}
+phone opens the file     {"bolt":4,"brainstorm":2}
+phone edits + deletes    {"bolt":1,"ponder":3}
+PC reopens               {"bolt":1,"ponder":3}     <- deletion propagated
+```
+
+A phone that has only ever seen the file is a full peer: applying the update
+gives it the history and the tombstones, not just the values. That is the whole
+difference from today, where the same sequence leaves `brainstorm` alive on the
+PC forever.
+
+Offline edits on both sides converge too — PC adds a card while the phone
+deletes a different one, and after one exchange both hold `{bolt, swords}`.
+
+**The file-overwrite race self-heals**, which is worth knowing before someone
+tries to prevent it. If both devices write the file without reading first, the
+second write clobbers the first — but only in the *file*. The clobbered device
+still has its own edit locally, and pushes it again on the next round, at which
+point both converge. Cloud clients that write conflicted copies instead are also
+survivable, since any of those files can be merged in later. No locking is
+needed.
+
+### Two tabs, same browser
+
+With `y-indexeddb` alone, tabs fork silently (Decision 2). Adding a
+`BroadcastChannel` provider is three lines:
+
+```js
+const ch = new BroadcastChannel('lmdt-doc');
+doc.on('update', (u, origin) => { if (origin !== 'bc') ch.postMessage(u); });
+ch.onmessage = (ev) => Y.applyUpdate(doc, new Uint8Array(ev.data), 'bc');
+```
+
+Verified in Chrome across two real tabs: a write in one appears in the other
+within a frame, the second tab's overwrite of the same key lands in the first,
+and a delete in either propagates immediately. Both tabs stayed converged
+throughout — which is the behaviour a user expects and does not currently get.
+
+## Telling the user what changed
+
+The requirement is that sync be legible: on opening the app, say what arrived
+from elsewhere rather than silently mutating the collection.
+
+With a live document this falls out of the observer API. `transaction.origin`
+separates remote applies from local edits, and each event carries
+`changes.keys` with the action and the previous value, so counts and net copy
+deltas are directly computable. A ~25-line reporter over `observeDeep` produced,
+from one file pull:
+
+```
+lists changed elsewhere : Deck 1
+cards added             : 1
+cards removed           : 1
+quantities changed      : 1  (net -3 copies)
+collection: new cards   : 1
+collection: qty changed : 1
+```
+
+That is the same shape as `CardsDelta` / `ListMergeDetail` in `merge.ts`, which
+already feeds the #77 merge preview — so the UI for this largely exists, and the
+wording should match it rather than inventing a second vocabulary for the same
+idea.
+
+Two things to get right whichever engine wins:
+
+- **Report on apply, not on open.** The counts belong to a specific incoming
+  change, so they must be captured during the transaction that applies it and
+  then shown, not recomputed later by diffing.
+- **Deletions must be in the report.** They are the one class of change the
+  current app cannot produce, so they are the one users will not expect, and
+  "3 cards removed elsewhere" is the sentence that prevents a support question.
+
 ## Staging
 
 Five phases, each landable and each leaving the app working. The dual-write
@@ -582,4 +753,13 @@ the tree is worse than none:
   orders — then the same test with one doc applying the other's update first.
 - **Multi-tab**: a page holding `IndexeddbPersistence('spike-doc', doc)` and a
   button that writes a uniquely-keyed entry, opened in two tabs, with a reload at
-  the end.
+  the end. Repeat with the three-line `BroadcastChannel` provider added to check
+  live propagation.
+- **Multi-device**: two docs sharing a `guid`, plus a `{ bytes }` object standing
+  in for the cloud file, with `pull`/`push` helpers around `Y.applyUpdate` and
+  `Y.encodeStateAsUpdate`. Drive the four scenarios in "Multi-device, verified
+  end to end" through it.
+- **Do we need Yjs**: implement the ~43-line LWW-plus-tombstones engine, run the
+  identical four scenarios, and compare byte sizes — whole document, gzipped
+  document, and `Y.encodeStateAsUpdate(doc, stateVector)` against a full JSON
+  rewrite for a single-field edit.
