@@ -71,6 +71,8 @@ As a longer-term experiment, LM Deck Tools may support direct device-to-device s
 
 This feature remains strictly experimental for two reasons: (a) WebRTC still requires a short-lived signaling exchange (typically via a public STUN/TURN service) to establish the peer connection, which introduces a transient dependency on an external server; (b) merge semantics for concurrent edits — particularly quantity decrements and list deletions — need careful validation before the feature can be considered reliable. Development will not begin until the File-Based Sync feature is stable and the signaling dependency question is resolved in a way that does not compromise the Absolute Privacy principle.
 
+There is a third blocker, and it is the binding one: **the app has no persistent CRDT document for `y-webrtc` to attach to.** Every save builds a throwaway `Y.Doc`, so the `.yjs` file is a snapshot in Yjs clothing — no history, no client identity, no tombstones. Principle 3 above describes the intended end state, not the current implementation. `docs/persistent-ydoc.md` is the design for closing that gap (#47); it must land before this section can be built.
+
 By deliberately choosing a focused, backend-less architecture, LM Deck Tools carves out a unique identity in a crowded market. It is not just another deck builder; it is a statement on privacy, data ownership, and sustainable solo development.
 
 ## 5. Business Strategy
