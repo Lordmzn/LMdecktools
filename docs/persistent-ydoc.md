@@ -104,6 +104,14 @@ The left-hand column is a **whitelist and must stay one**. The temptation
 during implementation will be to spread the Scryfall object and be done; that is
 exactly how the current bloat happened.
 
+The whitelist is not cheap even so, which is the argument for keeping it tight.
+Measured on `yjs@13.6`: 2,000 collection cards carrying exactly the six
+whitelisted fields above encode to **428 KB** — about 200 bytes per card for
+roughly 120 bytes of actual string content. A nested `Y.Map` charges per-field
+CRDT overhead (each field is an `Item` with its own id and origin), so every
+field admitted to the document costs on the order of 30 bytes per card that a
+plain object would not. Fields join this list one at a time and never leave.
+
 Cost, stated honestly: a replica that receives unknown card ids while offline
 renders them as name-and-quantity until it can reach Scryfall. That is why
 `name`, `set` and `collector_number` are in the document at all — enough to show
@@ -133,23 +141,67 @@ is not a selection — it silently reselects a different deck. It becomes
 `findCardListByName()` loses its index and becomes a scan, which is fine at this
 scale and is the correct semantics anyway: names are not unique.
 
-### Replica identity: one clientID per device, persisted
+### Replica identity: persist the guid, never the clientID
 
-`new Y.Doc()` generates a random `clientID`. A browser session creates one
-document, so **every session would add a new client to the document's state
-vector, permanently**. A user who opens the app three times a week for two years
-leaves ~300 dead clients in a file that must be transmitted whole.
+The `guid` is document identity and **must** be persisted: the local document
+and the linked file are the same logical document, and a guid mismatch is the
+signal that a file comes from a foreign lineage (which matters for the merge
+path below). `new Y.Doc({ guid })` takes it directly.
 
-The device therefore owns a clientID: generated once, stored in the existing
-`metadata` object store, and assigned to the document at construction on every
-subsequent load. Same for the document `guid` — the local document and the
-linked file are the same logical document, and a guid mismatch is the signal
-that a file comes from a foreign lineage (which matters for the merge path
-below).
+The `clientID` is replica identity, and the obvious-looking symmetry — one
+stable id per device, stored next to the guid — is a **trap**. It was the
+recommendation in the first draft of this document; measurement killed it.
 
-This is three lines of code and it is the difference between a file that stays
-small and one that grows without bound. It is easy to leave out and invisible
-until months of use have gone by.
+`Doc`'s constructor takes no `clientID` option: it always assigns
+`random.uint32()` (`yjs.cjs:463`). The property is public and writable, so
+persisting one is easy to do and there is no guard against it. Two tabs of the
+same browser are two `Y.Doc` instances and therefore already carry two distinct
+clientIDs, which is correct — they are two replicas that can edit concurrently.
+Forcing them to share one produces silent, order-dependent data loss:
+
+```
+two docs, clientID 999999 each, edited independently, both flushed to storage
+
+  replay A then B  ->  {"bolt":4}
+  replay B then A  ->  {"brainstorm":3}
+  converged?           false
+
+  control, distinct clientIDs
+                   ->  {"bolt":4,"brainstorm":3}
+```
+
+The second update is discarded as already-seen, because `(client, clock)` is
+supposed to be globally unique and the store has that range. Yjs itself treats a
+duplicate clientID as a fault to recover from — on receiving a remote update
+attributed to its own client it logs *"Changed the client-id because another
+client seems to be using it"* and mints a new one (`yjs.cjs:3379`) — but that
+fires only once the collision is observed over a live channel, and it does not
+repair items already written under the duplicated id. Two tabs writing to
+`y-indexeddb` without a live channel between them never observe it.
+
+And the cost it was meant to avoid is not there. Measured on `yjs@13.6`, the same
+2,000-card collection encoded with `Y.encodeStateAsUpdate`:
+
+| Writing clients | Encoded document | State vector |
+| --- | --- | --- |
+| 1 | 428,568 B | 8 B |
+| 50 | 422,629 B | 348 B |
+| 300 | 415,629 B | 1,778 B |
+| 1,000 | 420,683 B | 5,936 B |
+
+The document does not grow with the client count — structs are grouped by
+client, so a client costs one small group header, and that is offset by noise in
+how runs merge. Only the **state vector** grows, at ~6 bytes per client, and the
+state vector is a sync-handshake message, not what gets stored or written to the
+linked file. Sessions that make no edits cost exactly zero: 500 read-only
+sessions left a document byte-identical at 428,568 B.
+
+So: **let every session mint its own clientID.** It is what Yjs does unaided, it
+is correct under multi-tab by construction, and a decade of daily editing adds a
+few KB to a handshake message. If the state vector ever becomes a measured
+problem for QR-sized payloads in #11, the fix is leader election over
+`navigator.locks` — one tab holds an exclusive lock and adopts the persisted id,
+the others keep their random ones — not an unconditional shared id.
 
 ## Decision 1 — quantities are LWW registers, not counters
 
@@ -227,18 +279,20 @@ is collected, but the item identities that make deletion propagate correctly are
 retained by design — that is what a tombstone is for, and dropping them is
 dropping the feature this whole document exists to enable.
 
-So growth has three sources, in descending order of how much they matter:
+So growth has two sources that matter, and one that turns out not to:
 
 1. **Card facts in the document.** Addressed by the whitelist above. This is by
    far the largest term today and the only one that is pure waste.
-2. **Dead clientIDs.** Addressed by persisting the device clientID. Also pure
-   waste.
-3. **Genuine tombstones** — cards removed from decks, decks deleted. Real cost
+2. **Genuine tombstones** — cards removed from decks, decks deleted. Real cost
    of real functionality, and small: a tombstone is bytes, and the app deletes
    at human speed.
+3. **Dead clientIDs — not a real term.** The intuition that one client per
+   session accumulates in the file is wrong; see the measurements under "Replica
+   identity" above. A thousand writing clients over the same content encode to
+   the same size as one, and read-only sessions cost nothing at all.
 
-With 1 and 2 fixed, 3 is not a problem worth solving, and no GC strategy is
-needed for ordinary use.
+With 1 fixed, 2 is not a problem worth solving and 3 does not exist, so no GC
+strategy is needed for ordinary use.
 
 For the pathological case there is one escape hatch, and it must be named
 honestly rather than presented as maintenance. **Compaction means building a
@@ -406,13 +460,19 @@ break anything, because nothing reads them yet.
 ## Open questions for the spike
 
 1. Does `y-indexeddb` propagate between two tabs of the same origin, or is a
-   `BroadcastChannel` provider needed alongside it?
-2. What does a realistic document actually weigh — 5,000 collection cards and 20
-   decks — with the whitelist, and without it? The ratio decides how hard to
-   push on the card-facts cache in phase 1 versus deferring it.
-3. Can `doc.clientID` be assigned reliably after construction across the Yjs
-   version range in use, or does the device identity need to be threaded in
-   another way?
+   `BroadcastChannel` provider needed alongside it? This is sharper than it
+   looks: two tabs are two replicas with two clientIDs (see "Replica identity"),
+   so without a live channel they genuinely fork and only reconverge when
+   storage replays both sides. That is correct CRDT behaviour, but it means a
+   user with two tabs open is exercising the sync path on day one, before #11
+   ships.
+2. What does a realistic document weigh — 5,000 collection cards and 20 decks?
+   The measurement below puts the whitelisted floor at roughly 200 B per card;
+   the open part is what the unwhitelisted payload costs by comparison, which
+   decides whether the card-facts cache must land in phase 1 or can wait.
+3. ~~Can `doc.clientID` be assigned reliably after construction?~~ Answered: yes,
+   and it must not be. See "Replica identity: persist the guid, never the
+   clientID".
 
 Everything else in this document is a decision, not a question. If one of them
 turns out to be wrong, amend it here with the reason — the value of writing this
