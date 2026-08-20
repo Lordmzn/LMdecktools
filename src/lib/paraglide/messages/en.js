@@ -2185,7 +2185,7 @@ export const db_restore_button = () => `Restore from file`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
-export const db_no_fs_access = () => `Auto-save to a linked file requires Chrome 86+, Edge 86+, or Safari 15.2+, so this browser has no File DB tab. Download and restore copies here instead.`
+export const db_no_fs_access = () => `Auto-save to a linked file requires desktop Chrome or Edge 86+, or Chrome on Android 132+. Safari and Firefox have never supported it, so this browser has no File DB tab. Download and restore copies here instead.`
 
 
 /**
