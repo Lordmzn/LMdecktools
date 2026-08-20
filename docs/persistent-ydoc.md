@@ -1,10 +1,16 @@
 # Persistent Y.Doc as the source of truth
 
-Design for #47. **Status: proposed.** Nothing here is implemented; this document
-exists so the decisions are made once, in the open, before a change this large
-starts. It settles the three open questions the RFC left (migration, quantity
-semantics, document growth) and names four more the RFC did not ask but that
-fall out of the same change.
+Design for #47. **Status: proposed, and amended by
+`docs/durability-convergence-transport.md`** — read that first. It resolves the
+conditional this document ends on (Yjs is kept; full WebRTC #11 is the
+commitment) and it voids two sections outright: the alpha carries no
+backward-compatibility obligation, so **Migration** and **Staging** below are
+superseded by that document's M0–M5. Each is marked where it starts.
+
+Nothing here is implemented; this document exists so the decisions are made
+once, in the open, before a change this large starts. It settles the three open
+questions the RFC left (migration, quantity semantics, document growth) and
+names four more the RFC did not ask but that fall out of the same change.
 
 Blocks #11 (P2P QR sync). Supersedes nothing — `docs/project-vision.md` §2
 (Principle 3) and §4.3 describe the intended end state; this describes how to
@@ -110,6 +116,13 @@ the phase table below is honest about how much it touches.
 
 ### Recommendation
 
+> **Decided: Yjs is kept.** The conditional below was resolved by the inversion
+> table further down — full WebRTC #11 is the only variant that can ever reach
+> an iPhone, and a live channel needs incremental deltas. That made #11 a real
+> commitment, which is the branch this section calls for keeping Yjs. See
+> `durability-convergence-transport.md` §4 (T1, QWBP) and §5 (S1/S2). The
+> analysis is kept because the reasoning is the valuable part, not the verdict.
+
 **If #11 (P2P QR sync) is a real commitment, keep Yjs** — the 28-byte delta is
 not reachable any other way, and adopting the CRDT later means migrating twice.
 
@@ -124,6 +137,14 @@ That decision is the author's to make, and everything below assumes it went the
 Yjs way. The measurements are in `## Reproducing the measurements`.
 
 ### The weaker #11, and what it settles
+
+> **Not taken.** This section argues its way to "drop Yjs", and the section after
+> it explains why that conclusion does not survive: the weak variant is
+> permanently unable to reach an iPhone. The QR pairing hint described here is
+> not wasted, though — QWBP is the same optical-bootstrap idea carrying a
+> different payload (location + identity rather than a filename hint), and the
+> constraint that makes it work is the one measured here: a QR tops out around
+> 2,953 bytes, which is why QWBP compresses signaling to 55–100.
 
 A reformulation worth recording: instead of a WebRTC data channel, the QR code
 carries only enough for a second device to **link the same cloud file** — pairing,
@@ -183,6 +204,12 @@ That is newer than §4.2, which is why it reads as though mobile were out of sco
 On Android the file-based flow is now buildable; on iOS it is not, and no amount
 of care with file handling changes that, because every iOS browser is WebKit.
 
+"Buildable" is doing real work in that sentence, and the caveat was found later:
+Android backs handles with content URIs, so there is no atomic write and no
+rename, MIME filters are ignored, and the Intent to Ship records that save-as
+cannot create new files. Whether the flow actually works there is Q8 in
+`durability-convergence-transport.md` and needs a device.
+
 ### The inversion that makes #11 and #47 one decision
 
 That last point cuts the other way too, and it is the sharpest thing this
@@ -206,6 +233,12 @@ not really technical:
   bought for a capability the product declined to use.
 
 Deciding #47 without deciding that is deciding it by accident.
+
+**It was decided the first way.** `durability-convergence-transport.md` takes
+the iPhone seriously enough to restructure the product around it — D4 changes
+what the app *is* in an iOS Safari tab, and T1 builds the WebRTC channel. So Yjs
+stays, and every consequence this document lists as a cost is now a cost the
+project has agreed to carry.
 
 **One thing this analysis cannot settle from a desktop.** On Android, cloud clients
 expose files through the Storage Access Framework as on-demand document providers,
@@ -408,6 +441,13 @@ problem for QR-sized payloads in #11, the fix is leader election over
 `navigator.locks` — one tab holds an exclusive lock and adopts the persisted id,
 the others keep their random ones — not an unconditional shared id.
 
+`navigator.locks` is now shipped rather than contingent, but for a different
+job: C3 uses it so exactly one tab owns the *file handle and the peer
+connection*, while every tab keeps its own random `clientID`. Leader election is
+for exclusive resources, never for a shared identity. The separate stable
+per-device id that T3 needs is a **filename** (`deviceId` in `metadata`), and it
+must not be allowed to collapse into the `clientID`.
+
 ## Decision 1 — quantities are LWW registers, not counters
 
 The RFC asks whether quantities should be `Y.Map` scalars (last-writer-wins) or
@@ -568,6 +608,21 @@ behalf. (New UI means new keys in both `messages/en.json` and
 
 ## Migration
 
+> **Superseded in full.** This section assumes a backward-compatibility
+> obligation the project does not have: the app is in private alpha with no
+> active users, so schema changes are breaking changes and land as such. No
+> dual-write, no `legacy_id`, no DB v4→v5→v6 sequence, no v1.0 snapshot support.
+> The document is seeded from scratch and the legacy stores are dropped in the
+> same commit — see `durability-convergence-transport.md` §6, M1.
+>
+> Two things here outlive the section. **Lists keyed by UUID rather than by name
+> or by autoIncrement id** is a target-model decision, not a migration step, and
+> it is recorded above under "Identity". And **guid equality as the test for
+> foreign lineage** survives as C4's two-way classification. The rest is
+> machinery for a problem the alpha does not have.
+>
+> This licence expires at M2, which is the point where users get invited.
+
 Two artifacts exist in the wild and both must survive: local IndexedDB
 databases, and `.yjs` files users have saved, linked, or emailed themselves.
 
@@ -607,10 +662,14 @@ The rule, therefore:
 | v2 document, same guid | `meta.schema_version === 2`, guid matches | `Y.applyUpdate` — a true merge |
 | v2 document, foreign guid | guid differs | Union via `merge.ts` — a different lineage is not a peer |
 
-The third row is the one that is easy to miss. A friend's file, or the user's own
-file after a compaction, is a v2 document that is structurally valid and still
-not a peer. Guid equality is the test, and it is why the guid has to be stable
-and stored.
+**Rows two and three only.** The v1.0 row goes with the rest of the migration
+machinery — the alpha has no snapshot files to honour — leaving the **two-way**
+classification of C4: same guid merges, foreign guid unions.
+
+The foreign-guid row is the one that is easy to miss. A friend's file, or the
+user's own file after a compaction, is a document that is structurally valid and
+still not a peer. Guid equality is the test, and it is why the guid has to be
+stable and stored.
 
 ### The import guard
 
@@ -618,11 +677,12 @@ and stored.
 files that would destroy a database (#52); that contract holds and gets extended
 rather than replaced:
 
-- `SUPPORTED_VERSIONS` gains the v2 document version.
-- `parseImportFile()` must classify snapshot vs document vs foreign-lineage
-  document — the table above — before any state is touched, so
-  `inspectImportFile()` can tell the DB modal which of the three it is holding
-  and the user can see whether they are about to merge or to union.
+- `SUPPORTED_VERSIONS` gains the v2 document version — and gains real work from
+  the T2b share envelope, which is versioned JSON around a base64 update.
+- `parseImportFile()` must classify same-lineage vs foreign-lineage document
+  before any state is touched, so `inspectImportFile()` can tell the DB modal
+  which of the two it is holding and the user can see whether they are about to
+  merge or to union. Same bytes, different results — the UI has to say which.
 - Restore (`importDatabase(db, data, merge=false)`) is destructive today via
   `clearDatabase()`. With a document, "restore" means *adopt the file's document
   wholesale*, guid and all — replace the local lineage rather than clear stores
@@ -660,12 +720,14 @@ persistence, do not attach the file write path. `assertWritable()` is unchanged.
 
 The RFC says real merges become `Y.applyUpdate` and "the merge issue disappears
 by construction". That is true for same-lineage documents and only for those.
-Three cases keep the explicit union alive permanently:
+Three cases keep the explicit union alive permanently (four, before the v1.0
+snapshot case went out with the migration section):
 
-- v1.0 snapshot files, forever — they exist and users have them;
-- foreign-lineage v2 documents (a friend's file, a post-compaction file);
+- foreign-lineage documents — a friend's file, a post-compaction file;
 - the deliberate `max()` reconciliation that Decision 1 leans on as the answer
-  to LWW's failure mode.
+  to LWW's failure mode;
+- anything arriving from a device that was never a peer, which the share-sheet
+  transport (T2) makes routine rather than exceptional.
 
 So `merge.ts` and the #77 preview are not transitional scaffolding to be deleted
 at the end. They become the *union* path, sitting beside the *sync* path, and the
@@ -765,6 +827,13 @@ Two things to get right whichever engine wins:
 
 ## Staging
 
+> **Superseded by `durability-convergence-transport.md` §6 (M0–M5).** The dual-
+> write shadow in phase 1 and the legacy drop in phase 4 exist to protect users
+> who do not exist yet; under the alpha constraint M1 builds the final schema
+> directly, which is roughly half the work this table describes. Phase 0.5
+> survives as #84 and is still the thing to do first. Kept for the phase-0
+> column, which records what was actually measured.
+
 Five phases, each landable and each leaving the app working. The dual-write
 phase is what makes this safe to do at all.
 
@@ -789,9 +858,11 @@ break anything, because nothing reads them yet.
 
 ## Risks
 
-- **No rollback after phase 4.** Users' own `.yjs` backups are the only remedy,
-  which is an argument for making the DB modal nag about a backup before the
-  phase 1 upgrade runs.
+- **No rollback, at all.** The alpha drops the legacy stores in the same commit
+  that seeds the document, so there is no shadow phase to fall back to. This is
+  affordable exactly once — before users are invited at M2 — and it is why M2's
+  copy-count invariant, not a migration path, is what makes the app safe to
+  recommend.
 - **Mobile memory.** A document held live plus derived arrays is more resident
   state than reading rows on demand. #76 established mobile as a real target;
   this should be measured on a phone, not assumed.
