@@ -498,10 +498,15 @@ working.
       and `MergePreviewModal` states which. Brought forward from M3 because the
       file path had to work at the flip, and a preview that cannot say "3 cards
       removed" would have been lying from the first merge
-- [ ] BroadcastChannel provider (C2) + `navigator.locks` leader (C3)
+- [x] BroadcastChannel provider (C2) + `navigator.locks` leader (C3) —
+      `src/lib/tab-sync.ts` and `src/lib/leader.ts`. The handshake had to be
+      two-way: a one-way hello leaves the older tab with a causal gap, and Yjs
+      then applies an update's delete set while holding its insert pending, so a
+      value *disappears* rather than changing. Found by test, not by reasoning
 - **Exit:** the app runs entirely off the document; two tabs converge live.
-  **First half met** — the app has no other data path; the second half is the
-  BroadcastChannel provider above
+  **Met** — `two-tabs.spec.ts` drives two real pages in one context: an edit
+  crosses without a reload, a removal propagates, the later edit wins, and
+  `navigator.locks.query()` reports exactly one holder and one waiter
 
 ### M2 — Durability · 2 weeks
 - [ ] `persist()` on load; `persisted()` + `estimate()` in the DB modal (D2)
@@ -535,6 +540,8 @@ working.
 - [ ] QWBP peer on the desktop side
 - [ ] Direct download + signing/notarisation for macOS and Windows
 - **Exit:** the anchor holds a real file that the user's own backup covers
+
+**M0 and M1 are done.** M2 is next, and it is the gate on inviting users.
 
 **Constraints:** M0 is independent and ships immediately. M1 blocks M2–M5. M3 and
 M4 are parallel. M5 depends on M1 only. **M2 is the gate on inviting users** —

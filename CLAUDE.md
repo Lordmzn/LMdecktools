@@ -187,7 +187,14 @@ ydoc (guid: stable per database lineage)
 - **Quantities are LWW scalars, never counters.** Two devices each recording "I own 4 Bolt" yield 4, not 8. For _concurrent_ writes Yjs is not time-based at all — the higher clientID wins — so the UI must never describe sync as "the newest change wins".
 - **Never spread a Scryfall object in.** Every field admitted costs ~30 B per card forever, in a payload that moves in full on every sync (see Card Fields & Facts Cache). `setIfChanged()` exists for the same reason: every `set` is an `Item` kept forever, so re-asserting an unchanged name on each quantity bump grows every future sync payload.
 
-**The transport port (T0)** is `stateVector` / `updateFor` / `applyRemoteUpdate`, defined with the model so file semantics never leak into the store. Every transport — the linked file today, BroadcastChannel and a peer connection later — speaks those three calls and nothing else.
+**The transport port (T0)** is `stateVector` / `updateFor` / `applyRemoteUpdate`, defined with the model so file semantics never leak into the store. Every transport speaks those three calls and nothing else — the linked file, the tab channel, and the peer connection of #11.
+
+**Transport zero is the other tabs** (`src/lib/tab-sync.ts`, C2). Two tabs are one IndexedDB but two `Y.Doc`s with two `clientID`s — two replicas — and `y-indexeddb` does not bridge them: it replays once at construction and thereafter only appends. Without a channel the tabs fork and reconverge on reload, losing nothing but resolving concurrent writes by _higher clientID_ rather than by "later edit". The `BroadcastChannel` is what makes those writes causally ordered, so the app behaves the way the person using it expects. Two things it must keep doing:
+
+- **Never re-broadcast what arrived over the channel** (`BROADCAST_ORIGIN`), or two tabs ping-pong one update forever.
+- **The handshake is two-way.** A newcomer posts its state vector; every other tab answers with the difference _and its own state vector_, and the newcomer sends back whatever they lack. A one-way hello leaves the older tab missing the newcomer's history, and the next edit then arrives with a causal gap — at which point Yjs applies the delete set and holds the insert as pending, so the value does not change, it **disappears**. That was a real bug, found by test, and `doc.store.pendingStructs` is checked after every apply as the repair trigger.
+
+**One tab owns the exclusive resources** (`src/lib/leader.ts`, C3): `navigator.locks`, exclusive, never released. The holder owns the linked-file handle and the polling, and will own the peer connection; followers edit freely and their changes reach the file through the leader over the tab channel. Leader election is for exclusive _resources_, never for a shared identity — the `clientID` stays random per session.
 
 **Two operations, one file format.** `merge.ts` is permanent, not scaffolding:
 
