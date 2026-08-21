@@ -93,6 +93,34 @@ app does not have to. Two consequences encoded in `static/.htaccess`:
   the main site.** So it reads `/decktools/404.html`; a bare `/404.html` would
   serve the main site's error page.
 
+## Planned: manifest and service worker
+
+Not built yet, and the shape is constrained enough to record before it is.
+`docs/durability-convergence-transport.md` D3 makes installation a **storage**
+feature — on iOS it is the only way site data survives a week — so this lands as
+part of the app, not as PWA garnish.
+
+Three things bite on this host specifically:
+
+- **Scope is the base path.** A service worker registered from `/decktools/`
+  controls `/decktools/` and below. That is what we want, and it is also why it
+  must be served from inside the app directory rather than the domain root — a
+  worker at `/sw.js` would claim the whole of `lordmzn.it`, which is somebody
+  else's site.
+- **`.webmanifest` needs a MIME type.** Apache will not know
+  `application/manifest+json` on its own; it goes in `static/.htaccess` beside
+  the existing cache rules. Without it some browsers refuse the manifest and the
+  install prompt silently never appears.
+- **The worker script must not be cached.** It falls under the same rule as HTML
+  below — same filename across deploys, different contents — and a service worker
+  pinned by a stale `Cache-Control` is the classic way to strand users on an old
+  build with no way to push a fix. `must-revalidate`, explicitly.
+
+The Android `share_target` entry in the manifest requires the worker to have a
+fetch handler. The existing decision to cache card images through
+`caches.open()` *without* a worker (`project-vision.md` §4.1) is unaffected —
+the two coexist, and the worker is not there to cache images.
+
 ## Caching
 
 The rule that matters: **`_app/immutable/*` is content-hashed, HTML is not.**
@@ -219,6 +247,21 @@ than reveals. There is a known trick for making a workflow print its own secret
 to the run log; **do not use it here**, because `personal-website` is a public
 repository and its logs are world-readable. Reset the password instead, and
 update the secret in both repos if the other one is ever revived.
+
+### Not covered here: the desktop build
+
+`durability-convergence-transport.md` S1 adds a Tauri desktop app, and this
+document describes shipping exactly one artifact to one static host. That gap is
+the real cost of the anchor — not the Rust. A second pipeline means per-platform
+builds, macOS signing and notarisation, Windows signing, and hosting the binaries
+somewhere with stable URLs. Direct download from lordmzn.it keeps it store-free
+and AGPL-clean (`project-vision.md` §5.4), but nothing about the current deploy
+generalises to it. Write that section when the first binary exists, not before.
+
+One thing to decide early because it is a §5.5 question: **if the desktop app
+ever checks for updates, that is the project's first background network request
+to a host of our own.** The app has none today, and §5.5's closing rule says
+anything fetching in the background does not belong in that table at all.
 
 ### What it does not do
 

@@ -2185,7 +2185,7 @@ export const db_restore_button = () => `Ripristina da file`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
-export const db_no_fs_access = () => `Il salvataggio automatico su un file collegato richiede Chrome 86+, Edge 86+ o Safari 15.2+, quindi questo browser non ha la scheda DB su file. Scarica e ripristina le copie da qui.`
+export const db_no_fs_access = () => `Il salvataggio automatico su un file collegato richiede Chrome o Edge 86+ su desktop, oppure Chrome su Android 132+. Safari e Firefox non l'hanno mai supportato, quindi questo browser non ha la scheda DB su file. Scarica e ripristina le copie da qui.`
 
 
 /**

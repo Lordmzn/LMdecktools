@@ -43,7 +43,7 @@ A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-base
 
 ### Storage Layer
 
-Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Database `LMdecktools` v4 with four object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle), and `error_journal` (autoIncrement, `timestamp` + `category` indexes — added in v4, see Error Journal).
+Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Note for the #47 work: `y-indexeddb` opens its **own** database, named after the document and separate from `LMdecktools`, which breaks the one-database assumption in `checkLocalDatabase()` (`db.ts:50`), `clearDatabase()` (`:122`) and whatever the DB modal reports as "a database exists". Database `LMdecktools` v4 with four object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle), and `error_journal` (autoIncrement, `timestamp` + `category` indexes — added in v4, see Error Journal).
 
 ### Card Data
 
@@ -118,19 +118,28 @@ Routing: English is served at `/`, Italian at `/it-it/`, and `LanguageSwitcher.s
 
 ### Image Cache
 
-The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. (A minimal service worker is coming anyway, for installability and the Android share target; it does not take over image caching, and the two coexist. Also worth knowing: WebKit's ITP deletes the Cache API alongside IndexedDB after 7 idle days, so on Apple platforms this cache is a session-scale optimisation, not storage.) Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
 
 ### Yjs Integration
 
 `src/lib/yjs-integration.ts` holds the export/import/merge utilities. Both directions are live: `exportWithMetadata()` writes the Yjs binary format, `importWithMetadata()` reads it, and `importDatabase()` sniffs JSON vs Yjs.
 
-**These are snapshots, not a CRDT.** Every save builds a _fresh_ `Y.Doc` with fresh client IDs, so the file carries no history, no client identity, and no tombstones. Applying one snapshot doc's update to another is therefore not a merge — a key present on both sides resolves to one side's value, dropping the other's. That is why merging goes through `src/lib/merge.ts` instead (#46): an explicit union of lists by name and cards by `id`, quantities resolved to `max()`, local IndexedDB ids preserved, nothing ever cleared or deleted. Deletions consequently never propagate; real CRDT semantics require a persistent `Y.Doc` as the source of truth (#47), which is also the unstated prerequisite for the P2P sync roadmap item (#11).
+**These are snapshots, not a CRDT.** Every save builds a _fresh_ `Y.Doc` with fresh client IDs, so the file carries no history, no client identity, and no tombstones. Applying one snapshot doc's update to another is therefore not a merge — a key present on both sides resolves to one side's value, dropping the other's. That is why merging goes through `src/lib/merge.ts` instead (#46): an explicit union of lists by name and cards by `id`, quantities resolved to `max()`, local IndexedDB ids preserved, nothing ever cleared or deleted. Deletions consequently never propagate; real CRDT semantics require a persistent `Y.Doc` as the source of truth (#47), which is also the prerequisite for the P2P sync roadmap item (#11).
+
+**This is designed and decided, not open.** `docs/persistent-ydoc.md` settles the document model (#47) and `docs/durability-convergence-transport.md` settles what sits on top of it — durability, transports, and the decision to keep Yjs at all. Read both before changing anything in this area; several attractive-looking shortcuts are refuted there with measurements. Load-bearing consequences for day-to-day work:
+
+- **Do not spread Scryfall objects into stored records.** The card payload becomes a strict six-field whitelist plus a local, non-synced card-facts cache (#84). Every field admitted to the document costs ~30 B per card forever, and the whole document is what moves on every sync — spreading the object is exactly how the current 22× bloat happened.
+- **The alpha owes no backward compatibility.** No active users, so schema changes are breaking changes: no dual-write, no legacy stores kept alive, no v1.0 snapshot support. This licence expires the moment users are invited.
+- **`merge.ts` is permanent**, not scaffolding. It becomes the _union_ path (foreign-lineage files) beside the _sync_ path (same-guid documents), and the UI must say which one a file gets — same bytes, different results.
+- **File extensions:** `.ydelta` for per-device files, `.json` for the share-sheet envelope. `.yjs` retires with the snapshot format it named.
 
 ### Restore Validation
 
 Restoring from a file is destructive — `importDatabase(db, data, merge=false)` calls `clearDatabase()`. Every file therefore goes through `src/lib/import-guard.ts` first (#52), which parses without touching IndexedDB and throws `ImportValidationError` for: a file naming another `app`, a `version` outside `SUPPORTED_VERSIONS`, a file with neither `app` metadata nor a recognisable shape (`cardLists` / `decks` / `collection`), a payload whose `total_lists` / `total_cards` disagree with what decoded, and — destructive path only — a payload with zero lists _and_ zero collection cards. `exportWithMetadata()` writes those declared counts; files from before #52 omit them and are accepted without the check.
 
 Anything that reads a restore file must go through `parseImportFile()` / `assertRestorable()` rather than trusting `JSON.parse`. `inspectImportFile()` runs the same validation for the UI so the DB modal can show `app · version · exported_at · counts` and keep the Restore button disabled until a file passes.
+
+Once #47 lands, this guard gains a **two-way lineage classification** — same-guid document (merge via `Y.applyUpdate`) vs foreign-guid document (union via `merge.ts`) — and `inspectImportFile()` must surface which one the file will get before the user commits. `SUPPORTED_VERSIONS` also starts doing real work, since the share-sheet payload is a versioned JSON envelope around a base64 update.
 
 ## Testing
 

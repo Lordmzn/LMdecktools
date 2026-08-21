@@ -1,10 +1,16 @@
 # Persistent Y.Doc as the source of truth
 
-Design for #47. **Status: proposed.** Nothing here is implemented; this document
-exists so the decisions are made once, in the open, before a change this large
-starts. It settles the three open questions the RFC left (migration, quantity
-semantics, document growth) and names four more the RFC did not ask but that
-fall out of the same change.
+Design for #47. **Status: proposed, and amended by
+`docs/durability-convergence-transport.md`** — read that first. It resolves the
+conditional this document ends on (Yjs is kept; full WebRTC #11 is the
+commitment) and it voids two sections outright: the alpha carries no
+backward-compatibility obligation, so **Migration** and **Staging** below are
+superseded by that document's M0–M5. Each is marked where it starts.
+
+Nothing here is implemented; this document exists so the decisions are made
+once, in the open, before a change this large starts. It settles the three open
+questions the RFC left (migration, quantity semantics, document growth) and
+names four more the RFC did not ask but that fall out of the same change.
 
 Blocks #11 (P2P QR sync). Supersedes nothing — `docs/project-vision.md` §2
 (Principle 3) and §4.3 describe the intended end state; this describes how to
@@ -34,6 +40,212 @@ local: Deck B = [bolt x4] ; remote: Deck B = []  ->  merged: [bolt x4]
 shared document history to attach it to. P2P sync is not a feature that can be
 added on top of this representation — it needs the representation changed
 first.
+
+## Does this need Yjs at all?
+
+Asked after the design below was written, and it deserves a straight answer,
+because the honest one is **probably not — unless #11 is a real commitment.**
+
+The four scenarios that describe what users actually do were run through two
+engines: a persistent `Y.Doc`, and ~43 lines of hand-rolled last-writer-wins
+with tombstones ordered by a hybrid logical clock. Same scenarios, same script
+structure, no dependency in the second.
+
+| Scenario | Persistent `Y.Doc` | LWW + tombstones |
+| --- | --- | --- |
+| PC → cloud file → phone edits + deletes → PC reopens | correct, deletion propagates | correct, deletion propagates |
+| Both edited offline (add here, delete there), then sync | converges, nothing lost | converges, nothing lost |
+| Delete vs concurrent edit of the same card | converges — the edit resurrects the card | converges — the later edit wins |
+| Both write the cloud file, one clobbers the other | self-heals on the next round | self-heals on the next round |
+
+Identical outcomes on every scenario the product has. The third row differs in
+*rule* but not in quality: Yjs resurrects the card because a `set` creates a new
+item the delete never covered; LWW picks whichever happened later. If anything
+the LWW rule is easier to explain.
+
+### Where Yjs genuinely wins
+
+One place, and it is not small:
+
+```
+one quantity edit, sent to a peer that is already up to date
+
+  Yjs incremental delta        28 B
+  JSON whole-state        218,235 B
+                            7,794x
+```
+
+Yjs can compute "what you are missing" from a state vector. A JSON snapshot
+cannot, short of building a delta protocol — which is most of what Yjs is. For
+real-time P2P (#11) that gap is decisive; you cannot run a live channel on
+whole-state exchange. For a file in a Dropbox folder it is worth nothing,
+because both engines rewrite the file whole either way.
+
+Yjs is also immune to clock skew (it orders causally, never by wall clock),
+where LWW depends on device clocks being roughly right. An HLC bounds the damage
+and keeps convergence guaranteed, but a device with a badly wrong clock will
+systematically win or lose conflicts. Real, rare, and recoverable by editing
+again.
+
+### What Yjs costs here
+
+- **A whole layer of lineage management that exists only because of it.** Document
+  guids, foreign-lineage detection, the three-way import classification, "compaction
+  destroys lineage" — three sections of this document. With JSON, any two files
+  merge, always, and none of it needs to exist.
+- **An opaque binary file**, which sits awkwardly against Principle 3. The vision
+  doc sells the `.yjs` file as making data "tangible, portable, and easy to back
+  up"; a JSON file is greppable, diffable, hand-repairable and readable in a
+  decade. A Yjs blob is readable by this app and nothing else.
+- **Arbitrary conflict resolution.** Concurrent writes resolve by higher clientID,
+  not by recency (measured; see Decision 1). LWW by HLC gives the intuitive rule.
+- **1.16× the bytes raw, 1.53× gzipped** for the same 1,000-card collection.
+- **Conceptual surface** — clientIDs, tombstones, GC, lineage — carried
+  permanently by a solo maintainer.
+
+### The part that tips it
+
+**The app already contains most of the alternative.** `merge.ts` performs an
+explicit union and already computes the per-list, per-card delta that #77 shows
+in the merge preview. What it lacks is exactly two things: tombstones, so
+deletions propagate, and a timestamp rule instead of `max()`, so quantity edits
+reconcile rather than accumulate. Both are additions to tested code.
+
+The Yjs path, by contrast, is a ground-up replacement of the storage layer, and
+the phase table below is honest about how much it touches.
+
+### Recommendation
+
+> **Decided: Yjs is kept.** The conditional below was resolved by the inversion
+> table further down — full WebRTC #11 is the only variant that can ever reach
+> an iPhone, and a live channel needs incremental deltas. That made #11 a real
+> commitment, which is the branch this section calls for keeping Yjs. See
+> `durability-convergence-transport.md` §4 (T1, QWBP) and §5 (S1/S2). The
+> analysis is kept because the reasoning is the valuable part, not the verdict.
+
+**If #11 (P2P QR sync) is a real commitment, keep Yjs** — the 28-byte delta is
+not reachable any other way, and adopting the CRDT later means migrating twice.
+
+**If #11 is what §4.3 currently says it is** — "experimental", "may support",
+"development will not begin until…" — then this document describes a large amount
+of accidental complexity bought to solve a problem the product does not have.
+Ship tombstones and an HLC on top of `merge.ts` instead, keep the file as JSON,
+and adopt Yjs if and when P2P becomes real. The format migration is a sunk cost
+either way, because the design below needs one too.
+
+That decision is the author's to make, and everything below assumes it went the
+Yjs way. The measurements are in `## Reproducing the measurements`.
+
+### The weaker #11, and what it settles
+
+> **Not taken.** This section argues its way to "drop Yjs", and the section after
+> it explains why that conclusion does not survive: the weak variant is
+> permanently unable to reach an iPhone. The QR pairing hint described here is
+> not wasted, though — QWBP is the same optical-bootstrap idea carrying a
+> different payload (location + identity rather than a filename hint), and the
+> constraint that makes it work is the one measured here: a QR tops out around
+> 2,953 bytes, which is why QWBP compresses signaling to 55–100.
+
+A reformulation worth recording: instead of a WebRTC data channel, the QR code
+carries only enough for a second device to **link the same cloud file** — pairing,
+not transport. Data keeps moving as whole files through the user's own cloud
+folder.
+
+Three facts constrain what that can be.
+
+**A QR cannot carry the file handle.** `FileSystemFileHandle` is deliberately
+opaque: origin-bound, device-bound, not serialisable, and the browser never
+exposes a path (§4.2 already notes that opacity as a privacy feature). The second
+device must open its own picker regardless. Nothing can change this.
+
+**A QR cannot carry the data either.** The format tops out around 2,953 bytes
+(version 40, error-correction level L, byte mode). A single 60-card deck is
+roughly 8 KB whitelisted; a 1,000-card collection is 218 KB. Not close, in any
+encoding.
+
+**So the QR is a pairing hint and a verification token** — on the order of 100–200
+bytes: a lineage id, the expected filename, a folder hint, the schema version.
+That is a small feature, and a genuinely useful one. It converts "did I pick the
+right file?" from a guess into a checkable fact, which matters because restore is
+destructive and merge is silent. Scanning needs no dependency: `BarcodeDetector`
+is available on every platform where the file API works (Chrome Android 83,
+desktop Chrome 88, Safari 17).
+
+**And it settles the Yjs question.** The weak #11 has no live peer channel — every
+exchange is still a whole file through a cloud folder. The 28-byte incremental
+delta, which is the *only* place Yjs wins decisively, buys exactly nothing here.
+Under this reformulation the recommendation above is no longer conditional:
+**extend `merge.ts` with tombstones and an HLC, and drop Yjs.**
+
+The lineage id the QR needs is the one piece of the Yjs design that survives — and
+it gets cheaper. With Yjs, lineage is a *correctness* requirement (applying a
+foreign document's update is wrong, hence the three-way import classification).
+With JSON and LWW, merging a foreign file is merely a union, so the lineage id is
+*advisory*: one field, used to warn the user, not a classification system.
+
+### Platform reality, which is narrower than §4.2 claims
+
+Checked against MDN's browser-compat-data rather than assumed:
+
+| | Chrome / Edge desktop | Chrome Android | Safari macOS | any iOS browser | Firefox |
+| --- | --- | --- | --- | --- | --- |
+| `showOpenFilePicker` / `showSaveFilePicker` | 86 | **132** | **never** | **never** | never |
+| `BarcodeDetector` | 88 | 83 | 17 | 17 | no |
+
+Two corrections follow.
+
+**`project-vision.md` §4.2 is wrong about Safari.** It lists "Chrome 86+, Edge 86+,
+and Safari 15.2+". Safari has never implemented the File System Access API —
+`version_added: false` for all three pickers, on macOS and iOS alike. The app
+promises a feature there that cannot exist.
+
+**The phone half only became possible in January 2025**, with Chrome Android 132.
+That is newer than §4.2, which is why it reads as though mobile were out of scope.
+On Android the file-based flow is now buildable; on iOS it is not, and no amount
+of care with file handling changes that, because every iOS browser is WebKit.
+
+"Buildable" is doing real work in that sentence, and the caveat was found later:
+Android backs handles with content URIs, so there is no atomic write and no
+rename, MIME filters are ignored, and the Intent to Ship records that save-as
+cannot create new files. Whether the flow actually works there is Q8 in
+`durability-convergence-transport.md` and needs a device.
+
+### The inversion that makes #11 and #47 one decision
+
+That last point cuts the other way too, and it is the sharpest thing this
+analysis found:
+
+| | serves iOS? | needs Yjs? |
+| --- | --- | --- |
+| Weak #11 — QR pairs a second device to the same cloud file | **no**, ever | no |
+| Full #11 — QR opens a WebRTC channel | **yes** | yes |
+
+`RTCPeerConnection` has worked in Safari and on iOS since Safari 11. The File
+System Access API never has. So the *heavier* option is the only one that can
+ever reach an iPhone, and the *lighter* one is permanently desktop-and-Android.
+
+That makes #11 and #47 a single coupled decision rather than two, and the axis is
+not really technical:
+
+- **Serving iPhone users matters** → full WebRTC #11, and Yjs earns its keep,
+  because a live channel needs incremental deltas and nothing else provides them.
+- **Desktop and Android are enough** → weak pairing #11, and Yjs is complexity
+  bought for a capability the product declined to use.
+
+Deciding #47 without deciding that is deciding it by accident.
+
+**It was decided the first way.** `durability-convergence-transport.md` takes
+the iPhone seriously enough to restructure the product around it — D4 changes
+what the app *is* in an iOS Safari tab, and T1 builds the WebRTC channel. So Yjs
+stays, and every consequence this document lists as a cost is now a cost the
+project has agreed to carry.
+
+**One thing this analysis cannot settle from a desktop.** On Android, cloud clients
+expose files through the Storage Access Framework as on-demand document providers,
+not as a true synced local folder the way the desktop clients do. Whether a handle
+obtained that way survives a session, writes back, and actually re-syncs to the
+cloud is a real-device question. It is the make-or-break for the weaker #11 and it
+needs a phone, a Dropbox account and an afternoon — not a simulation.
 
 ## Target model
 
@@ -117,6 +329,32 @@ renders them as name-and-quantity until it can reach Scryfall. That is why
 `name`, `set` and `collector_number` are in the document at all — enough to show
 a readable list and to re-resolve the card later, not enough to render the
 image.
+
+### How much the payload actually costs
+
+Measured against 350 real Scryfall cards (MH3 + BLB), whose median serialised
+size is **5,184 bytes** each — against 131 bytes for the same card whitelisted.
+Run through the real `exportWithMetadata()`, not a reconstruction of it:
+
+| Document | Today's payload | Whitelisted | |
+| --- | --- | --- | --- |
+| 1,000 collection cards + 5 decks × 60 | **7.1 MB** | 320 KB | 22× |
+| 5,000 collection cards + 20 decks × 60 | **33.7 MB** | 1.5 MB | 22× |
+
+Two things follow, and the second is the more urgent.
+
+**This is not a future problem.** `exportWithMetadata()` is what the linked-file
+autosave writes today, debounced at 500 ms, rewriting the file whole. A user with
+a 1,000-card collection is writing 7 MB to disk on every single card they add or
+remove, and spends 76 ms of main-thread time just building the update before the
+write starts (288 ms at 5,000 cards). That is a shipped defect in the current
+`.yjs` path, independent of anything in this document.
+
+**And the fix is separable from this design.** Stripping the payload to the
+whitelist plus a card-facts cache is a change to what gets written; it needs no
+CRDT, no migration and no new dependency. It can ship on its own, ahead of #47,
+and it is where essentially all of the size win lives. Filed as #84 for exactly
+that reason — it should not wait behind a large redesign.
 
 ### Identity: lists keyed by id, not name
 
@@ -203,6 +441,13 @@ problem for QR-sized payloads in #11, the fix is leader election over
 `navigator.locks` — one tab holds an exclusive lock and adopts the persisted id,
 the others keep their random ones — not an unconditional shared id.
 
+`navigator.locks` is now shipped rather than contingent, but for a different
+job: C3 uses it so exactly one tab owns the *file handle and the peer
+connection*, while every tab keeps its own random `clientID`. Leader election is
+for exclusive resources, never for a shared identity. The separate stable
+per-device id that T3 needs is a **filename** (`deviceId` in `metadata`), and it
+must not be allowed to collapse into the `clientID`.
+
 ## Decision 1 — quantities are LWW registers, not counters
 
 The RFC asks whether quantities should be `Y.Map` scalars (last-writer-wins) or
@@ -226,6 +471,33 @@ acts. It is right in the case where they performed one act twice. The second is
 the common one, and its failure mode (a number is stale) is recoverable by
 looking at the shelf, while the counter's failure mode (a number is fabricated)
 is not.
+
+**"Last-writer-wins" is a misnomer for half of this, and the half it misnames is
+the one that matters.** Measured on `yjs@13.6`:
+
+```
+two replicas that have never seen each other both set the same key
+
+  lower clientID writes first   ->  from-HIGH
+  higher clientID writes first  ->  from-HIGH
+
+one replica sees the other's write, then overwrites it
+
+  causally ordered              ->  the later edit, regardless of clientID
+```
+
+For *causally ordered* writes Yjs is genuinely last-writer-wins. For *concurrent*
+writes it is not time-based at all: the higher clientID wins, wall-clock order is
+irrelevant, and since a clientID is a random `uint32` minted per session, the
+winner is arbitrary — deterministic and identical on every replica, which is what
+convergence requires, but not "the most recent edit".
+
+That does not overturn the decision — an arbitrary pick between two assertions
+about one shelf is still an assertion about that shelf, and the recovery is still
+to look at the shelf. It does mean the UI must never describe sync as "the newest
+change wins", because for the case users will actually notice it is untrue. It
+also raises the value of a live channel considerably: with one, edits become
+causally ordered and the intuitive rule holds. See Decision 2.
 
 Two supports make this liveable:
 
@@ -261,15 +533,41 @@ three places that currently assume one database — `checkLocalDatabase()`
 reports as "a database exists". All three need to account for both.
 
 The hand-rolled `db.ts` does not disappear: it keeps `metadata` (auto-load
-preference, linked-file handle, device clientID, document guid) and
-`error_journal`. Those are device-local, must not sync, and have no business in
-a CRDT.
+preference, linked-file handle, document guid) and `error_journal`. Those are
+device-local, must not sync, and have no business in a CRDT.
 
-Unverified, and the first thing the spike should establish: whether
-`y-indexeddb` propagates updates between two tabs of the same origin, or whether
-that needs a `BroadcastChannel` provider alongside it. Two tabs open on the same
-database is an ordinary thing for a user to do, and today it more or less works
-because every write goes to IndexedDB and reads re-read it.
+### It needs a BroadcastChannel provider beside it, and that is not cosmetic
+
+`y-indexeddb` has **no cross-tab mechanism at all**. Its source (`9.0.12`)
+contains no `BroadcastChannel`, no `storage` listener and no polling: it reads
+every stored update once at construction, emits `synced`, and thereafter only
+appends. A second tab learns nothing until it is reloaded.
+
+Confirmed in Chrome with two real tabs against one IndexedDB database:
+
+| Step | Tab A | Tab B |
+| --- | --- | --- |
+| both loaded | clientID 26298 | clientID 59558 — distinct, as expected |
+| A adds two entries | 2 entries | **0 entries**, 4.5 s later, log shows only `synced` |
+| B adds its own + writes key `bolt` | 3 entries | 2 entries — fully forked |
+| both reloaded | 4 entries | 4 entries — **identical** |
+
+The good news is the second half of that table. The fork is safe: every disjoint
+write from both tabs survived, and both tabs converged to byte-identical state
+once storage replayed both sides. That is the CRDT doing its job, and it is
+strictly better than the current code, where two tabs race on whole-row writes.
+
+The bad news is the key both tabs wrote. It resolved to one side, silently, by
+the arbitrary rule from Decision 1 — because without a live channel the two
+writes are *concurrent*, not ordered. A `BroadcastChannel` provider makes them
+causally ordered, at which point the later edit wins and the behaviour matches
+what the user expects. So the provider is not a nicety for live-updating a second
+tab; it is what converts an arbitrary conflict into an intuitive one, and it
+belongs in phase 2 rather than "later".
+
+Worth stating plainly: **two tabs mean the user is exercising the sync path on
+day one**, long before #11 ships. Whatever guarantees P2P sync will need, multi-tab
+needs first, and multi-tab is free to test.
 
 ## Decision 3 — growth is bounded by tombstones and replicas; compaction is explicit and breaks lineage
 
@@ -310,6 +608,21 @@ behalf. (New UI means new keys in both `messages/en.json` and
 
 ## Migration
 
+> **Superseded in full.** This section assumes a backward-compatibility
+> obligation the project does not have: the app is in private alpha with no
+> active users, so schema changes are breaking changes and land as such. No
+> dual-write, no `legacy_id`, no DB v4→v5→v6 sequence, no v1.0 snapshot support.
+> The document is seeded from scratch and the legacy stores are dropped in the
+> same commit — see `durability-convergence-transport.md` §6, M1.
+>
+> Two things here outlive the section. **Lists keyed by UUID rather than by name
+> or by autoIncrement id** is a target-model decision, not a migration step, and
+> it is recorded above under "Identity". And **guid equality as the test for
+> foreign lineage** survives as C4's two-way classification. The rest is
+> machinery for a problem the alpha does not have.
+>
+> This licence expires at M2, which is the point where users get invited.
+
 Two artifacts exist in the wild and both must survive: local IndexedDB
 databases, and `.yjs` files users have saved, linked, or emailed themselves.
 
@@ -349,10 +662,14 @@ The rule, therefore:
 | v2 document, same guid | `meta.schema_version === 2`, guid matches | `Y.applyUpdate` — a true merge |
 | v2 document, foreign guid | guid differs | Union via `merge.ts` — a different lineage is not a peer |
 
-The third row is the one that is easy to miss. A friend's file, or the user's own
-file after a compaction, is a v2 document that is structurally valid and still
-not a peer. Guid equality is the test, and it is why the guid has to be stable
-and stored.
+**Rows two and three only.** The v1.0 row goes with the rest of the migration
+machinery — the alpha has no snapshot files to honour — leaving the **two-way**
+classification of C4: same guid merges, foreign guid unions.
+
+The foreign-guid row is the one that is easy to miss. A friend's file, or the
+user's own file after a compaction, is a document that is structurally valid and
+still not a peer. Guid equality is the test, and it is why the guid has to be
+stable and stored.
 
 ### The import guard
 
@@ -360,11 +677,12 @@ and stored.
 files that would destroy a database (#52); that contract holds and gets extended
 rather than replaced:
 
-- `SUPPORTED_VERSIONS` gains the v2 document version.
-- `parseImportFile()` must classify snapshot vs document vs foreign-lineage
-  document — the table above — before any state is touched, so
-  `inspectImportFile()` can tell the DB modal which of the three it is holding
-  and the user can see whether they are about to merge or to union.
+- `SUPPORTED_VERSIONS` gains the v2 document version — and gains real work from
+  the T2b share envelope, which is versioned JSON around a base64 update.
+- `parseImportFile()` must classify same-lineage vs foreign-lineage document
+  before any state is touched, so `inspectImportFile()` can tell the DB modal
+  which of the two it is holding and the user can see whether they are about to
+  merge or to union. Same bytes, different results — the UI has to say which.
 - Restore (`importDatabase(db, data, merge=false)`) is destructive today via
   `clearDatabase()`. With a document, "restore" means *adopt the file's document
   wholesale*, guid and all — replace the local lineage rather than clear stores
@@ -402,12 +720,14 @@ persistence, do not attach the file write path. `assertWritable()` is unchanged.
 
 The RFC says real merges become `Y.applyUpdate` and "the merge issue disappears
 by construction". That is true for same-lineage documents and only for those.
-Three cases keep the explicit union alive permanently:
+Three cases keep the explicit union alive permanently (four, before the v1.0
+snapshot case went out with the migration section):
 
-- v1.0 snapshot files, forever — they exist and users have them;
-- foreign-lineage v2 documents (a friend's file, a post-compaction file);
+- foreign-lineage documents — a friend's file, a post-compaction file;
 - the deliberate `max()` reconciliation that Decision 1 leans on as the answer
-  to LWW's failure mode.
+  to LWW's failure mode;
+- anything arriving from a device that was never a peer, which the share-sheet
+  transport (T2) makes routine rather than exceptional.
 
 So `merge.ts` and the #77 preview are not transitional scaffolding to be deleted
 at the end. They become the *union* path, sitting beside the *sync* path, and the
@@ -422,18 +742,113 @@ are getting.
 document: a synced error journal would carry one device's stack traces to
 another, which is both useless and a privacy regression.
 
+## Multi-device, verified end to end
+
+The two flows that matter were run rather than assumed. Both work with a
+persistent document; neither works today.
+
+### PC → cloud file → phone → cloud file → PC
+
+Each device holds a long-lived doc; the file in the synced folder is read with
+`Y.applyUpdate` and written with `Y.encodeStateAsUpdate`.
+
+```
+PC creates Deck 1        {"bolt":4,"brainstorm":2}
+phone opens the file     {"bolt":4,"brainstorm":2}
+phone edits + deletes    {"bolt":1,"ponder":3}
+PC reopens               {"bolt":1,"ponder":3}     <- deletion propagated
+```
+
+A phone that has only ever seen the file is a full peer: applying the update
+gives it the history and the tombstones, not just the values. That is the whole
+difference from today, where the same sequence leaves `brainstorm` alive on the
+PC forever.
+
+Offline edits on both sides converge too — PC adds a card while the phone
+deletes a different one, and after one exchange both hold `{bolt, swords}`.
+
+**The file-overwrite race self-heals**, which is worth knowing before someone
+tries to prevent it. If both devices write the file without reading first, the
+second write clobbers the first — but only in the *file*. The clobbered device
+still has its own edit locally, and pushes it again on the next round, at which
+point both converge. Cloud clients that write conflicted copies instead are also
+survivable, since any of those files can be merged in later. No locking is
+needed.
+
+### Two tabs, same browser
+
+With `y-indexeddb` alone, tabs fork silently (Decision 2). Adding a
+`BroadcastChannel` provider is three lines:
+
+```js
+const ch = new BroadcastChannel('lmdt-doc');
+doc.on('update', (u, origin) => { if (origin !== 'bc') ch.postMessage(u); });
+ch.onmessage = (ev) => Y.applyUpdate(doc, new Uint8Array(ev.data), 'bc');
+```
+
+Verified in Chrome across two real tabs: a write in one appears in the other
+within a frame, the second tab's overwrite of the same key lands in the first,
+and a delete in either propagates immediately. Both tabs stayed converged
+throughout — which is the behaviour a user expects and does not currently get.
+
+## Telling the user what changed
+
+The requirement is that sync be legible: on opening the app, say what arrived
+from elsewhere rather than silently mutating the collection.
+
+With a live document this falls out of the observer API. `transaction.origin`
+separates remote applies from local edits, and each event carries
+`changes.keys` with the action and the previous value, so counts and net copy
+deltas are directly computable. A ~25-line reporter over `observeDeep` produced,
+from one file pull:
+
+```
+lists changed elsewhere : Deck 1
+cards added             : 1
+cards removed           : 1
+quantities changed      : 1  (net -3 copies)
+collection: new cards   : 1
+collection: qty changed : 1
+```
+
+That is the same shape as `CardsDelta` / `ListMergeDetail` in `merge.ts`, which
+already feeds the #77 merge preview — so the UI for this largely exists, and the
+wording should match it rather than inventing a second vocabulary for the same
+idea.
+
+Two things to get right whichever engine wins:
+
+- **Report on apply, not on open.** The counts belong to a specific incoming
+  change, so they must be captured during the transaction that applies it and
+  then shown, not recomputed later by diffing.
+- **Deletions must be in the report.** They are the one class of change the
+  current app cannot produce, so they are the one users will not expect, and
+  "3 cards removed elsewhere" is the sentence that prevents a support question.
+
 ## Staging
+
+> **Superseded by `durability-convergence-transport.md` §6 (M0–M5).** The dual-
+> write shadow in phase 1 and the legacy drop in phase 4 exist to protect users
+> who do not exist yet; under the alpha constraint M1 builds the final schema
+> directly, which is roughly half the work this table describes. Phase 0.5
+> survives as #84 and is still the thing to do first. Kept for the phase-0
+> column, which records what was actually measured.
 
 Five phases, each landable and each leaving the app working. The dual-write
 phase is what makes this safe to do at all.
 
 | Phase | Content | Ends when |
 | --- | --- | --- |
-| 0 | Spike: `y-indexeddb` behaviour, multi-tab, real document sizes with and without the whitelist | The three unknowns below are answered |
-| 1 | Document module, schema, stable guid + clientID, seed migration. Document is written but **nothing reads it** — a shadow of IndexedDB | Tests assert the document and the stores agree after every operation |
-| 2 | Flip reads: runes derive from the document, mutators write to it. IndexedDB card stores become legacy | The app runs entirely off the document |
+| 0 | Spike: `y-indexeddb` behaviour, multi-tab, real document sizes | **Done** — see the measurements throughout this document |
+| 0.5 | Strip the Scryfall payload to the whitelist + card-facts cache (#84). **Independent of everything below**, ships on its own | `.yjs` files shrink ~22×; autosave stops writing megabytes |
+| 1 | Document module, schema, stable guid, seed migration. Document is written but **nothing reads it** — a shadow of IndexedDB | Tests assert the document and the stores agree after every operation |
+| 2 | Flip reads: runes derive from the document, mutators write to it. `BroadcastChannel` provider alongside `y-indexeddb`. IndexedDB card stores become legacy | The app runs entirely off the document, and two tabs stay in step |
 | 3 | File path writes the real document; import guard learns the three-way classification; union path kept and labelled | A file round-trips with lineage intact and deletions propagate |
 | 4 | DB v6 drops the legacy stores | — |
+
+Phase 0.5 is new, and it is the one to do first regardless of whether the rest of
+this document is ever built. It carries most of the practical benefit, none of
+the risk, and it is currently a live defect.
 
 Phase 1's "shadow" is the whole safety argument: the migration and the document
 model get exercised against real user data for a release without being able to
@@ -443,9 +858,11 @@ break anything, because nothing reads them yet.
 
 ## Risks
 
-- **No rollback after phase 4.** Users' own `.yjs` backups are the only remedy,
-  which is an argument for making the DB modal nag about a backup before the
-  phase 1 upgrade runs.
+- **No rollback, at all.** The alpha drops the legacy stores in the same commit
+  that seeds the document, so there is no shadow phase to fall back to. This is
+  affordable exactly once — before users are invited at M2 — and it is why M2's
+  copy-count invariant, not a migration path, is what makes the app safe to
+  recommend.
 - **Mobile memory.** A document held live plus derived arrays is more resident
   state than reading rows on demand. #76 established mobile as a real target;
   this should be measured on a phone, not assumed.
@@ -459,21 +876,52 @@ break anything, because nothing reads them yet.
 
 ## Open questions for the spike
 
-1. Does `y-indexeddb` propagate between two tabs of the same origin, or is a
-   `BroadcastChannel` provider needed alongside it? This is sharper than it
-   looks: two tabs are two replicas with two clientIDs (see "Replica identity"),
-   so without a live channel they genuinely fork and only reconverge when
-   storage replays both sides. That is correct CRDT behaviour, but it means a
-   user with two tabs open is exercising the sync path on day one, before #11
-   ships.
-2. What does a realistic document weigh — 5,000 collection cards and 20 decks?
-   The measurement below puts the whitelisted floor at roughly 200 B per card;
-   the open part is what the unwhitelisted payload costs by comparison, which
-   decides whether the card-facts cache must land in phase 1 or can wait.
-3. ~~Can `doc.clientID` be assigned reliably after construction?~~ Answered: yes,
-   and it must not be. See "Replica identity: persist the guid, never the
-   clientID".
+All three are answered; the section is kept so the answers are findable next to
+the questions that produced them.
+
+1. ~~Does `y-indexeddb` propagate between two tabs?~~ **No** — it has no
+   cross-tab mechanism whatsoever, confirmed by source and by two real tabs in
+   Chrome. Tabs fork and reconverge on reload with no data lost, but concurrent
+   writes to one key resolve arbitrarily. A `BroadcastChannel` provider is
+   required, in phase 2. See Decision 2.
+2. ~~What does a realistic document weigh?~~ **7.1 MB at 1,000 cards, 33.7 MB at
+   5,000** with today's payload, against 320 KB and 1.5 MB whitelisted — 22×
+   either way, measured through the real `exportWithMetadata()`. It does not
+   "decide whether the card-facts cache can wait": it is a current defect in the
+   shipped autosave path and became phase 0.5. See "How much the payload actually
+   costs".
+3. ~~Can `doc.clientID` be assigned reliably after construction?~~ **Yes, and it
+   must not be.** See "Replica identity: persist the guid, never the clientID".
 
 Everything else in this document is a decision, not a question. If one of them
 turns out to be wrong, amend it here with the reason — the value of writing this
 down is lost if the reasoning drifts back into commit messages.
+
+## Reproducing the measurements
+
+Every number above came from throwaway scripts against `yjs@13.6` /
+`y-indexeddb@9.0.12` and 350 real Scryfall cards, not from estimates. They are
+not checked in — the method is short enough to restate, and a stale benchmark in
+the tree is worse than none:
+
+- **Document weight**: fetch two set searches from `api.scryfall.com`, synthesise
+  N cards by cycling them with unique ids, feed a `{ collection, savedCardLists }`
+  shape straight into the real `exportWithMetadata()`, and compare `byteLength`
+  with and without the field whitelist.
+- **Client count**: build one document by applying updates from N throwaway docs
+  writing disjoint keys; compare `Y.encodeStateAsUpdate` and
+  `Y.encodeStateVector` byte lengths across N.
+- **Conflict rule**: two docs with fixed clientIDs, same key, applied in both
+  orders — then the same test with one doc applying the other's update first.
+- **Multi-tab**: a page holding `IndexeddbPersistence('spike-doc', doc)` and a
+  button that writes a uniquely-keyed entry, opened in two tabs, with a reload at
+  the end. Repeat with the three-line `BroadcastChannel` provider added to check
+  live propagation.
+- **Multi-device**: two docs sharing a `guid`, plus a `{ bytes }` object standing
+  in for the cloud file, with `pull`/`push` helpers around `Y.applyUpdate` and
+  `Y.encodeStateAsUpdate`. Drive the four scenarios in "Multi-device, verified
+  end to end" through it.
+- **Do we need Yjs**: implement the ~43-line LWW-plus-tombstones engine, run the
+  identical four scenarios, and compare byte sizes — whole document, gzipped
+  document, and `Y.encodeStateAsUpdate(doc, stateVector)` against a full JSON
+  rewrite for a single-field edit.

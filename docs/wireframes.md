@@ -5,7 +5,7 @@
 ```
 +------------------------------------------------------------------+
 |  HEADER                                                          |
-|  [swords-pirate] [Home] [Collection] [Card Lists]    [Choose DB] |
+|  [swords-pirate] [Home] [Collection] [Card Lists]  [3 copies] [DB]|
 +------------------------------------------------------------------+
 |                                                                  |
 |                        PAGE CONTENT                              |
@@ -24,6 +24,34 @@
 - DB loaded + linked file active: orange button `[Database v]` with green checkmark + small link icon
 - DB open read-only ("peek" mode): brass button `[Database v]` — `--color-warning-solid`,
   deliberately **not** the orange primary, see [Feedback Colours](#feedback-colours)
+
+**Copy counter (planned).** Sits left of the DB button and opens the copies panel
+in the DB modal. It is the app's durability promise made visible, so it is
+persistent chrome rather than a notification — see `project-vision.md` §2,
+Principle 3.
+
+```
+  [ 3 copies ]      normal — neutral chrome, no colour
+  [ 1 copy   ]      warning state — brass, --color-warning
+```
+
+Three rules it must follow:
+
+- **Never green, and never a checkmark.** There is no "Synced ✓" state anywhere
+  in this app; the architecture cannot verify currency. The counter reports how
+  many copies exist and how stale each is, and nothing more.
+- **One copy is a warning**, and the alarm lane is correct here — this genuinely
+  is "something is wrong", not "one of several equally-valid kinds". Dismissible
+  for the session, never permanently silenceable.
+- **Age is part of the reading.** The panel lists each copy with when it was last
+  heard from; a copy untouched for 40 days reads as `40 days old`, not as a copy.
+
+```
+  Copies: 3
+    This device        live
+    MacBook            merged 2 days ago
+    collection.ydelta  exported 9 days ago
+```
 
 ---
 
@@ -117,6 +145,14 @@ category redder than another would rank them by hue rather than by what they are
 - **Name variants for the job, not the hue.** `CompareColumn` takes
   `onlyA` / `both` / `onlyB`, not `amber` / `green` / `blue`, so the call sites
   do not start lying the next time the palette moves.
+- **Success green may never be used to assert sync state.** No "Synced ✓", no
+  green dot on a paired device, no checkmark on a copy. This is a product
+  constraint from `project-vision.md` §2 (Principle 3), not a palette preference:
+  the app has no coordinator and therefore cannot know that a copy is current,
+  so green would be claiming something untrue. Sync surfaces report *counts and
+  ages* in neutral chrome, and escalate to the **warning** lane when only one
+  copy exists. Success green keeps its ordinary job — an operation that just
+  completed, like a write that landed.
 
 Every value above holds AA or better on all three surfaces (`#0a0c10`,
 `#0f1218`, `#1a1d26`) and on its own tint background. Contrast is not the
@@ -362,7 +398,9 @@ or `--color-danger` here just because a column happens to be "missing" cards.
 
 Five-tab toolbar: **[In-browser DB]** **[File DB]** **[Cache]** **[Import]** **[Export]**
 
-The **File DB** tab is not rendered at all where the File System Access API is missing (Firefox); the In-browser DB tab says why, next to the download/restore controls that replace it there.
+The **File DB** tab is not rendered at all where the File System Access API is missing (Firefox, and every browser on iOS/macOS Safari); the In-browser DB tab says why, next to the download/restore controls that replace it there.
+
+Planned tabs, from `docs/durability-convergence-transport.md`: **Copies** (the panel behind the header counter) and **Pair** (QR pairing). Both are described at the end of this section.
 
 Auto-load: If the user has previously connected to the local DB, the app auto-loads it on startup (no modal needed). The preference is stored in IndexedDB metadata.
 
@@ -412,8 +450,10 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 | | [Restore from file]                                  | |
 | +------------------------------------------------------+ |
 | (if !fsAccessSupported):                                 |
-| Auto-save requires Chrome 86+, Edge 86+, Safari 15.2+,  |
-| so this browser has no File DB tab.                      |
+| Auto-save to a linked file requires desktop Chrome or    |
+| Edge 86+, or Chrome on Android 132+. Safari and Firefox  |
+| have never supported it, so this browser has no File DB  |
+| tab. Download and restore copies here instead.           |
 | -------------------------------------------------------- |
 | +------------------------------------------------------+ |
 | | [+ icon]                                             | |
@@ -455,6 +495,121 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 | Note: You can always export or import your data later.   |
 +----------------------------------------------------------+
 ```
+
+### Planned tabs
+
+All from `docs/durability-convergence-transport.md`. Nothing here is built.
+
+```
+| === COPIES TAB ===                                       |
+|                                                          |
+| Copies: 3                                                |
+| +------------------------------------------------------+ |
+| | This device            live                          | |
+| | MacBook (paired)       last heard from 2 days ago    | |
+| | collection.ydelta      exported 9 days ago           | |
+| +------------------------------------------------------+ |
+| [ Save a copy ]  [ Pair a device ]                       |
+|                                                          |
+| (one-copy state — brass surface, not red, not dismissible |
+|  beyond the session):                                    |
+| +------------------------------------------------------+ |
+| | Your collection exists in one place.  [ Save a copy ] | |
+| +------------------------------------------------------+ |
+|                                                          |
+| -------------------------------------------------------- |
+| Browser storage                                          |
+|   Persistent: granted / not granted                      |
+|   Using 84.2 MB of ~2.1 GB available                     |
+|                                                          |
+| === PAIR TAB ===                                         |
+|                                                          |
+| +------------------------------------------------------+ |
+| |            [ QR code, 55-100 bytes ]                 | |
+| |                                                      | |
+| |  Or read this to the other device:                   | |
+| |  [ hK3m...  80-140 chars ]         [Copy]            | |
+| +------------------------------------------------------+ |
+| [ Scan the other device ]                                |
+|                                                          |
+| Both devices need a camera, or one of you types the code. |
+| Works on a shared local network only — nothing is sent    |
+| through any server, so there is nothing to fall back to.  |
+| One scan per session.                                     |
+```
+
+**Import preview must state the operation, not just the file.** Same bytes, two
+different results, so the label carries the decision:
+
+```
+| +------------------------------------------------------+ |
+| | app · version · exported_at · counts                 | |
+| | From this collection  ->  MERGE                      | |
+| |   Changes from the other device are applied.         | |
+| |   Removals there are removals here.                  | |
+| |    - or -                                            | |
+| | From a different collection  ->  UNION               | |
+| |   Nothing is removed. Quantities keep the higher      | |
+| |   of the two. Lists are matched by name.             | |
+| +------------------------------------------------------+ |
+```
+
+**Compaction** sits in the Cache tab next to "clear image cache", as a confirmed
+destructive action with copy that says what it costs: it rebuilds the document
+from current values, which **breaks lineage** — every other device must re-seed
+from it as if it were a new database, and unsynced edits on those devices are
+lost. Never automatic, never scheduled. (`persistent-ydoc.md` Decision 3.)
+
+---
+
+## Install Wall + Preview Mode (planned, iOS browser tab)
+
+The most consequential planned screen: on iOS, an uninstalled browser tab shows
+a **different app**. Storage there is isolated per Home Screen icon and per
+browser with nothing crossing between, so data typed into the Safari tab is
+invisible from the installed icon — indistinguishable from data loss. Rather
+than warning about the trap, preview mode removes it: the store is in-memory and
+**nothing is ever written to the browser's container**.
+
+```
++----------------------------------------------------------+
+| PREVIEW — nothing here is being saved.   [ How to install ]|
++----------------------------------------------------------+
+|                                                          |
+|            (the whole app, fully usable,                 |
+|             running against an in-memory store)          |
+|                                                          |
++----------------------------------------------------------+
+```
+
+Banner is persistent, non-dismissible, and uses the **warning** lane. "How to
+install" opens:
+
+```
++----------------------------------------------------------+
+| Install LM Deck Tools                              [X]   |
+|----------------------------------------------------------|
+| On iPhone and iPad, a website's data is deleted after     |
+| 7 days without a visit. Installing moves your collection  |
+| out of that rule.                                         |
+|                                                          |
+|   1. Tap [share icon] Share                              |
+|   2. Add to Home Screen                                  |
+|   3. Open the app from its icon — not from Safari        |
+|                                                          |
+| Add the icon once. A second icon for the same site is a  |
+| third, empty copy of the app and cannot see the first.   |
+|                                                          |
+| (if a third-party browser is detected — see Q6:)         |
+| Your browser may not offer Add to Home Screen. Open      |
+| this page in Safari first.                               |
++----------------------------------------------------------+
+```
+
+Detection: `display-mode: standalone` or `navigator.standalone` means installed
+(full app, any platform); neither plus iOS means the wall. iOS itself is
+`navigator.maxTouchPoints > 1` plus a platform check, since iPadOS reports
+itself as a Mac.
 
 ---
 

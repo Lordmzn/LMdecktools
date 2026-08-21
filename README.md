@@ -12,9 +12,9 @@ LM Deck Tools gives MTG players a single place to manage their decks and physica
 
 LM Deck Tools is built around three non-negotiable principles that deliberately set it apart from mainstream MTG platforms:
 
-1. **Zero Backend, Zero Cost** — There is no server. The app runs entirely in the browser using IndexedDB for storage and the Scryfall API for card data. No hosting costs, no backend maintenance, sustainable indefinitely.
-2. **Absolute Privacy** — No accounts, no tracking, no data collection. Your collection and lists never leave your machine unless you explicitly export them.
-3. **User-Controlled Data** — All application state is saved in a single `.yjs` file that you own. Copy it, back it up, move it between computers — no lock-in, no dependence on any external service.
+1. **Zero Backend, Zero Cost** — There is no server. The app runs in the browser using IndexedDB for storage and the Scryfall API for card data. No hosting costs, no backend maintenance, sustainable indefinitely. (Planned: a desktop build and direct device-to-device sync. Neither adds a server — the principle is about who holds your data, not about the runtime.)
+2. **Absolute Privacy** — No accounts, no tracking, no data collection. Your collection and lists never leave your machine unless you explicitly export or share them.
+3. **User-Controlled Data** — Your data is a CRDT document you own: write it to a file, copy it, move it between computers, hand it to another device. No lock-in, no dependence on any external service. **Durability is a copy count** — the app tells you how many copies of your collection exist and how old each one is, and it will never show you a "Synced ✓" it cannot actually verify.
 
 Features that conflict with these principles (cloud sync, social feeds, price tracking, format legality, push notifications) are explicitly out of scope. See [`docs/project-vision.md`](docs/project-vision.md) and the Out of Scope section in [`docs/user-stories.md`](docs/user-stories.md) for details.
 
@@ -41,9 +41,16 @@ Features that conflict with these principles (cloud sync, social feeds, price tr
 
 - All data stored locally in IndexedDB — no server, no account
 - Card images cached via the browser Cache API — instant repeat loads, no Scryfall round-trip
-- Link a file on your local filesystem (Chrome/Edge/Safari 15.2+): every change writes silently to your chosen location — place it in a cloud-synced folder for "Bring Your Own Cloud" multi-device access, with no backend and no data leaving your machine
+- Link a file on your local filesystem (desktop Chrome/Edge 86+, Chrome Android 132+): every change writes silently to your chosen location — place it in a cloud-synced folder for "Bring Your Own Cloud" multi-device access, with no backend and no data leaving your machine. **Safari has never supported this API**, on macOS or iOS, and neither has Firefox; those browsers get download-and-restore instead
 - Export/import card lists and collections as text, CSV, or JSON
 - Merge imports with existing data or replace entirely
+
+Planned, and designed in `docs/durability-convergence-transport.md`: installable
+as an app (which is what keeps data alive on iOS, where Safari deletes site
+storage after 7 idle days), sharing your collection through the OS share sheet,
+device-to-device sync over a QR code and the local network with no server
+involved, and a desktop build that keeps your data in a real file your existing
+backups already cover.
 
 ## Tech Stack
 
@@ -53,6 +60,7 @@ Features that conflict with these principles (cloud sync, social feeds, price tr
 | Styling     | Tailwind CSS 4            |
 | Language    | TypeScript 5              |
 | Storage     | IndexedDB (browser-local) |
+| Data model  | Yjs CRDT document         |
 | Card Data   | Scryfall API              |
 | Image Cache | Browser Cache API         |
 | i18n        | Paraglide (EN, IT)        |
