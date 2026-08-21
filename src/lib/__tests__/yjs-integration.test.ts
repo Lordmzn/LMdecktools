@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import * as Y from 'yjs';
 import type { CardList } from '../db';
 import {
 	cardListsToYDoc,
@@ -173,6 +174,104 @@ describe('Yjs Integration', () => {
 
 			expect(result.metadata.total_lists).toBe(2);
 			expect(result.metadata.total_cards).toBe(1);
+		});
+
+		it('writes the whitelist only, whatever the store is holding (#84)', () => {
+			// The store should never hold a fat record any more, but this is the
+			// payload the linked-file autosave rewrites whole on every change —
+			// so the file must be thin even if something upstream regresses.
+			const scryfallCard = {
+				id: 'c1',
+				name: 'Lightning Bolt',
+				set: 'lea',
+				set_name: 'Limited Edition Alpha',
+				collector_number: '161',
+				lang: 'en',
+				mana_cost: '{R}',
+				type_line: 'Instant',
+				oracle_text: 'Lightning Bolt deals 3 damage to any target.',
+				image_uris: { small: 's.jpg', normal: 'n.jpg', png: 'p.png', art_crop: 'a.jpg' },
+				card_faces: [{ image_uris: { normal: 'front.jpg' } }],
+				legalities: { modern: 'legal', legacy: 'legal', vintage: 'legal' },
+				prices: { usd: '1.23', eur: '1.05', tix: '0.02' },
+				all_parts: [{ id: 'token', component: 'token' }],
+				related_uris: { gatherer: 'https://example.invalid' }
+			};
+
+			const fat = {
+				savedCardLists: [
+					makeCardList({ name: 'Red Aggro', cards: [{ ...scryfallCard, LM_quantity: 4 }] })
+				],
+				collection: [{ ...scryfallCard, quantity_owned: 4 }]
+			};
+
+			const result = importWithMetadata(exportWithMetadata(fat as any));
+
+			const exported = [result.collection[0], result.cardLists[0].cards[0]];
+			for (const card of exported) {
+				expect(card.name).toBe('Lightning Bolt');
+				expect(card.set).toBe('lea');
+				expect(card.collector_number).toBe('161');
+				for (const key of [
+					'image_uris',
+					'card_faces',
+					'legalities',
+					'prices',
+					'all_parts',
+					'oracle_text',
+					'set_name'
+				]) {
+					expect(card).not.toHaveProperty(key);
+				}
+			}
+		});
+
+		it('is far smaller than the same database was before the whitelist (#84)', () => {
+			const scryfallCard = (id: string) => ({
+				id,
+				name: `Card ${id}`,
+				set: 'mh3',
+				set_name: 'Modern Horizons 3',
+				collector_number: '42',
+				lang: 'en',
+				mana_cost: '{1}{R}',
+				type_line: 'Instant',
+				oracle_text: 'x'.repeat(300),
+				image_uris: Object.fromEntries(
+					['small', 'normal', 'large', 'png', 'art_crop', 'border_crop'].map((size) => [
+						size,
+						`https://cards.scryfall.io/${size}/${id}.jpg`
+					])
+				),
+				legalities: Object.fromEntries(
+					Array.from({ length: 20 }, (_, i) => [`format_${i}`, 'not_legal'])
+				),
+				prices: { usd: '1.23', usd_foil: '4.56', eur: '1.05', tix: '0.02' },
+				related_uris: { gatherer: 'https://example.invalid/gatherer' }
+			});
+
+			const cards = Array.from({ length: 200 }, (_, i) => scryfallCard(`card-${i}`));
+			const store = {
+				savedCardLists: [],
+				collection: cards.map((card) => ({ ...card, quantity_owned: 1 }))
+			};
+
+			// The old export, reproduced: same encoder, but every key of every card.
+			const before = new Y.Doc();
+			const yCollection = before.getMap('collection');
+			for (const card of store.collection) {
+				const yCard = new Y.Map();
+				for (const [key, value] of Object.entries(card)) yCard.set(key, value);
+				yCollection.set(card.id, yCard);
+			}
+
+			const fat = Y.encodeStateAsUpdate(before).byteLength;
+			const thin = exportWithMetadata(store as any).byteLength;
+
+			// Real Scryfall cards (median 5,184 bytes) measure 22× (#84). These
+			// fixtures are a third of that size, so the floor is set accordingly —
+			// the point is the order of magnitude, not the exact ratio.
+			expect(thin * 5).toBeLessThan(fat);
 		});
 	});
 

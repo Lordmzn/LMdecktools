@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { getImageUrl } from '$lib/image-cache';
+	import CardArt from '$lib/components/CardArt.svelte';
+	import { cardFactsOf } from '$lib/store.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	let { card, owned, onRemove, onAddToCollection, onIncrement, onDecrement, disabled } = $props<{
@@ -11,13 +12,15 @@
 		onDecrement: (card: any) => void;
 		disabled: boolean;
 	}>();
-	const isDFC = $derived(card.card_faces?.length > 1);
+	// Art comes from the local facts cache, not from the saved record (#84).
+	const facts = $derived(cardFactsOf(card));
+	const isDFC = $derived((facts.card_faces?.length ?? 0) > 1);
 	let flipped = $state(false);
 	const faceIndex = $derived(flipped ? 1 : 0);
 	const imageUrl = $derived(
-		card.image_uris?.normal ??
-			card.card_faces?.[faceIndex]?.image_uris?.normal ??
-			card.card_faces?.[0]?.image_uris?.normal
+		facts.image_uris?.normal ??
+			facts.card_faces?.[faceIndex]?.image_uris?.normal ??
+			facts.card_faces?.[0]?.image_uris?.normal
 	);
 </script>
 
@@ -30,9 +33,12 @@
 			? 'ring-success ring-2'
 			: 'ring-warning ring-2'}"
 	>
-		{#await getImageUrl(imageUrl) then cachedUrl}
-			<img src={cachedUrl} alt={card.name} class="h-auto w-full" />
-		{/await}
+		<CardArt
+			url={imageUrl}
+			name={card.name}
+			set={card.set}
+			collectorNumber={card.collector_number}
+		/>
 
 		<!-- Quantity Stepper — an 18×24 pill floating on the art is the control a
 		     user hits most while building a list, and the smallest thing in the

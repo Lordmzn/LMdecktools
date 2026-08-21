@@ -216,6 +216,9 @@ whitelisted**, and 5,000 cards + 20 decks at **33.7 MB against 1.5 MB**, through
 the real `exportWithMetadata()`. That is 22× on the file, and under C0 the same
 22× lands on every QR-bootstrapped first sync and every shared file. **#84 is
 therefore a prerequisite of M4, not an optimisation, and it ships before M1.**
+**Shipped** — the whitelist is `src/lib/card-fields.ts` and the facts live in the
+`card_facts` store; the ~200 B/card floor above is what the document now starts
+from.
 
 ### C1 — Two tabs are one store and two replicas
 
@@ -468,8 +471,9 @@ working.
   promised a capability it lacks
 
 ### M1 — Document model · #47, collapsed
-- [ ] **#84 first** — card-facts whitelist. Independent of everything below,
-      already measured, and a prerequisite of M4 rather than an optimisation
+- [x] **#84 first** — card-facts whitelist. **Done**, ahead of everything below:
+      `card-fields.ts` holds the whitelist, `card_facts` (DB v5) holds the rest.
+      The document model inherits it; there is nothing to re-measure here
 - [ ] Persistent `Y.Doc` — stable `guid`, per-session `clientID`, tombstones
 - [ ] **Breaking schema change.** Drop legacy stores in the same commit. Seed the
       document from scratch; no dual-write, no phased read flip

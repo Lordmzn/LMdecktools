@@ -356,6 +356,18 @@ CRDT, no migration and no new dependency. It can ship on its own, ahead of #47,
 and it is where essentially all of the size win lives. Filed as #84 for exactly
 that reason — it should not wait behind a large redesign.
 
+> **Shipped.** #84 landed ahead of everything else in this document, as intended.
+> The whitelist lives in `src/lib/card-fields.ts` and is applied in three places:
+> the store mutators, the `db.ts` write boundary, and `exportWithMetadata()`.
+> Facts moved to a `card_facts` store (`src/lib/card-facts.ts`), seeded for
+> existing databases by the v4 → v5 upgrade so nothing needed refetching on day
+> one, and refilled by `hydrateCardFacts()` for cards that arrive from another
+> device. Two departures from the sketch above, both smaller than they look:
+> `is_foil` is on the whitelist (it describes the user's copy, not the printing),
+> and the cache holds only `set_name` plus the `small`/`normal` image URLs rather
+> than the whole discarded object — the other four Scryfall image sizes and the
+> unused fields are refetchable too, and this is a phone's disk as well.
+
 ### Identity: lists keyed by id, not name
 
 `cardListsToYDoc()` keys lists by name (`yCardLists.set(cardList.name, yList)`),
@@ -840,7 +852,7 @@ phase is what makes this safe to do at all.
 | Phase | Content | Ends when |
 | --- | --- | --- |
 | 0 | Spike: `y-indexeddb` behaviour, multi-tab, real document sizes | **Done** — see the measurements throughout this document |
-| 0.5 | Strip the Scryfall payload to the whitelist + card-facts cache (#84). **Independent of everything below**, ships on its own | `.yjs` files shrink ~22×; autosave stops writing megabytes |
+| 0.5 | Strip the Scryfall payload to the whitelist + card-facts cache (#84). **Independent of everything below**, ships on its own | **Done** — shipped ahead of #47; see the "Shipped" note under "How much the payload actually costs" |
 | 1 | Document module, schema, stable guid, seed migration. Document is written but **nothing reads it** — a shadow of IndexedDB | Tests assert the document and the stores agree after every operation |
 | 2 | Flip reads: runes derive from the document, mutators write to it. `BroadcastChannel` provider alongside `y-indexeddb`. IndexedDB card stores become legacy | The app runs entirely off the document, and two tabs stay in step |
 | 3 | File path writes the real document; import guard learns the three-way classification; union path kept and labelled | A file round-trips with lineage intact and deletions propagate |

@@ -8,6 +8,7 @@
 		addToCollection,
 		removeFromCollection,
 		updateCollectionQuantity,
+		cardSetLabel,
 		logAppError
 	} from '$lib/store.svelte';
 	import type { ErrorCategory } from '$lib/error-journal';
@@ -47,12 +48,12 @@
 						(card) =>
 							filterText === '' ||
 							card.name.toLowerCase().includes(filterText.toLowerCase()) ||
-							card.set_name?.toLowerCase().includes(filterText.toLowerCase())
+							cardSetLabel(card).toLowerCase().includes(filterText.toLowerCase())
 					)
 					.sort((a, b) => {
 						if (sortBy === 'name') return a.name.localeCompare(b.name);
 						if (sortBy === 'quantity') return b.quantity_owned - a.quantity_owned;
-						if (sortBy === 'set') return (a.set_name || '').localeCompare(b.set_name || '');
+						if (sortBy === 'set') return cardSetLabel(a).localeCompare(cardSetLabel(b));
 						return 0;
 					})
 			: []

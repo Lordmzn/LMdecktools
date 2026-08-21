@@ -15,6 +15,7 @@ import {
 	mergeCards,
 	putMetadata,
 	getMetadata,
+	type Card,
 	type CardList,
 	type CollectionCard
 } from './db';
@@ -26,6 +27,19 @@ import {
 	type ErrorCategory,
 	type ErrorEntry
 } from './error-journal';
+import {
+	carriesCardFacts,
+	extractCardFacts,
+	toStoredCollectionCard,
+	toStoredListCard,
+	type CardFacts
+} from './card-fields';
+import {
+	loadCardFacts as dbLoadCardFacts,
+	putCardFacts,
+	missingFactIds,
+	type CardFactsIndex
+} from './card-facts';
 import { exportWithMetadata, importWithMetadata } from './yjs-integration';
 import { mergeCardListSets, mergeCollections } from './merge';
 import type { CardsDelta, ListMergeDetail } from './merge';
@@ -128,6 +142,13 @@ class Store implements StoreInterface {
 	// DB-wide list stats (all lists, not just the selected one)
 	totalListCards = $derived(countCardsInLists(this.savedCardLists));
 
+	/**
+	 * Scryfall's own facts about the cards on screen — images, faces, set names —
+	 * keyed by card id (#84). Cached locally, never saved with the user's data,
+	 * refetched when missing. Components read it through `cardFactsOf()`.
+	 */
+	cardFacts = $state<CardFactsIndex>({});
+
 	// Collection state
 	collection = $state<CollectionCard[]>([]);
 	totalOwnedCards = $derived(this.collection.reduce((sum, card) => sum + card.quantity_owned, 0));
@@ -170,9 +191,115 @@ function assertWritable(): void {
 	}
 }
 
-/** Strip Svelte reactive Proxy wrappers so objects can be stored in IndexedDB. */
-function toPlainCard(card: any): any {
-	return JSON.parse(JSON.stringify(card));
+// ==================== CARD FACTS (#84) ====================
+
+/**
+ * The facts needed to draw a card, wherever they happen to be.
+ *
+ * A card fresh from a Scryfall search carries its own — that is the object the
+ * API just returned. A card loaded from the database carries none, by design:
+ * its facts live in the local cache, keyed by id. Components call this rather
+ * than reaching for `card.image_uris`, which is only ever set on the first kind.
+ */
+export function cardFactsOf(card: { id?: string } | null | undefined): CardFacts {
+	if (!card?.id) return { id: '' };
+	if (carriesCardFacts(card)) return extractCardFacts(card) ?? { id: card.id };
+	return store.cardFacts[card.id] ?? { id: card.id };
+}
+
+/**
+ * How a card's edition reads in a filter or a sort: Scryfall's full set name
+ * when the facts cache has it, the set code the record itself carries when it
+ * does not. Never blank for a card that has a set (#84).
+ */
+export function cardSetLabel(card: { id?: string; set?: string } | null | undefined): string {
+	return cardFactsOf(card).set_name ?? card?.set?.toUpperCase() ?? '';
+}
+
+/**
+ * Remember the renderable half of cards we are holding in full, so they still
+ * draw after a reload — the write path drops everything but the whitelist (#84).
+ *
+ * Facts for a given printing never change, so an id already in the index is
+ * skipped: bulk paths can hand over a whole fetched batch without re-writing
+ * what is already cached. Never throws — this is a cache, and a failed cache
+ * write is not a reason to fail the user's edit.
+ */
+async function cacheCardFacts(cards: unknown[], target: IDBDatabase | null = db): Promise<void> {
+	const fresh: CardFacts[] = [];
+
+	for (const card of cards) {
+		const facts = extractCardFacts(card);
+		if (facts && !store.cardFacts[facts.id]) fresh.push(facts);
+	}
+	if (fresh.length === 0) return;
+
+	const next = { ...store.cardFacts };
+	for (const facts of fresh) next[facts.id] = facts;
+	store.cardFacts = next;
+
+	// As with the error journal, no `ensureDB()`: opening a database is the
+	// user's choice, and caching an image URL is no reason to make it for them.
+	if (!target) return;
+	try {
+		await putCardFacts(target, fresh);
+	} catch (error) {
+		logAppError('indexeddb', error, { operation: 'cacheCardFacts', count: fresh.length });
+	}
+}
+
+/** Every card currently held, list cards and collection alike. */
+function allHeldCards(): { id?: string }[] {
+	return [...store.collection, ...store.savedCardLists.flatMap((list) => list.cards)];
+}
+
+let hydrating = false;
+
+/**
+ * Fetch the facts for cards the cache cannot draw — a file restored from
+ * another device, or a database whose cache was cleared. Batched through the
+ * same `/cards/collection` endpoint the importers use, paced between batches
+ * since this runs unattended rather than on a click.
+ *
+ * Fire-and-forget: until it finishes, those cards render as name and quantity,
+ * which is the agreed cost of keeping Scryfall's facts out of the saved file.
+ */
+export async function hydrateCardFacts(): Promise<void> {
+	if (hydrating) return;
+
+	const missing = missingFactIds(allHeldCards(), store.cardFacts);
+	if (missing.length === 0) return;
+
+	hydrating = true;
+	try {
+		const { found } = await fetchCardsByIds(missing, undefined, { pauseMs: 100 });
+		await cacheCardFacts([...found.values()]);
+	} finally {
+		hydrating = false;
+	}
+}
+
+/** Read the cached facts for everything in this database into memory. */
+async function loadCardFactsIndex(): Promise<void> {
+	if (!db) return;
+
+	try {
+		store.cardFacts = await dbLoadCardFacts(db);
+	} catch (error) {
+		logAppError('indexeddb', error, { operation: 'loadCardFacts' });
+		store.cardFacts = {};
+	}
+}
+
+/**
+ * Load everything the UI reads: the user's data from IndexedDB, then the facts
+ * that make it drawable. The refetch of what the cache is missing is deliberately
+ * not awaited — it needs the network, and the lists are readable without it.
+ */
+async function loadCardData(): Promise<void> {
+	await Promise.all([loadCardLists(), loadCollection()]);
+	await loadCardFactsIndex();
+	void hydrateCardFacts();
 }
 
 // ==================== INITIALIZATION ====================
@@ -198,7 +325,7 @@ export async function tryAutoLoadDB() {
 	}
 
 	store.dbMode = 'active';
-	await Promise.all([loadCardLists(), loadCollection()]);
+	await loadCardData();
 	await initLinkedFile();
 }
 
@@ -208,7 +335,7 @@ export async function tryAutoLoadDB() {
 export async function peekDB() {
 	db = await openDatabase();
 	store.dbMode = 'peek';
-	await Promise.all([loadCardLists(), loadCollection()]);
+	await loadCardData();
 }
 
 /**
@@ -223,7 +350,7 @@ export async function initDB() {
 	}
 	db = await openDatabase();
 	store.dbMode = 'active';
-	await Promise.all([loadCardLists(), loadCollection()]);
+	await loadCardData();
 	await putMetadata(db!, 'autoLoadDB', true);
 	await initLinkedFile();
 	console.log('initDB done');
@@ -425,6 +552,10 @@ async function mergeSnapshotIntoDB(
 		dbLoadCollection(_db)
 	]);
 
+	// Same as the restore path: a snapshot written before #84 still carries the
+	// facts, and this is the last moment they exist before the write strips them.
+	await cacheCardFacts([...remoteCollection, ...remoteLists.flatMap((list) => list.cards)], _db);
+
 	const lists = mergeCardListSets(localLists, remoteLists);
 	for (const list of lists.changed) {
 		await dbSaveCardList(_db, list);
@@ -435,7 +566,7 @@ async function mergeSnapshotIntoDB(
 		await saveCollectionCard(_db, card);
 	}
 
-	await Promise.all([loadCardLists(), loadCollection()]);
+	await loadCardData();
 }
 
 export async function linkExistingFile(): Promise<void> {
@@ -608,7 +739,7 @@ export async function loadFromFile(
 	// succeeds, so a rejected file changes nothing at all (#52)
 	const result = await importDatabase(_db, data, false, onProgress);
 	store.dbMode = 'active';
-	await Promise.all([loadCardLists(), loadCollection()]);
+	await loadCardData();
 	await putMetadata(_db, 'autoLoadDB', true);
 	triggerAutoSave();
 	return result;
@@ -634,6 +765,11 @@ export async function importDatabase(
 
 	const cardLists = payload.cardLists;
 	const collection = payload.collection;
+
+	// A file written before #84 carries whole Scryfall objects. The write path
+	// strips them, so harvest the facts on the way in — otherwise restoring an
+	// old backup would send the app back to Scryfall for cards it just read.
+	await cacheCardFacts([...collection, ...cardLists.flatMap((list) => list.cards)], db);
 
 	let imported = 0;
 	let merged = 0;
@@ -792,7 +928,11 @@ async function fetchCardsByName(
  */
 async function fetchCardsByIds(
 	ids: string[],
-	onProgress?: (fetched: number, total: number) => void
+	onProgress?: (fetched: number, total: number) => void,
+	// `pauseMs` is for the unattended caller (fact hydration): a user-triggered
+	// import is one deliberate action and goes at full speed, but a background
+	// refill of the facts cache should not machine-gun Scryfall on page load.
+	options: { pauseMs?: number } = {}
 ): Promise<{ found: Map<string, any>; notFound: string[] }> {
 	const uniqueIds = [...new Set(ids)];
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
@@ -804,6 +944,10 @@ async function fetchCardsByIds(
 	for (let i = 0; i < uniqueIds.length; i += SCRYFALL_BATCH_SIZE) {
 		const chunk = uniqueIds.slice(i, i + SCRYFALL_BATCH_SIZE);
 		const identifiers = chunk.map((id) => ({ id }));
+
+		if (i > 0 && options.pauseMs) {
+			await new Promise((resolve) => setTimeout(resolve, options.pauseMs));
+		}
 
 		try {
 			const response = await fetch(SCRYFALL_COLLECTION_URL, {
@@ -860,11 +1004,14 @@ export async function addToCollection(card: any, quantity: number = 1) {
 
 	const existingCard = await getCollectionCard(_db, card.id);
 
-	const cardData: CollectionCard = {
-		...toPlainCard(card),
-		quantity_owned: existingCard ? existingCard.quantity_owned + quantity : quantity
-	};
+	// The record keeps the whitelist and the quantity; what the search result
+	// carries beyond that goes to the facts cache instead (#84).
+	const cardData = toStoredCollectionCard(
+		card,
+		existingCard ? existingCard.quantity_owned + quantity : quantity
+	);
 
+	await cacheCardFacts([card], _db);
 	await saveCollectionCard(_db, cardData);
 
 	if (existingCard) {
@@ -902,10 +1049,7 @@ export async function removeFromCollection(card: any, quantity: number = 1) {
 		return null;
 	} else {
 		// Update quantity
-		const cardData: CollectionCard = {
-			...toPlainCard(existingCard),
-			quantity_owned: newQuantity
-		};
+		const cardData = toStoredCollectionCard(existingCard, newQuantity);
 
 		await saveCollectionCard(_db, cardData);
 
@@ -927,11 +1071,9 @@ export async function updateCollectionQuantity(card: any, quantity: number) {
 		return removeFromCollection(card, 9999);
 	}
 
-	const cardData: CollectionCard = {
-		...toPlainCard(card),
-		quantity_owned: quantity
-	};
+	const cardData = toStoredCollectionCard(card, quantity);
 
+	await cacheCardFacts([card], _db);
 	await saveCollectionCard(_db, cardData);
 
 	const existingIndex = store.collection.findIndex((c) => c.id === card.id);
@@ -983,6 +1125,10 @@ export async function importCollectionFromText(
 		(lower) => parsed.find((p) => p.name.toLowerCase() === lower)!.name
 	);
 	const { found } = await fetchCardsByName(uniqueNames, onProgress);
+
+	// Cache the batch's facts once, ahead of the loop: the per-card writes below
+	// keep only the whitelist, and re-extracting per card would be wasted work.
+	await cacheCardFacts([...found.values()]);
 
 	// 3. Process results
 	for (const entry of parsed) {
@@ -1076,6 +1222,7 @@ export async function importCardsToCollection(
 	assertWritable();
 
 	const { byId, byName, notFound } = await fetchParsedCards(cards, onProgress);
+	await cacheCardFacts([...byId.values(), ...byName.values()]);
 
 	let success = 0;
 	let failed = 0;
@@ -1115,21 +1262,14 @@ export async function importCardsToNewList(
 	assertWritable();
 
 	const { byId, byName, notFound } = await fetchParsedCards(cards, onProgress);
+	await cacheCardFacts([...byId.values(), ...byName.values()]);
 
-	const newCards: any[] = [];
+	const newCards: Card[] = [];
 	let failed = 0;
 	for (const entry of cards) {
 		const card = resolveCard(entry, byId, byName);
 		if (card) {
-			newCards.push({
-				id: card.id,
-				name: card.name,
-				image_uris: card.image_uris,
-				card_faces: card.card_faces,
-				mana_cost: card.mana_cost,
-				type_line: card.type_line,
-				LM_quantity: entry.quantity
-			});
+			newCards.push(toStoredListCard(card, entry.quantity));
 		} else {
 			failed++;
 		}
@@ -1217,14 +1357,16 @@ export async function saveCardList(name: string, cards: any[]) {
 
 	if (!currentListData) throw new Error('No card list selected');
 
-	const updatedList: CardList = JSON.parse(
-		JSON.stringify({
-			...currentListData,
-			name,
-			cards,
-			updated_at: Date.now()
-		})
-	);
+	// `toStoredListCard` is what drops Svelte's reactive proxies here — every
+	// whitelisted value is a primitive, so the copy is structured-cloneable
+	// without the `JSON.parse(JSON.stringify(...))` round trip this used to make
+	// over whole Scryfall objects (#84).
+	const updatedList: CardList = {
+		...$state.snapshot(currentListData),
+		name,
+		cards: cards.map((card) => toStoredListCard(card)),
+		updated_at: Date.now()
+	};
 
 	await dbSaveCardList(_db, updatedList);
 
@@ -1290,7 +1432,7 @@ export async function addAllToCollection(): Promise<{ added: number; failed: num
 		const merge = mergeCardsIntoCollection(
 			$state.snapshot(store.collection) as CollectionCard[],
 			cards,
-			toPlainCard
+			toStoredCollectionCard
 		);
 
 		// Only the touched rows need writing; the rest of the collection is untouched.
@@ -1353,6 +1495,10 @@ export async function addCardToList(card: any) {
 	// No list yet (fresh or list-less database): create one on demand
 	if (!store.currentCardList) await createNewCardList();
 
+	// Unconditionally, even when the card is already in the list: the list may
+	// have come from a file whose facts this device has never seen (#84).
+	await cacheCardFacts([card]);
+
 	const cards = store.listCards;
 	const name = store.currentCardList?.name || 'Nuovo mazzo';
 
@@ -1366,7 +1512,7 @@ export async function addCardToList(card: any) {
 			LM_quantity: newCards[existingIndex].LM_quantity + 1
 		};
 	} else {
-		newCards = [...cards, { ...toPlainCard(card), LM_quantity: 1 }];
+		newCards = [...cards, toStoredListCard(card, 1)];
 	}
 
 	return saveCardList(name, newCards);
@@ -1387,12 +1533,12 @@ export async function removeCardFromList(card: any) {
 
 	if (cards[existingIndex].LM_quantity > 1) {
 		newCards = [...cards];
-		newCards[existingIndex] = {
-			...toPlainCard(newCards[existingIndex]),
-			LM_quantity: newCards[existingIndex].LM_quantity - 1
-		};
+		newCards[existingIndex] = toStoredListCard(
+			newCards[existingIndex],
+			newCards[existingIndex].LM_quantity - 1
+		);
 	} else {
-		newCards = cards.filter((_, i) => i !== existingIndex).map(toPlainCard);
+		newCards = cards.filter((_, i) => i !== existingIndex);
 	}
 
 	return saveCardList(name, newCards);
@@ -1433,10 +1579,11 @@ export async function importListFromText(
 		(lower) => parsed.find((p) => p.name.toLowerCase() === lower)!.name
 	);
 	const { found } = await fetchCardsByName(uniqueNames, onProgress);
+	await cacheCardFacts([...found.values()]);
 
 	// 3. Build card list from results, merging duplicates by card id
 	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
-	const cardMap = new Map<string, any>();
+	const cardMap = new Map<string, Card>();
 	for (const entry of parsed) {
 		const card = found.get(entry.name.toLowerCase());
 		if (card) {
@@ -1444,15 +1591,7 @@ export async function importListFromText(
 			if (existing) {
 				existing.LM_quantity += entry.quantity;
 			} else {
-				cardMap.set(card.id, {
-					id: card.id,
-					name: card.name,
-					image_uris: card.image_uris,
-					card_faces: card.card_faces,
-					mana_cost: card.mana_cost,
-					type_line: card.type_line,
-					LM_quantity: entry.quantity
-				});
+				cardMap.set(card.id, toStoredListCard(card, entry.quantity));
 			}
 		} else {
 			logAppError('scryfall-api', `Card not found: ${entry.name}`, {

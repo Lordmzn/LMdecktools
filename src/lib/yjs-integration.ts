@@ -8,6 +8,38 @@
 import * as Y from 'yjs';
 import type { StoreInterface } from './store.svelte';
 import type { CardList, Card, CollectionCard } from './db';
+import { toStoredCollectionCard, toStoredListCard } from './card-fields';
+
+/**
+ * One card as a `Y.Map`, carrying the defined fields of an already-stripped
+ * record and nothing else (#84). Every field admitted here costs bytes in every
+ * file, on every write — see `card-fields.ts` for what may be admitted.
+ */
+function toYCard(card: object): Y.Map<unknown> {
+	const yCard = new Y.Map<unknown>();
+	for (const [key, value] of Object.entries(card as Record<string, unknown>)) {
+		if (value !== undefined) yCard.set(key, value);
+	}
+	return yCard;
+}
+
+/**
+ * One card read back out, keeping **every** field the file carries.
+ *
+ * Deliberately not stripped to the whitelist: a file written before #84 still
+ * holds the card facts, and this is the only place they exist. The store
+ * harvests them into the local facts cache on import, and the write path is
+ * what drops them — strip here and restoring an old backup would leave the app
+ * asking Scryfall for cards it had just finished reading.
+ */
+function fromYCard(yCard: Y.Map<any>, cardId: string): Record<string, unknown> {
+	const card: Record<string, unknown> = {};
+	yCard.forEach((value, key) => {
+		card[key] = value;
+	});
+	card.id = cardId;
+	return card;
+}
 
 /**
  * Convert card lists to a Yjs document
@@ -26,23 +58,10 @@ export function cardListsToYDoc(cardLists: CardList[]): Y.Doc {
 		yList.set('created_at', cardList.created_at);
 		yList.set('updated_at', cardList.updated_at);
 
-		// Store cards as a map keyed by card ID
+		// Store cards as a map keyed by card ID, whitelisted as everywhere else (#84)
 		const yCards = new Y.Map();
 		for (const card of cardList.cards) {
-			const yCard = new Y.Map();
-			yCard.set('id', card.id);
-			yCard.set('name', card.name);
-			yCard.set('mana_cost', card.mana_cost || '');
-			yCard.set('LM_quantity', card.LM_quantity);
-
-			// Store other card properties
-			for (const [key, value] of Object.entries(card)) {
-				if (!['id', 'name', 'mana_cost', 'LM_quantity'].includes(key)) {
-					yCard.set(key, value);
-				}
-			}
-
-			yCards.set(card.id, yCard);
+			yCards.set(card.id, toYCard(toStoredListCard(card)));
 		}
 
 		yList.set('cards', yCards);
@@ -65,21 +84,7 @@ export function yDocToCardLists(ydoc: Y.Doc): CardList[] {
 		const cards: Card[] = [];
 
 		yCards.forEach((yCard: Y.Map<any>, cardId: string) => {
-			const card: Card = {
-				id: cardId,
-				name: yCard.get('name'),
-				mana_cost: yCard.get('mana_cost'),
-				LM_quantity: yCard.get('LM_quantity')
-			};
-
-			// Add other properties
-			yCard.forEach((value, key) => {
-				if (!['id', 'name', 'mana_cost', 'LM_quantity'].includes(key)) {
-					card[key] = value;
-				}
-			});
-
-			cards.push(card);
+			cards.push(fromYCard(yCard, cardId) as unknown as Card);
 		});
 
 		cardLists.push({
@@ -146,19 +151,7 @@ export function mergeListCardQuantities(
 					existingYCard.set('LM_quantity', currentQuantity + remoteCard.LM_quantity);
 				} else {
 					// New card - add it
-					const yCard = new Y.Map();
-					yCard.set('id', remoteCard.id);
-					yCard.set('name', remoteCard.name);
-					yCard.set('mana_cost', remoteCard.mana_cost || '');
-					yCard.set('LM_quantity', remoteCard.LM_quantity);
-
-					for (const [key, value] of Object.entries(remoteCard)) {
-						if (!['id', 'name', 'mana_cost', 'LM_quantity'].includes(key)) {
-							yCard.set(key, value);
-						}
-					}
-
-					existingYCards.set(remoteCard.id, yCard);
+					existingYCards.set(remoteCard.id, toYCard(toStoredListCard(remoteCard)));
 				}
 			}
 
@@ -178,19 +171,7 @@ export function mergeListCardQuantities(
 
 			const yCards = new Y.Map();
 			for (const card of remoteList.cards) {
-				const yCard = new Y.Map();
-				yCard.set('id', card.id);
-				yCard.set('name', card.name);
-				yCard.set('mana_cost', card.mana_cost || '');
-				yCard.set('LM_quantity', card.LM_quantity);
-
-				for (const [key, value] of Object.entries(card)) {
-					if (!['id', 'name', 'mana_cost', 'LM_quantity'].includes(key)) {
-						yCard.set(key, value);
-					}
-				}
-
-				yCards.set(card.id, yCard);
+				yCards.set(card.id, toYCard(toStoredListCard(card)));
 			}
 
 			yList.set('cards', yCards);
@@ -216,14 +197,13 @@ export function exportWithMetadata(store: StoreInterface): Uint8Array {
 	yMeta.set('total_lists', store.savedCardLists.length);
 	yMeta.set('total_cards', store.collection.length);
 
-	// Add collection
+	// Add collection. Written field by field from the whitelist rather than by
+	// copying every key of the record (#84): the record should hold nothing else,
+	// and if one day it does, it still must not reach the file. This is the
+	// payload that the linked-file autosave rewrites whole on every change.
 	const yCollection = ydoc.getMap('collection');
 	for (const card of store.collection) {
-		const yCard = new Y.Map();
-		for (const [key, value] of Object.entries(card)) {
-			yCard.set(key, value);
-		}
-		yCollection.set(card.id, yCard);
+		yCollection.set(card.id, toYCard(toStoredCollectionCard(card)));
 	}
 
 	// Add card lists
@@ -239,11 +219,7 @@ export function exportWithMetadata(store: StoreInterface): Uint8Array {
 
 		const yCards = new Y.Map();
 		for (const card of cardList.cards) {
-			const yCard = new Y.Map();
-			for (const [key, value] of Object.entries(card)) {
-				yCard.set(key, value);
-			}
-			yCards.set(card.id, yCard);
+			yCards.set(card.id, toYCard(toStoredListCard(card)));
 		}
 
 		yList.set('cards', yCards);
@@ -260,22 +236,8 @@ export function yDocToCollection(ydoc: Y.Doc): CollectionCard[] {
 	const yCollection = ydoc.getMap('collection');
 	const collection: CollectionCard[] = [];
 
-	yCollection.forEach((yCardRaw) => {
-		const yCard = yCardRaw as Y.Map<any>;
-		const card: CollectionCard = {
-			id: yCard.get('id'),
-			name: yCard.get('name'),
-			quantity_owned: yCard.get('quantity_owned')
-		};
-
-		// Add other properties
-		yCard.forEach((value, key) => {
-			if (!['id', 'name', 'quantity_owned'].includes(key)) {
-				card[key] = value;
-			}
-		});
-
-		collection.push(card);
+	yCollection.forEach((yCardRaw, cardId) => {
+		collection.push(fromYCard(yCardRaw as Y.Map<any>, cardId) as unknown as CollectionCard);
 	});
 
 	return collection;
