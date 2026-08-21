@@ -75,7 +75,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 	await page.goto('./');
 	await page.waitForLoadState('networkidle');
 
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();

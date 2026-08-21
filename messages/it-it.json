@@ -205,6 +205,11 @@
 	"merge_delta_new_list_one": "nuova lista, {count} carta",
 	"merge_delta_new_list_other": "nuova lista, {count} carte",
 	"merge_delta_settings": "impostazioni di corrispondenza aggiornate",
+	"merge_delta_removed_one": "{count} carta rimossa",
+	"merge_delta_removed_other": "{count} carte rimosse",
+	"merge_delta_list_removed": "lista eliminata sull'altro dispositivo",
+	"merge_preview_op_merge": "Questo file è una copia di questo database. Unendolo arriva tutto ciò che è cambiato sull'altro dispositivo, comprese le eliminazioni.",
+	"merge_preview_op_union": "Questo file viene da un altro database. Le sue liste e le sue carte si aggiungono alle tue e non viene rimosso nulla di tuo.",
 
 	"compare_meta_title": "Confronta liste · LM Deck Tools",
 	"compare_meta_description": "Affianca due liste di carte di Magic: The Gathering e scopri cosa tiene ciascuna da sola e cosa hanno in comune.",

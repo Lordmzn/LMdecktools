@@ -1557,6 +1557,46 @@ export const merge_delta_settings = () => `matching settings updated`
 
 
 /**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_removed_one = (params) => `${params.count} card removed`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_removed_other = (params) => `${params.count} cards removed`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_list_removed = () => `list deleted on the other device`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_op_merge = () => `This file is a copy of this database. Merging brings over everything that changed on the other device — including anything deleted there.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_op_union = () => `This file comes from a different database. Its lists and cards are added to yours, and nothing of yours is removed.`
+
+
+/**
  * 
  * @returns {string}
  */

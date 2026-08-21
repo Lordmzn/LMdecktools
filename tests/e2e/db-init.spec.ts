@@ -15,7 +15,7 @@ test.beforeEach(async ({ page }) => {
 // Helper: open the DB modal via JS click + wait for content
 async function openDBModal(page: import('@playwright/test').Page) {
 	await page.waitForLoadState('networkidle');
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await expect(dbButton).toBeVisible();
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	// Wait for modal content to appear

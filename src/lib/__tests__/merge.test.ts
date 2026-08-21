@@ -11,7 +11,7 @@ import { mergeCardListSets, mergeCollections, mergeListCards } from '../merge';
 
 function makeCardList(overrides: Partial<CardList> = {}): CardList {
 	return {
-		id: 1,
+		id: 'list-1',
 		name: 'Test List',
 		cards: [],
 		cardMatching: 'generic',
@@ -100,31 +100,31 @@ describe('mergeCardListSets', () => {
 	});
 
 	it('unions non-overlapping lists and keeps the local-only one untouched', () => {
-		const local = [makeCardList({ id: 7, name: 'Local List' })];
-		const remote = [makeCardList({ id: 1, name: 'Remote List' })];
+		const local = [makeCardList({ id: 'list-7', name: 'Local List' })];
+		const remote = [makeCardList({ id: 'list-1', name: 'Remote List' })];
 
 		const { merged, changed } = mergeCardListSets(local, remote);
 
 		expect(merged.map((l) => l.name).sort()).toEqual(['Local List', 'Remote List']);
 		expect(changed.map((l) => l.name)).toEqual(['Remote List']);
-		expect(findList(merged, 'Local List').id).toBe(7);
+		expect(findList(merged, 'Local List').id).toBe('list-7');
 	});
 
 	it('drops the remote id on a remote-only list so it cannot overwrite a local key', () => {
-		// Both sides use id 1 for different lists — reusing it would clobber the local one.
-		const local = [makeCardList({ id: 1, name: 'Local List' })];
-		const remote = [makeCardList({ id: 1, name: 'Remote List' })];
+		// Both sides use the same id for different lists — reusing it would clobber the local one.
+		const local = [makeCardList({ id: 'list-1', name: 'Local List' })];
+		const remote = [makeCardList({ id: 'list-1', name: 'Remote List' })];
 
 		const { merged } = mergeCardListSets(local, remote);
 
 		expect(findList(merged, 'Remote List').id).toBeUndefined();
-		expect(findList(merged, 'Local List').id).toBe(1);
+		expect(findList(merged, 'Local List').id).toBe('list-1');
 	});
 
 	it('preserves the local id and list metadata of a shared list', () => {
 		const local = [
 			makeCardList({
-				id: 42,
+				id: 'list-42',
 				name: 'Deck A',
 				cardMatching: 'specific',
 				languageMatching: 'strict',
@@ -134,7 +134,7 @@ describe('mergeCardListSets', () => {
 		];
 		const remote = [
 			makeCardList({
-				id: 9,
+				id: 'list-9',
 				name: 'Deck A',
 				cardMatching: 'generic',
 				languageMatching: 'any',
@@ -146,7 +146,7 @@ describe('mergeCardListSets', () => {
 		const { merged } = mergeCardListSets(local, remote);
 		const list = findList(merged, 'Deck A');
 
-		expect(list.id).toBe(42);
+		expect(list.id).toBe('list-42');
 		// Local is newer, so it keeps its matching settings
 		expect(list.cardMatching).toBe('specific');
 		expect(list.languageMatching).toBe('strict');
@@ -178,7 +178,10 @@ describe('mergeCardListSets', () => {
 	});
 
 	it('never deletes a local list that is absent from the remote snapshot', () => {
-		const local = [makeCardList({ name: 'Deck A' }), makeCardList({ id: 2, name: 'Deck B' })];
+		const local = [
+			makeCardList({ name: 'Deck A' }),
+			makeCardList({ id: 'list-2', name: 'Deck B' })
+		];
 
 		const { merged } = mergeCardListSets(local, []);
 
@@ -256,7 +259,7 @@ describe('merge deltas', () => {
 		);
 
 		// 1 copy of Bolt (1 -> 2) plus 3 copies of a card not held at all
-		expect(delta).toEqual({ added: 4, fromNewCards: 3 });
+		expect(delta).toEqual({ added: 4, fromNewCards: 3, removed: 0 });
 	});
 
 	it('reports nothing for a snapshot that is behind or identical', () => {
@@ -264,13 +267,13 @@ describe('merge deltas', () => {
 			[{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }],
 			[{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }]
 		);
-		expect(identical.delta).toEqual({ added: 0, fromNewCards: 0 });
+		expect(identical.delta).toEqual({ added: 0, fromNewCards: 0, removed: 0 });
 
 		const behind = mergeListCards(
 			[{ id: 'bolt', name: 'Bolt', LM_quantity: 4 }],
 			[{ id: 'bolt', name: 'Bolt', LM_quantity: 1 }]
 		);
-		expect(behind.delta).toEqual({ added: 0, fromNewCards: 0 });
+		expect(behind.delta).toEqual({ added: 0, fromNewCards: 0, removed: 0 });
 	});
 
 	it('counts collection copies the same way', () => {
@@ -282,7 +285,7 @@ describe('merge deltas', () => {
 			]
 		);
 
-		expect(delta).toEqual({ added: 4, fromNewCards: 1 });
+		expect(delta).toEqual({ added: 4, fromNewCards: 1, removed: 0 });
 	});
 
 	it('marks a remote-only list as added and counts every copy in it as new', () => {
@@ -303,7 +306,7 @@ describe('merge deltas', () => {
 			{
 				name: 'Modern Burn',
 				status: 'added',
-				delta: { added: 8, fromNewCards: 8 },
+				delta: { added: 8, fromNewCards: 8, removed: 0 },
 				settingsChanged: false
 			}
 		]);
@@ -332,7 +335,7 @@ describe('merge deltas', () => {
 			{
 				name: 'Atraxa',
 				status: 'updated',
-				delta: { added: 4, fromNewCards: 3 },
+				delta: { added: 4, fromNewCards: 3, removed: 0 },
 				settingsChanged: false
 			}
 		]);
@@ -348,7 +351,7 @@ describe('merge deltas', () => {
 			{
 				name: 'Atraxa',
 				status: 'updated',
-				delta: { added: 0, fromNewCards: 0 },
+				delta: { added: 0, fromNewCards: 0, removed: 0 },
 				settingsChanged: true
 			}
 		]);
@@ -361,6 +364,6 @@ describe('merge deltas', () => {
 		);
 
 		expect(details).toEqual([]);
-		expect(delta).toEqual({ added: 0, fromNewCards: 0 });
+		expect(delta).toEqual({ added: 0, fromNewCards: 0, removed: 0 });
 	});
 });

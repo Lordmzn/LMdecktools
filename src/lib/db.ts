@@ -10,7 +10,13 @@ export type CardMatching = 'generic' | 'specific';
 export type LanguageMatching = 'any' | 'strict';
 
 export interface CardList {
-	id?: number;
+	/**
+	 * A `crypto.randomUUID()`, assigned at creation and stable for life (#47).
+	 * It used to be an IndexedDB autoIncrement key, which meant nothing on
+	 * another machine; keying by name instead made a rename indistinguishable
+	 * from delete-and-recreate, which under sync is a duplicated deck.
+	 */
+	id?: string;
 	name: string;
 	cards: Card[];
 	cardMatching: CardMatching;
@@ -35,9 +41,15 @@ export interface CollectionCard extends StoredCard {
 }
 
 const DB_NAME = 'LMdecktools';
-const DB_VERSION = 5;
-const STORE_NAME = 'card_lists';
-const COLLECTION_STORE = 'collection';
+const DB_VERSION = 6;
+/**
+ * The two stores v6 drops (#47). The user's lists and collection live in the
+ * document now; what is left in `LMdecktools` is device-local and must never
+ * sync — the auto-load preference, the linked-file handle, the document guid,
+ * the error journal and the card-facts cache.
+ */
+const LEGACY_LISTS_STORE = 'card_lists';
+const LEGACY_COLLECTION_STORE = 'collection';
 const METADATA_STORE = 'metadata';
 export const ERROR_JOURNAL_STORE = 'error_journal';
 export const CARD_FACTS_STORE = 'card_facts';
@@ -66,6 +78,27 @@ export function storageFactory(): IDBFactory | undefined {
 }
 
 /**
+ * Whether a named IndexedDB database exists.
+ *
+ * There are two of them since #47: `LMdecktools` for device-local state, and
+ * the one `y-indexeddb` opens for the document. "Is there a database here?" is
+ * now a question about both, and the store is what puts the two answers
+ * together — `db.ts` has no business knowing about the document.
+ */
+export async function databaseExists(name: string): Promise<boolean> {
+	if (!factory) return false;
+	try {
+		return factory.databases().then(
+			(dbs) => dbs.map((db) => db.name).includes(name),
+			() => false
+		);
+	} catch {
+		console.warn("Browser doesn't support indexedDB.databases()");
+		return false;
+	}
+}
+
+/**
  * Check local DB existence
  */
 export async function checkLocalDatabase(): Promise<boolean> {
@@ -90,6 +123,9 @@ export async function openDatabase(): Promise<IDBDatabase> {
 			reject(new Error('This browser has no IndexedDB.'));
 			return;
 		}
+
+		// Whatever a previous open rescued belongs to that open, not this one.
+		legacySeed = null;
 		const request = factory.open(DB_NAME, DB_VERSION);
 
 		request.onerror = () => {
@@ -102,25 +138,11 @@ export async function openDatabase(): Promise<IDBDatabase> {
 
 		request.onupgradeneeded = (event) => {
 			const db = (event.target as IDBOpenDBRequest).result;
+			const upgrade = (event.target as IDBOpenDBRequest).transaction;
 
-			// v2 → v3: drop old 'decks' store, create 'card_lists' store
+			// v2 → v3: drop old 'decks' store
 			if (db.objectStoreNames.contains('decks')) {
 				db.deleteObjectStore('decks');
-			}
-
-			// Create card_lists store if it doesn't exist
-			if (!db.objectStoreNames.contains(STORE_NAME)) {
-				const objectStore = db.createObjectStore(STORE_NAME, {
-					keyPath: 'id',
-					autoIncrement: true
-				});
-				objectStore.createIndex('name', 'name', { unique: false });
-				objectStore.createIndex('updated_at', 'updated_at', { unique: false });
-			}
-
-			// Create collection store if it doesn't exist
-			if (!db.objectStoreNames.contains(COLLECTION_STORE)) {
-				db.createObjectStore(COLLECTION_STORE, { keyPath: 'id' });
 			}
 
 			// Create metadata store for tracking changes
@@ -144,173 +166,92 @@ export async function openDatabase(): Promise<IDBDatabase> {
 				db.createObjectStore(CARD_FACTS_STORE, { keyPath: 'id' });
 			}
 
-			// A database that already holds records has fat ones; a brand-new
-			// database (oldVersion 0) has nothing to strip.
-			if (event.oldVersion > 0 && event.oldVersion < 5) {
-				const upgrade = (event.target as IDBOpenDBRequest).transaction;
-				if (upgrade) stripStoredCards(upgrade);
-			}
+			// v5 → v6: the lists and the collection become the document (#47).
+			if (upgrade) harvestLegacyStores(db, upgrade);
 		};
 	});
 }
 
 /**
- * v4 → v5 migration: rewrite every stored record down to the whitelist, keeping
- * what is stripped as card facts so nothing needs refetching on day one (#84).
- *
- * Runs inside the versionchange transaction, so it either lands with the version
- * bump or not at all — there is no window where the app can read half-migrated
- * records.
+ * What the v6 upgrade rescued from the stores it dropped, waiting to be seeded
+ * into a fresh document. Read once, by `takeLegacySeed()`.
  */
-function stripStoredCards(transaction: IDBTransaction): void {
-	const facts = transaction.objectStore(CARD_FACTS_STORE);
+let legacySeed: { cardLists: CardList[]; collection: CollectionCard[] } | null = null;
 
+/**
+ * v5 → v6: read the legacy stores out, then delete them.
+ *
+ * The alpha owes no backward compatibility and the design says to seed the
+ * document from scratch — but "from scratch" and "throw the maintainer's own
+ * collection away" are not the same sentence, and the difference costs thirty
+ * lines that expire with this upgrade. Nothing here survives it: there is no
+ * dual-write, no legacy read path, and after one run the stores do not exist.
+ *
+ * The rows are stashed rather than converted in place because a versionchange
+ * transaction cannot write to a `Y.Doc`; the store seeds from them immediately
+ * after the database opens.
+ */
+function harvestLegacyStores(db: IDBDatabase, upgrade: IDBTransaction): void {
+	const hasLists = db.objectStoreNames.contains(LEGACY_LISTS_STORE);
+	const hasCollection = db.objectStoreNames.contains(LEGACY_COLLECTION_STORE);
+	if (!hasLists && !hasCollection) return;
+
+	const seed: { cardLists: CardList[]; collection: CollectionCard[] } = {
+		cardLists: [],
+		collection: []
+	};
+
+	// A pre-#84 database still holds whole Scryfall objects. The document takes
+	// the whitelist only, so the facts are filed on the way past — otherwise the
+	// upgrade would send the app back to Scryfall for cards it just read.
+	const facts = upgrade.objectStore(CARD_FACTS_STORE);
 	const rememberFacts = (card: unknown) => {
 		const extracted = extractCardFacts(card);
 		if (extracted) facts.put(extracted);
 	};
 
-	const collectionCursor = transaction.objectStore(COLLECTION_STORE).openCursor();
-	collectionCursor.onsuccess = () => {
-		const cursor = collectionCursor.result;
-		if (!cursor) return;
+	if (hasCollection) {
+		const request = upgrade.objectStore(LEGACY_COLLECTION_STORE).getAll();
+		request.onsuccess = () => {
+			for (const card of (request.result ?? []) as CollectionCard[]) {
+				rememberFacts(card);
+				seed.collection.push(toStoredCollectionCard(card));
+			}
+			db.deleteObjectStore(LEGACY_COLLECTION_STORE);
+		};
+	}
 
-		const card = cursor.value as CollectionCard;
-		rememberFacts(card);
-		cursor.update(toStoredCollectionCard(card));
-		cursor.continue();
+	if (hasLists) {
+		const request = upgrade.objectStore(LEGACY_LISTS_STORE).getAll();
+		request.onsuccess = () => {
+			for (const list of (request.result ?? []) as CardList[]) {
+				seed.cardLists.push({
+					...list,
+					// The autoIncrement key is not portable; the document assigns a UUID.
+					id: undefined,
+					cards: (list.cards ?? []).map((card) => {
+						rememberFacts(card);
+						return toStoredListCard(card);
+					})
+				});
+			}
+			db.deleteObjectStore(LEGACY_LISTS_STORE);
+		};
+	}
+
+	upgrade.oncomplete = () => {
+		if (seed.cardLists.length > 0 || seed.collection.length > 0) legacySeed = seed;
 	};
-
-	const listCursor = transaction.objectStore(STORE_NAME).openCursor();
-	listCursor.onsuccess = () => {
-		const cursor = listCursor.result;
-		if (!cursor) return;
-
-		const list = cursor.value as CardList;
-		const cards = (list.cards ?? []).map((card) => {
-			rememberFacts(card);
-			return toStoredListCard(card);
-		});
-		cursor.update({ ...list, cards });
-		cursor.continue();
-	};
 }
 
 /**
- * Clear all data from the database.
- *
- * User data only: `error_journal` (diagnostics) and `card_facts` (a refetchable
- * cache of Scryfall's own facts, like the image cache) are deliberately left
- * alone. Keeping the facts means a restore right after a clear draws its cards
- * immediately instead of waiting on the network.
+ * The rescued v5 rows, once. Returns null on a database that never held any —
+ * which is every database created from here on.
  */
-export async function clearDatabase(db: IDBDatabase): Promise<void> {
-	await Promise.all([
-		new Promise<void>((resolve, reject) => {
-			const transaction = db.transaction(STORE_NAME, 'readwrite');
-			const store = transaction.objectStore(STORE_NAME);
-			const request = store.clear();
-
-			request.onsuccess = () => {
-				putMetadata(db, 'last_clear', Date.now());
-				resolve();
-			};
-
-			request.onerror = () => {
-				reject(new Error(`Failed to clear database: ${request.error?.message}`));
-			};
-		}),
-		new Promise<void>((resolve, reject) => {
-			const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
-			const store = transaction.objectStore(COLLECTION_STORE);
-			const request = store.clear();
-
-			request.onsuccess = () => {
-				putMetadata(db, 'last_clear', Date.now());
-				resolve();
-			};
-
-			request.onerror = () => {
-				reject(new Error(`Failed to clear database: ${request.error?.message}`));
-			};
-		})
-	]);
-}
-
-/**
- * Load all card lists from the database
- */
-export async function loadAllCardLists(db: IDBDatabase): Promise<CardList[]> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(STORE_NAME, 'readonly');
-		const store = transaction.objectStore(STORE_NAME);
-		const request = store.getAll();
-
-		request.onsuccess = () => {
-			resolve(request.result);
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to load card lists: ${request.error?.message}`));
-		};
-	});
-}
-
-/**
- * Save a card list to the database
- */
-export async function saveCardList(db: IDBDatabase, cardList: CardList): Promise<number> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(STORE_NAME, 'readwrite');
-		const store = transaction.objectStore(STORE_NAME);
-
-		// The whitelist is applied here, at the boundary, and not only by the
-		// callers: this is the one place every list write passes through, so a
-		// caller holding a fat Scryfall object cannot put one on disk (#84).
-		const listToSave = {
-			...cardList,
-			cards: (cardList.cards ?? []).map((card) => toStoredListCard(card)),
-			updated_at: Date.now()
-		};
-
-		let request: IDBRequest;
-		if (cardList.id) {
-			request = store.put(listToSave);
-		} else {
-			// Remove id so autoIncrement can generate a new key
-			const { id: _id, ...listWithoutId } = listToSave;
-			request = store.add(listWithoutId);
-		}
-
-		request.onsuccess = () => {
-			putMetadata(db, 'last_save', Date.now());
-			resolve(request.result as number);
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to save card list: ${request.error?.message}`));
-		};
-	});
-}
-
-/**
- * Delete a card list from the database
- */
-export async function deleteCardList(db: IDBDatabase, listId: number): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(STORE_NAME, 'readwrite');
-		const store = transaction.objectStore(STORE_NAME);
-		const request = store.delete(listId);
-
-		request.onsuccess = () => {
-			putMetadata(db, 'last_save', Date.now());
-			resolve();
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to delete card list: ${request.error?.message}`));
-		};
-	});
+export function takeLegacySeed(): { cardLists: CardList[]; collection: CollectionCard[] } | null {
+	const seed = legacySeed;
+	legacySeed = null;
+	return seed;
 }
 
 /**
@@ -340,192 +281,5 @@ export async function getMetadata(db: IDBDatabase, key: string): Promise<any> {
 			resolve(request.result || null);
 		};
 		request.onerror = () => reject(request.error);
-	});
-}
-
-/**
- * Find a card list by name
- */
-export async function findCardListByName(db: IDBDatabase, name: string): Promise<CardList | null> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(STORE_NAME, 'readonly');
-		const store = transaction.objectStore(STORE_NAME);
-		const index = store.index('name');
-		const request = index.get(name);
-
-		request.onsuccess = () => {
-			resolve(request.result || null);
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to find card list: ${request.error?.message}`));
-		};
-	});
-}
-
-/**
- * Merge two card lists, combining quantities for matching cards
- */
-export function mergeCards(existing: Card[], incoming: Card[]): Card[] {
-	const cardMap = new Map<string, Card>();
-
-	// Add existing cards
-	for (const card of existing) {
-		cardMap.set(card.id, { ...card });
-	}
-
-	// Merge incoming cards
-	for (const card of incoming) {
-		const existingCard = cardMap.get(card.id);
-		if (existingCard) {
-			existingCard.LM_quantity += card.LM_quantity;
-		} else {
-			cardMap.set(card.id, { ...card });
-		}
-	}
-
-	return Array.from(cardMap.values());
-}
-
-/**
- * Create a new empty card list with default values
- */
-export function createEmptyCardList(): CardList {
-	return {
-		name: 'A list',
-		cards: [],
-		cardMatching: 'generic',
-		languageMatching: 'any',
-		created_at: Date.now(),
-		updated_at: Date.now()
-	};
-}
-
-// ==================== COLLECTION FUNCTIONS ====================
-
-/**
- * Load all cards from the collection
- */
-export async function loadCollection(db: IDBDatabase): Promise<CollectionCard[]> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(COLLECTION_STORE, 'readonly');
-		const store = transaction.objectStore(COLLECTION_STORE);
-		const request = store.getAll();
-
-		request.onsuccess = () => {
-			resolve(request.result);
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to load collection: ${request.error?.message}`));
-		};
-	});
-}
-
-/**
- * Add or update a card in the collection
- */
-export async function saveCollectionCard(
-	db: IDBDatabase,
-	card: CollectionCard
-): Promise<CollectionCard> {
-	// Stripped at the boundary, as in `saveCardList` — see there (#84).
-	const cardToSave = toStoredCollectionCard(card);
-
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
-		const store = transaction.objectStore(COLLECTION_STORE);
-		const request = store.put(cardToSave);
-
-		request.onsuccess = () => {
-			resolve(cardToSave);
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to save card: ${request.error?.message}`));
-		};
-	});
-}
-
-/**
- * Add or update many cards in one transaction.
- *
- * `saveCollectionCard` in a loop costs a transaction per card, which is what
- * made adding a whole list to the collection crawl (#62). One `readwrite`
- * transaction covers the batch; the promise settles when the transaction
- * commits, so a caller that awaits it knows every card is durable.
- *
- * All-or-nothing, as IndexedDB transactions are: if one `put` fails the
- * transaction aborts and nothing in the batch lands. That is the right
- * semantics here — a half-written bulk add is worse than a failed one.
- */
-export async function saveCollectionCards(
-	db: IDBDatabase,
-	cards: CollectionCard[]
-): Promise<CollectionCard[]> {
-	if (cards.length === 0) return [];
-
-	const cardsToSave = cards.map((card) => toStoredCollectionCard(card));
-
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
-		const store = transaction.objectStore(COLLECTION_STORE);
-
-		for (const card of cardsToSave) {
-			store.put(card);
-		}
-
-		transaction.oncomplete = () => {
-			resolve(cardsToSave);
-		};
-
-		transaction.onerror = () => {
-			reject(new Error(`Failed to save cards: ${transaction.error?.message}`));
-		};
-
-		transaction.onabort = () => {
-			reject(new Error(`Failed to save cards: ${transaction.error?.message ?? 'aborted'}`));
-		};
-	});
-}
-
-/**
- * Delete a card from the collection
- */
-export async function deleteCollectionCard(db: IDBDatabase, cardId: string): Promise<void> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
-		const store = transaction.objectStore(COLLECTION_STORE);
-		const request = store.delete(cardId);
-
-		request.onsuccess = () => {
-			resolve();
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to delete card: ${request.error?.message}`));
-		};
-	});
-}
-
-/**
- * Get a specific card from the collection
- */
-export async function getCollectionCard(
-	db: IDBDatabase,
-	cardId: string
-): Promise<CollectionCard | null> {
-	return new Promise((resolve, reject) => {
-		const transaction = db.transaction(COLLECTION_STORE, 'readonly');
-		const store = transaction.objectStore(COLLECTION_STORE);
-		const request = store.get(cardId);
-
-		request.onsuccess = () => {
-			resolve(request.result || null);
-		};
-
-		request.onerror = () => {
-			reject(new Error(`Failed to get card: ${request.error?.message}`));
-		};
 	});
 }

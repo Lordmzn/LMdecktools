@@ -101,7 +101,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 	await page.waitForLoadState('networkidle');
 
 	// Create a new DB via the modal
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
@@ -313,25 +313,30 @@ test.describe('Card Lists', () => {
 		await addCardViaSearch(page);
 		await page.locator('button[title="Close"]').click();
 
-		// What IndexedDB holds is the whitelist: no images, no legalities, no prices.
+		// What the saved document holds is the whitelist: no images, no set names,
+		// no legalities. Asserted over the stored bytes rather than a decoded
+		// record — since #47 the data is a Yjs update log, and "the art never
+		// reaches the file" is exactly a statement about those bytes.
 		const stored = await page.evaluate(async () => {
 			const db = await new Promise<IDBDatabase>((resolve, reject) => {
-				const request = indexedDB.open('LMdecktools');
+				const request = indexedDB.open('lmdecktools-doc');
 				request.onsuccess = () => resolve(request.result);
 				request.onerror = () => reject(request.error);
 			});
-			const lists = await new Promise<any[]>((resolve, reject) => {
-				const request = db.transaction('card_lists', 'readonly').objectStore('card_lists').getAll();
+			const updates = await new Promise<ArrayBuffer[]>((resolve, reject) => {
+				const request = db.transaction('updates', 'readonly').objectStore('updates').getAll();
 				request.onsuccess = () => resolve(request.result);
 				request.onerror = () => reject(request.error);
 			});
 			db.close();
-			return lists[0].cards[0];
+
+			return updates.map((update) => String.fromCharCode(...new Uint8Array(update))).join('');
 		});
 
-		expect(stored).not.toHaveProperty('image_uris');
-		expect(stored).not.toHaveProperty('set_name');
-		expect(stored.name).toBe('Lightning Bolt');
+		expect(stored).toContain('Lightning Bolt');
+		expect(stored).not.toContain('image_uris');
+		expect(stored).not.toContain('cards.scryfall.io');
+		expect(stored).not.toContain('set_name');
 
 		// And the art comes back anyway, from the local facts cache rather than
 		// from the record — a full reload, not a client-side navigation.

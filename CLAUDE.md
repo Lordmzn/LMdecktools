@@ -39,13 +39,32 @@ Requires Node 22 and pnpm 11 (see `.tool-versions`). With [asdf](https://asdf-vm
 
 ### State Management
 
-A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-based runes. Exported as `export const store = new Store()`. Components import `store` directly — no context API or Svelte 4 writable stores. Async functions (`initDB`, `addToCollection`, `createNewDeck`, etc.) are exported alongside and mutate `store.*` after DB operations.
+A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-based runes. Exported as `export const store = new Store()`. Components import `store` directly — no context API or Svelte 4 writable stores.
+
+Since #47 the runes are **projections of the document, not the source of truth**. `store.savedCardLists` and `store.collection` are rebuilt wholesale by an observer, coalesced into a microtask, so a 300-card import is one rebuild rather than three hundred. Three rules follow, and each of them was a bug first:
+
+- **Mutators write to the document and stop.** No assigning to `store.*`, and no `triggerAutoSave()` — the fourteen call sites collapsed into one `doc.on('update')`.
+- **Mutators read the document, never the runes** (`liveLists()` / `liveCollection()` / `liveList()`). Between a write and the next microtask the runes are stale, and a mutator reading its own stale projection loses the write before it.
+- **Every exported mutator is `async` and settles with the runes rebuilt.** The observer's microtask is queued inside the transaction, so it runs before the caller's continuation. One contract, not two.
+
+`currentCardList` and the `dbLoaded` / `isReadOnly` pair are plain getters rather than `$derived`, deliberately: a `$derived` read outside a reactive owner — which is every test in this repo — keeps returning a list that has just been deleted.
 
 ### Storage Layer
 
-Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Note for the #47 work: `y-indexeddb` opens its **own** database, named after the document and separate from `LMdecktools`, which breaks the one-database assumption in `checkLocalDatabase()` (`db.ts:50`), `clearDatabase()` (`:122`) and whatever the DB modal reports as "a database exists". Database `LMdecktools` v5 with five object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle), `error_journal` (autoIncrement, `timestamp` + `category` indexes — added in v4, see Error Journal), and `card_facts` (keyed by Scryfall card ID — added in v5, see Card Fields & Facts Cache).
+**There are two databases** (#47), and forgetting the second one is the mistake this section exists to prevent:
 
-The v4 → v5 upgrade rewrites every existing `collection` and `card_lists` row down to the whitelist and files what it strips in `card_facts`, inside the versionchange transaction so there is no half-migrated state to read (`stripStoredCards()`).
+| Database           | Holds                                                                                                                             | Written by                           |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------ |
+| `LMdecktools` (v6) | device-local state only — `metadata` (auto-load preference, linked-file handle, **document guid**), `error_journal`, `card_facts` | `src/lib/db.ts`                      |
+| `lmdecktools-doc`  | the user's lists and collection, as a log of Yjs updates                                                                          | `y-indexeddb`, via `src/lib/ydoc.ts` |
+
+Nothing in `LMdecktools` may ever sync. Everything in the document does.
+
+`src/lib/db.ts` is the hand-rolled wrapper for the first (raw `IDBRequest` callbacks wrapped in Promises) and knows nothing about the second — `databaseExists(name)` is generic, and `localDatabaseExists()` in the store is what puts the two answers together. Anything asking "is there a database here?" goes through the store, not through `checkLocalDatabase()`.
+
+`db.ts` is also where the storage **factory** lives (`useStorageFactory()`), which is what preview mode swaps — see Install Context & Preview Mode. Note that `y-indexeddb` reaches for the global `indexedDB` directly and ignores the factory, which is why preview mode attaches no persistence at all.
+
+The v5 → v6 upgrade drops the `card_lists` and `collection` stores. It reads them out first (`harvestLegacyStores()` → `takeLegacySeed()`) and the store seeds the document from what it rescued: the alpha owes no backward compatibility, but "seed from scratch" and "throw the maintainer's own collection away" are not the same sentence. That code expires with the upgrade — there is no dual-write and no legacy read path.
 
 ### Install Context & Preview Mode
 
@@ -148,32 +167,50 @@ Routing: English is served at `/`, Italian at `/it-it/`, and `LanguageSwitcher.s
 
 The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. (A minimal service worker is coming anyway, for installability and the Android share target; it does not take over image caching, and the two coexist. Also worth knowing: WebKit's ITP deletes the Cache API alongside IndexedDB after 7 idle days, so on Apple platforms this cache is a session-scale optimisation, not storage.) Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
 
-### Yjs Integration
+### The Document (#47)
 
-`src/lib/yjs-integration.ts` holds the export/import/merge utilities. Both directions are live: `exportWithMetadata()` writes the Yjs binary format, `importWithMetadata()` reads it, and `importDatabase()` sniffs JSON vs Yjs.
+`src/lib/ydoc.ts` is the data model and the transport port. One long-lived `Y.Doc` with a stable `guid`, mutated in place:
 
-**These are snapshots, not a CRDT.** Every save builds a _fresh_ `Y.Doc` with fresh client IDs, so the file carries no history, no client identity, and no tombstones. Applying one snapshot doc's update to another is therefore not a merge — a key present on both sides resolves to one side's value, dropping the other's. That is why merging goes through `src/lib/merge.ts` instead (#46): an explicit union of lists by name and cards by `id`, quantities resolved to `max()`, local IndexedDB ids preserved, nothing ever cleared or deleted. Deletions consequently never propagate; real CRDT semantics require a persistent `Y.Doc` as the source of truth (#47), which is also the prerequisite for the P2P sync roadmap item (#11).
+```
+ydoc (guid: stable per database lineage)
+├── meta          Y.Map    schema_version, app, guid, created_at
+├── collection    Y.Map<scryfall_id, Y.Map>   quantity_owned + whitelist
+└── card_lists    Y.Map<list_id, Y.Map>       name, matching, timestamps
+                       cards: Y.Map<scryfall_id, Y.Map>  LM_quantity + whitelist
+```
 
-**This is designed and decided, not open.** `docs/persistent-ydoc.md` settles the document model (#47) and `docs/durability-convergence-transport.md` settles what sits on top of it — durability, transports, and the decision to keep Yjs at all. Read both before changing anything in this area; several attractive-looking shortcuts are refuted there with measurements. Load-bearing consequences for day-to-day work:
+`docs/persistent-ydoc.md` settles the model and `docs/durability-convergence-transport.md` settles what sits on top — durability, transports, and the decision to keep Yjs at all. **Read both before changing anything here**; several attractive-looking shortcuts are refuted in them with measurements. What a change to this area has to respect:
 
-- **Do not spread Scryfall objects into stored records.** Shipped ahead of the rest as #84 — see Card Fields & Facts Cache above, which is now the reference. Every field admitted to the document costs ~30 B per card forever, and the whole document is what moves on every sync.
-- **The alpha owes no backward compatibility.** No active users, so schema changes are breaking changes: no dual-write, no legacy stores kept alive, no v1.0 snapshot support. This licence expires the moment users are invited.
-- **`merge.ts` is permanent**, not scaffolding. It becomes the _union_ path (foreign-lineage files) beside the _sync_ path (same-guid documents), and the UI must say which one a file gets — same bytes, different results.
-- **File extensions:** `.ydelta` for per-device files, `.json` for the share-sheet envelope. `.yjs` retires with the snapshot format it named.
+- **The guid is stamped inside the document as well as out.** `Y.encodeStateAsUpdate()` does not carry it, so a file would otherwise have no lineage and the import guard could not tell a peer's document from a stranger's.
+- **Every session mints its own `clientID`.** Never persist or share one: two tabs sharing a clientID lose data silently and order-dependently.
+- **Lists are keyed by `crypto.randomUUID()`**, so a rename stays a rename rather than a delete-and-recreate — which under sync is a duplicated deck. `store.currentCardListId`, never an index: a position is not a selection once a replica can insert a list.
+- **Quantities are LWW scalars, never counters.** Two devices each recording "I own 4 Bolt" yield 4, not 8. For _concurrent_ writes Yjs is not time-based at all — the higher clientID wins — so the UI must never describe sync as "the newest change wins".
+- **Never spread a Scryfall object in.** Every field admitted costs ~30 B per card forever, in a payload that moves in full on every sync (see Card Fields & Facts Cache). `setIfChanged()` exists for the same reason: every `set` is an `Item` kept forever, so re-asserting an unchanged name on each quantity bump grows every future sync payload.
+
+**The transport port (T0)** is `stateVector` / `updateFor` / `applyRemoteUpdate`, defined with the model so file semantics never leak into the store. Every transport — the linked file today, BroadcastChannel and a peer connection later — speaks those three calls and nothing else.
+
+**Two operations, one file format.** `merge.ts` is permanent, not scaffolding:
+
+| Payload                                               | Operation                                  | Can it remove?            |
+| ----------------------------------------------------- | ------------------------------------------ | ------------------------- |
+| Same guid — a replica of this database                | **merge** — `applyRemoteUpdate()`          | yes: tombstones propagate |
+| Different guid — a friend's file, a compacted lineage | **union** — `merge.ts`, `max()` quantities | no, never                 |
+
+Same bytes, different results, so **the UI has to say which** — `MergePreview.operation` drives that line in `MergePreviewModal.svelte`. Removals are reported explicitly rather than netted off: they are the one class of change the app could never produce before, so the one users will not expect.
 
 ### Restore Validation
 
-Restoring from a file is destructive — `importDatabase(db, data, merge=false)` calls `clearDatabase()`. Every file therefore goes through `src/lib/import-guard.ts` first (#52), which parses without touching IndexedDB and throws `ImportValidationError` for: a file naming another `app`, a `version` outside `SUPPORTED_VERSIONS`, a file with neither `app` metadata nor a recognisable shape (`cardLists` / `decks` / `collection`), a payload whose `total_lists` / `total_cards` disagree with what decoded, and — destructive path only — a payload with zero lists _and_ zero collection cards. `exportWithMetadata()` writes those declared counts; files from before #52 omit them and are accepted without the check.
+Restoring from a file is destructive, and differently so since #47: "restore" now means **adopt the file's lineage wholesale**, guid and all, so the restored database is a replica of the one the file came from rather than a stranger holding the same values. Anything else leaves every other device unable to sync with it.
 
-Anything that reads a restore file must go through `parseImportFile()` / `assertRestorable()` rather than trusting `JSON.parse`. `inspectImportFile()` runs the same validation for the UI so the DB modal can show `app · version · exported_at · counts` and keep the Restore button disabled until a file passes.
+Every file goes through `src/lib/import-guard.ts` first (#52), which parses without touching IndexedDB and throws `ImportValidationError` for: a file naming another `app`, a `version` outside `SUPPORTED_VERSIONS`, a file with neither `app` metadata nor a recognisable shape (`cardLists` / `decks` / `collection`), a JSON payload whose `total_lists` / `total_cards` disagree with what decoded, a **1.0 snapshot** (refused by name — it has no lineage to adopt), and — destructive path only — a payload with zero lists _and_ zero collection cards.
 
-Once #47 lands, this guard gains a **two-way lineage classification** — same-guid document (merge via `Y.applyUpdate`) vs foreign-guid document (union via `merge.ts`) — and `inspectImportFile()` must surface which one the file will get before the user commits. `SUPPORTED_VERSIONS` also starts doing real work, since the share-sheet payload is a versioned JSON envelope around a base64 update.
+Anything that reads a restore file must go through `parseImportFile()` / `assertRestorable()` rather than trusting `JSON.parse`. `ImportPayload.guid` is what the two-way classification reads; `inspectImportFile()` runs the same validation for the UI so the DB modal can show `app · version · exported_at · counts` and keep the Restore button disabled until a file passes.
 
 ## Testing
 
 ### Structure
 
-- `src/lib/__tests__/` — unit tests for lib modules (`db.test.ts`, `yjs-integration.test.ts`, `store.test.ts`)
+- `src/lib/__tests__/` — unit tests for lib modules (`ydoc.test.ts`, `db.test.ts`, `store*.test.ts`)
 - `src/lib/components/__tests__/` — component tests (placeholder, expand as needed)
 - `tests/e2e/` — Playwright E2E tests (`db-init.spec.ts`)
 - `src/tests/setup.ts` — test setup (imports `fake-indexeddb/auto` and `@testing-library/jest-dom/vitest`)
@@ -181,7 +218,10 @@ Once #47 lands, this guard gains a **two-way lineage classification** — same-g
 ### Gotchas
 
 - **Svelte 5 runes in tests:** `$state`/`$derived` require a reactive owner. The `Store` class cannot be instantiated directly in a plain `.test.ts` — use `@testing-library/svelte` to mount a wrapper component, or mock the module (see `store.test.ts`)
-- **fake-indexeddb:** Imported in setup file. Tests that use IndexedDB must close/delete the DB in `afterEach` to avoid state leaking between tests
+- **fake-indexeddb:** Imported in setup file. Tests that touch storage must `await closeDB()` and then `resetDatabases()` (`src/lib/__tests__/reset.ts`) in `afterEach` — **both** databases, because deleting only `LMdecktools` leaves the document's own store to be replayed into the next test. Awaiting `closeDB()` matters too: `deleteDatabase()` behind a live connection blocks silently until something times out.
+- **Never open a second connection to `LMdecktools` in a test.** It blocks the `afterEach` delete, and everything after it queues behind a delete that never lands. Go through the store's own functions.
+- **The document is the authority in assertions too.** After a mutator resolves the runes are rebuilt, so `store.*` is safe to read; anything asserting on what was _persisted_ decodes the update log (`persistedDocument()` in `tests/e2e/base.ts`).
+- **List order is `created_at`, then id.** Two lists created in the same millisecond tie, so fixtures that care must set `created_at` explicitly — never index into `savedCardLists` expecting insertion order.
 - **Paraglide imports:** Vitest uses the paraglide Vite plugin (already in `vite.config.ts`) to resolve `$paraglide/runtime` imports
 - **E2E DB button:** The DB modal button requires `evaluate((btn) => btn.click())` rather than Playwright's `.click()` due to layout; see `openDBModal` helper in E2E tests
 

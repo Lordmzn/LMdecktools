@@ -7,6 +7,7 @@
  * Kept separate from store.test.ts to avoid vi.mock conflicts.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { resetDatabases } from './reset';
 
 const mockPickAndLinkNewFile = vi.fn();
 
@@ -20,7 +21,7 @@ vi.mock('../linked-file', async (importOriginal) => {
 	};
 });
 
-const { linkFile, saveNow, unlinkFile, closeDB, store } = await import('../store.svelte');
+const { initDB, linkFile, saveNow, unlinkFile, closeDB, store } = await import('../store.svelte');
 
 type WritableMock = {
 	write: ReturnType<typeof vi.fn>;
@@ -40,8 +41,15 @@ function workingWritable(): WritableMock {
 	};
 }
 
-/** Link a file backed by `createWritable`, leaving the store in the 'active' state. */
+/**
+ * Link a file backed by `createWritable`, leaving the store in the 'active'
+ * state.
+ *
+ * The database is opened first because what gets written is now the document
+ * (#47), and linking a file is only reachable from an open database anyway.
+ */
 async function link(createWritable: ReturnType<typeof vi.fn>): Promise<FileSystemFileHandle> {
+	await initDB();
 	const handle = makeHandle(createWritable);
 	mockPickAndLinkNewFile.mockResolvedValue(handle);
 	await linkFile();
@@ -56,12 +64,9 @@ describe('linked file write status', () => {
 
 	afterEach(async () => {
 		await unlinkFile();
-		closeDB();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await closeDB();
+		store.dbMode = 'none';
+		await resetDatabases();
 		vi.restoreAllMocks();
 	});
 

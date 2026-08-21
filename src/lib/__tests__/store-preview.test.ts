@@ -10,7 +10,7 @@ import { enterPreviewMode, addToCollection, closeDB, store } from '../store.svel
 import { useStorageFactory, checkLocalDatabase } from '../db';
 
 afterEach(async () => {
-	closeDB();
+	await closeDB();
 	store.dbMode = 'none';
 	store.installContext = 'browser';
 	store.collection = [];

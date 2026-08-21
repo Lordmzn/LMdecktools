@@ -39,13 +39,23 @@ export interface CardsDelta {
 	added: number;
 	/** The subset of `added` contributed by cards the target did not hold at all. */
 	fromNewCards: number;
+	/**
+	 * Copies lost. Always zero on the union path, which never removes anything —
+	 * it is the *sync* path that can, now that a document carries tombstones
+	 * (#47), and a removal is the one class of change a user will not expect.
+	 */
+	removed: number;
 }
 
 /** Per-list breakdown of {@link mergeCardListSets}, one entry per list the merge touches. */
 export interface ListMergeDetail {
 	name: string;
-	/** `added` for a list that exists only in the snapshot, `updated` for one both sides hold. */
-	status: 'added' | 'updated';
+	/**
+	 * `added` for a list that exists only in the incoming payload, `updated` for
+	 * one both sides hold, `removed` for one the sync path deletes — which only
+	 * the document model can produce.
+	 */
+	status: 'added' | 'updated' | 'removed';
 	delta: CardsDelta;
 	/** True when the snapshot is newer and hands over different matching settings. */
 	settingsChanged: boolean;
@@ -56,7 +66,7 @@ export interface CardListMergeResult extends MergeResult<CardList> {
 }
 
 function emptyDelta(): CardsDelta {
-	return { added: 0, fromNewCards: 0 };
+	return { added: 0, fromNewCards: 0, removed: 0 };
 }
 
 function countCopies(cards: { LM_quantity: number }[]): number {
@@ -138,7 +148,7 @@ export function mergeCardListSets(local: CardList[], remote: CardList[]): CardLi
 			details.push({
 				name: added.name,
 				status: 'added',
-				delta: { added: copies, fromNewCards: copies },
+				delta: { added: copies, fromNewCards: copies, removed: 0 },
 				settingsChanged: false
 			});
 			delta.added += copies;
@@ -178,6 +188,111 @@ export function mergeCardListSets(local: CardList[], remote: CardList[]): CardLi
 	}
 
 	return { merged, changed, details, delta };
+}
+
+// ==================== THE SYNC PATH (#47) ====================
+//
+// Everything above unions two sets that are not peers. What follows describes
+// what applying a *same-lineage* document would do — which is a different
+// operation on the same bytes, and can remove things. The UI has to say which
+// one a file is getting; these functions are how it knows what to say.
+
+function cardsById<T extends { id: string }>(cards: T[]): Map<string, T> {
+	const byId = new Map<string, T>();
+	for (const card of cards) byId.set(card.id, card);
+	return byId;
+}
+
+/** Copies gained and lost between two versions of one card set. */
+function diffCards(
+	before: { id: string; LM_quantity: number }[],
+	after: { id: string; LM_quantity: number }[]
+): CardsDelta {
+	const delta = emptyDelta();
+	const wasThere = cardsById(before);
+	const isThere = cardsById(after);
+
+	for (const card of after) {
+		const previous = wasThere.get(card.id);
+		if (!previous) {
+			delta.added += card.LM_quantity;
+			delta.fromNewCards += card.LM_quantity;
+		} else if (card.LM_quantity > previous.LM_quantity) {
+			delta.added += card.LM_quantity - previous.LM_quantity;
+		} else if (card.LM_quantity < previous.LM_quantity) {
+			delta.removed += previous.LM_quantity - card.LM_quantity;
+		}
+	}
+
+	for (const card of before) {
+		if (!isThere.has(card.id)) delta.removed += card.LM_quantity;
+	}
+
+	return delta;
+}
+
+function isEmptyDelta(delta: CardsDelta): boolean {
+	return delta.added === 0 && delta.removed === 0;
+}
+
+/**
+ * What changed between two projections of the document — the sync path's
+ * answer to `mergeCardListSets`, computed by applying a payload to a throwaway
+ * clone rather than by unioning.
+ *
+ * Lists are matched by **id** here, not by name: on the sync path both sides
+ * descend from the same lineage, so a rename is a rename and the id is what
+ * survives it.
+ */
+export function diffProjections(
+	before: { collection: CollectionCard[]; cardLists: CardList[] },
+	after: { collection: CollectionCard[]; cardLists: CardList[] }
+): { collection: CardsDelta; lists: ListMergeDetail[] } {
+	const collection = diffCards(
+		before.collection.map((c) => ({ id: c.id, LM_quantity: c.quantity_owned })),
+		after.collection.map((c) => ({ id: c.id, LM_quantity: c.quantity_owned }))
+	);
+
+	const lists: ListMergeDetail[] = [];
+	const beforeById = new Map(before.cardLists.map((list) => [list.id, list]));
+	const afterById = new Map(after.cardLists.map((list) => [list.id, list]));
+
+	for (const list of after.cardLists) {
+		const previous = beforeById.get(list.id);
+
+		if (!previous) {
+			const copies = countCopies(list.cards);
+			lists.push({
+				name: list.name,
+				status: 'added',
+				delta: { added: copies, fromNewCards: copies, removed: 0 },
+				settingsChanged: false
+			});
+			continue;
+		}
+
+		const delta = diffCards(previous.cards, list.cards);
+		const settingsChanged =
+			previous.cardMatching !== list.cardMatching ||
+			previous.languageMatching !== list.languageMatching;
+
+		if (!isEmptyDelta(delta) || settingsChanged || previous.name !== list.name) {
+			lists.push({ name: list.name, status: 'updated', delta, settingsChanged });
+		}
+	}
+
+	for (const list of before.cardLists) {
+		if (afterById.has(list.id)) continue;
+		const copies = countCopies(list.cards);
+		lists.push({
+			name: list.name,
+			status: 'removed',
+			delta: { added: 0, fromNewCards: 0, removed: copies },
+			settingsChanged: false
+		});
+	}
+
+	return { collection, lists };
 }
 
 /**

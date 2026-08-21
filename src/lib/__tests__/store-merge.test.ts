@@ -11,6 +11,7 @@
  * Kept separate from the other store tests to avoid vi.mock conflicts.
  */
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest';
+import { resetDatabases } from './reset';
 import type { CardList, CollectionCard } from '../db';
 
 const mockPickAndLinkNewFile = vi.fn();
@@ -25,10 +26,17 @@ vi.mock('../linked-file', async (importOriginal) => {
 	};
 });
 
-const { initDB, closeDB, linkFile, unlinkFile, mergeFromFile, previewMergeFromFile, store } =
-	await import('../store.svelte');
-const { openDatabase, saveCardList, saveCollectionCard } = await import('../db');
-const { exportWithMetadata } = await import('../yjs-integration');
+const {
+	initDB,
+	closeDB,
+	linkFile,
+	unlinkFile,
+	mergeFromFile,
+	previewMergeFromFile,
+	importDatabase,
+	store
+} = await import('../store.svelte');
+const { createDocument, seedDocument, updateFor } = await import('../ydoc');
 
 function makeCardList(overrides: Partial<CardList> = {}): CardList {
 	return {
@@ -42,15 +50,26 @@ function makeCardList(overrides: Partial<CardList> = {}): CardList {
 	};
 }
 
-/** Serialize a remote database state into the linked-file snapshot format. */
+/**
+ * A file from **another device's lineage** — a fresh guid every time, which is
+ * what makes it the union path rather than the sync path (C4). That is the case
+ * this file exists for: #46 was a union that deleted local-only records.
+ */
 function snapshot(cardLists: CardList[], collection: CollectionCard[]): Uint8Array {
-	return exportWithMetadata({
-		dbMode: 'active',
-		dbLoaded: true,
-		isReadOnly: false,
-		savedCardLists: cardLists,
+	const foreign = createDocument();
+	seedDocument(foreign, {
+		// Ids and creation order spelled out: a `Y.Map` has none of its own, so
+		// `readLists()` orders by `created_at` and falls back to the id — and two
+		// fixtures made in the same millisecond would otherwise come back in an
+		// arbitrary order.
+		cardLists: cardLists.map((list, i) => ({
+			...list,
+			id: list.id ?? `remote-${i}`,
+			created_at: i
+		})),
 		collection
 	});
+	return updateFor(foreign);
 }
 
 /** A linked file that always reads back `data`, and swallows writes. */
@@ -69,12 +88,16 @@ function makeHandle(data: Uint8Array): FileSystemFileHandle {
 	} as unknown as FileSystemFileHandle;
 }
 
-/** Seed the local database directly, bypassing the store's write guards. */
+/**
+ * Put the local document into a known state, through the real import path —
+ * there are no object stores to write behind the app's back any more.
+ */
 async function seedLocal(cardLists: CardList[], collection: CollectionCard[]): Promise<void> {
-	const db = await openDatabase();
-	for (const list of cardLists) await saveCardList(db, list);
-	for (const card of collection) await saveCollectionCard(db, card);
-	db.close();
+	if (cardLists.length === 0 && collection.length === 0) return;
+	// Through the store's own connection: a second one to `LMdecktools` would
+	// keep the afterEach `deleteDatabase()` blocked, and everything after it
+	// would queue behind a delete that never lands.
+	await importDatabase(snapshot(cardLists, collection), true);
 }
 
 function listByName(name: string): CardList {
@@ -94,15 +117,11 @@ describe('mergeFromFile', () => {
 
 	afterEach(async () => {
 		await unlinkFile();
-		closeDB();
+		await closeDB();
 		store.dbMode = 'none';
 		store.savedCardLists = [];
 		store.collection = [];
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	/** Seed local state and link a file holding the remote snapshot, without merging. */
@@ -110,8 +129,8 @@ describe('mergeFromFile', () => {
 		local: { lists: CardList[]; collection: CollectionCard[] },
 		remote: { lists: CardList[]; collection: CollectionCard[] }
 	): Promise<void> {
-		await seedLocal(local.lists, local.collection);
 		await initDB();
+		await seedLocal(local.lists, local.collection);
 
 		mockPickAndLinkNewFile.mockResolvedValue(makeHandle(snapshot(remote.lists, remote.collection)));
 		await linkFile();
@@ -205,8 +224,8 @@ describe('mergeFromFile', () => {
 		expect(store.collection).toHaveLength(1);
 	});
 
-	it('keeps IndexedDB keys stable for lists that survive the merge', async () => {
-		await mergeInto(
+	it('keeps list identity stable for lists that survive the merge', async () => {
+		await linkWith(
 			{ lists: [makeCardList({ name: 'Deck A' })], collection: [] },
 			{
 				lists: [
@@ -219,12 +238,14 @@ describe('mergeFromFile', () => {
 				collection: []
 			}
 		);
+		const deckAId = listByName('Deck A').id;
+		await mergeFromFile();
 
-		// The local list keeps the id it was stored under, and the remote-only
-		// list gets a fresh one rather than reusing the snapshot's.
-		expect(listByName('Deck A').id).toBe(1);
-		expect(listByName('Remote Deck').id).toBeTypeOf('number');
-		expect(listByName('Remote Deck').id).not.toBe(1);
+		// The local list keeps the UUID it has always had, and the remote-only list
+		// gets a fresh one rather than reusing the foreign document's (#47).
+		expect(listByName('Deck A').id).toBe(deckAId);
+		expect(listByName('Remote Deck').id).toBeTypeOf('string');
+		expect(listByName('Remote Deck').id).not.toBe(deckAId);
 	});
 
 	/**
@@ -267,22 +288,25 @@ describe('mergeFromFile', () => {
 			const preview = await previewMergeFromFile();
 
 			expect(preview).toEqual({
-				collection: { added: 4, fromNewCards: 1 },
+				collection: { added: 4, fromNewCards: 1, removed: 0 },
 				lists: [
 					{
 						name: 'Atraxa',
 						status: 'updated',
-						delta: { added: 4, fromNewCards: 3 },
+						delta: { added: 4, fromNewCards: 3, removed: 0 },
 						settingsChanged: false
 					},
 					{
 						name: 'Modern Burn',
 						status: 'added',
-						delta: { added: 4, fromNewCards: 4 },
+						delta: { added: 4, fromNewCards: 4, removed: 0 },
 						settingsChanged: false
 					}
 				],
-				unchanged: false
+				unchanged: false,
+				// A foreign lineage, so the union — which is why nothing is ever
+				// reported as removed here (C4).
+				operation: 'union'
 			});
 
 			// The dry run must not have touched the database it just described
@@ -308,9 +332,10 @@ describe('mergeFromFile', () => {
 			);
 
 			expect(await previewMergeFromFile()).toEqual({
-				collection: { added: 0, fromNewCards: 0 },
+				collection: { added: 0, fromNewCards: 0, removed: 0 },
 				lists: [],
-				unchanged: true
+				unchanged: true,
+				operation: 'union'
 			});
 		});
 

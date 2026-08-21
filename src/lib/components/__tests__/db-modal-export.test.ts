@@ -32,6 +32,10 @@ function seedCollection(count: number) {
 let clipboardText: string | null = null;
 
 beforeEach(() => {
+	// An open database, as every path to these panels implies. Without it the
+	// modal peeks on mount, and peeking projects the (empty) document over
+	// whatever the test seeded (#47).
+	store.dbMode = 'active';
 	clipboardText = null;
 	seedCollection(CARD_COUNT);
 	vi.stubGlobal('navigator', {
@@ -46,6 +50,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	store.dbMode = 'none';
 	vi.unstubAllGlobals();
 	store.collection = [];
 });

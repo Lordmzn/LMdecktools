@@ -3,12 +3,13 @@
  * Kept separate from store.test.ts to avoid vi.mock conflicts.
  */
 import { describe, it, expect, afterEach } from 'vitest';
+import { resetDatabases } from './reset';
 import {
 	addToCollection,
 	removeFromCollection,
 	createNewCardList,
 	deleteCardList,
-	saveCardList,
+	replaceListCards,
 	countCards,
 	countCardsInLists,
 	peekDB,
@@ -44,13 +45,9 @@ describe('Write guards', () => {
 describe('dbMode transitions', () => {
 	afterEach(async () => {
 		// Close connection first so deleteDatabase isn't blocked
-		closeDB();
+		await closeDB();
 		store.dbMode = 'none';
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	it('peekDB sets dbMode=peek, dbLoaded=true, isReadOnly=true', async () => {
@@ -72,13 +69,9 @@ describe('dbMode transitions', () => {
 
 describe('deleteCardList operations', () => {
 	afterEach(async () => {
-		closeDB();
+		await closeDB();
 		store.dbMode = 'none';
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	it('throws when no list is selected', async () => {
@@ -87,14 +80,15 @@ describe('deleteCardList operations', () => {
 		await expect(deleteCardList()).rejects.toThrow('No card list selected');
 	});
 
-	it('deletes a list and adjusts currentCardListIndex', async () => {
+	it('deletes a list and moves the selection to a surviving one', async () => {
 		await initDB();
 		await createNewCardList();
-		await createNewCardList(); // now 2 lists; index points to the new one
+		const second = await createNewCardList(); // now 2 lists; the new one is selected
 		const countBefore = store.savedCardLists.length;
 		await deleteCardList();
 		expect(store.savedCardLists.length).toBe(countBefore - 1);
-		expect(store.currentCardListIndex).toBeGreaterThanOrEqual(0);
+		expect(store.currentCardListId).not.toBe(second.id);
+		expect(store.currentCardList).not.toBeNull();
 	});
 
 	it('deleting the last list leaves no list selected', async () => {
@@ -102,7 +96,7 @@ describe('deleteCardList operations', () => {
 		await createNewCardList();
 		await deleteCardList();
 		expect(store.savedCardLists.length).toBe(0);
-		expect(store.currentCardListIndex).toBeNaN();
+		expect(store.currentCardListId).toBeNull();
 		expect(store.currentCardList).toBeNull();
 	});
 });
@@ -111,30 +105,26 @@ describe('deleteCardList operations', () => {
 
 describe('DB content stats', () => {
 	afterEach(async () => {
-		closeDB();
+		await closeDB();
 		store.dbMode = 'none';
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	it('connecting to an empty database does not create a list', async () => {
 		await peekDB();
 		await initDB();
 		expect(store.savedCardLists.length).toBe(0);
-		expect(store.currentCardListIndex).toBeNaN();
+		expect(store.currentCardListId).toBeNull();
 	});
 
 	it('counts cards across every list, not just the current one', async () => {
 		await initDB();
 
-		await createNewCardList();
-		await saveCardList('Deck A', [{ id: 'a', name: 'Card A', LM_quantity: 2 }]);
+		const deckA = await createNewCardList();
+		await replaceListCards(deckA.id!, [{ id: 'a', name: 'Card A', LM_quantity: 2 }]);
 
-		await createNewCardList();
-		await saveCardList('Deck B', [
+		const deckB = await createNewCardList();
+		await replaceListCards(deckB.id!, [
 			{ id: 'b', name: 'Card B', LM_quantity: 3 },
 			{ id: 'c', name: 'Card C', LM_quantity: 1 }
 		]);
@@ -142,9 +132,11 @@ describe('DB content stats', () => {
 		// store.totalCards / store.totalListCards are $derived and cannot be read
 		// reliably outside a reactive owner (see CLAUDE.md), so assert on the
 		// pure helpers those deriveds delegate to.
+		// By name, not by position: `readLists` orders by `created_at`, and two
+		// lists made in the same millisecond tie — position is not identity (#47).
 		const lists = store.savedCardLists;
 		expect(lists.length).toBe(2);
-		expect(countCards(lists[1].cards)).toBe(4); // current list only
+		expect(countCards(lists.find((l) => l.id === deckB.id)!.cards)).toBe(4); // one list
 		expect(countCardsInLists(lists)).toBe(6); // all lists
 	});
 });

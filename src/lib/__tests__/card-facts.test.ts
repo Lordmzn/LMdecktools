@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { openDatabase, clearDatabase, saveCollectionCard, CARD_FACTS_STORE } from '../db';
+import { resetDatabases } from './reset';
+import { openDatabase, CARD_FACTS_STORE } from '../db';
 import { loadCardFacts, putCardFacts, clearCardFacts, missingFactIds } from '../card-facts';
 import type { CardFacts } from '../card-fields';
 
@@ -20,11 +21,7 @@ describe('card facts cache', () => {
 
 	afterEach(async () => {
 		db.close();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	it('has its own store in the database, not a database of its own', () => {
@@ -50,13 +47,21 @@ describe('card facts cache', () => {
 		await expect(putCardFacts(db, [])).resolves.toBeUndefined();
 	});
 
-	it('survives clearDatabase — it is a cache, not the user data being cleared', async () => {
+	it('survives clearing the user data — it is a cache, not the data being cleared', async () => {
+		// `clearDB()` destroys the document and mints a new lineage; the facts
+		// cache is refetchable third-party data and is deliberately left behind,
+		// so a restore straight afterwards draws its cards without the network.
+		const { initDB, clearDB, closeDB, store } = await import('../store.svelte');
+		await initDB();
 		await putCardFacts(db, [bolt]);
-		await saveCollectionCard(db, { id: 'bolt', name: 'Lightning Bolt', quantity_owned: 1 });
 
-		await clearDatabase(db);
+		await clearDB();
 
 		expect(await loadCardFacts(db)).toEqual({ bolt });
+		expect(store.collection).toEqual([]);
+
+		await closeDB();
+		store.dbMode = 'none';
 	});
 
 	it('can be dropped on its own', async () => {

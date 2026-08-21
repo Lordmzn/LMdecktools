@@ -2,28 +2,39 @@
  * Bulk collection writes and the ownership index (#62).
  *
  * Kept out of store.test.ts, which mocks the whole store module for the export
- * formatters — here we want the real thing, with only `saveCollectionCards`
- * wrapped so the number of write transactions is observable.
+ * formatters — here we want the real thing.
+ *
+ * What #62 was about survives the move to the document (#47), in the same shape
+ * for a different reason: the whole batch must land in **one transaction**, so
+ * the observer rebuilds the runes once and the grid repaints once. It used to
+ * be one IndexedDB write instead of n; it is now one document transaction
+ * instead of n, and `countTransactions` is what pins it.
  */
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { saveCollectionCards, type CollectionCard } from '../db';
+import { describe, it, expect, afterEach } from 'vitest';
+import { resetDatabases } from './reset';
+import type { CollectionCard } from '../db';
 import { buildCollectionIndex, checkOwnership, mergeCardsIntoCollection } from '../collection';
 import {
 	addAllToCollection,
 	addToCollection,
 	createNewCardList,
-	saveCardList,
+	currentDocument,
+	replaceListCards,
 	initDB,
 	closeDB,
 	store
 } from '../store.svelte';
 
-vi.mock('../db', async (importOriginal) => {
-	const mod = await importOriginal<typeof import('../db')>();
-	return { ...mod, saveCollectionCards: vi.fn(mod.saveCollectionCards) };
-});
-
-const batchWrite = vi.mocked(saveCollectionCards);
+/** How many document transactions `run` produces. */
+async function countTransactions(run: () => Promise<unknown>): Promise<number> {
+	const doc = currentDocument()!;
+	let count = 0;
+	const tick = () => count++;
+	doc.on('afterTransaction', tick);
+	await run();
+	doc.off('afterTransaction', tick);
+	return count;
+}
 
 /** A list card as the app builds them — only the fields the collection cares about. */
 function listCard(id: string, name: string, quantity: number, lang = 'en') {
@@ -34,46 +45,40 @@ async function freshDB() {
 	await initDB();
 }
 
-beforeEach(() => {
-	batchWrite.mockClear();
-});
-
 afterEach(async () => {
-	closeDB();
+	await closeDB();
 	store.dbMode = 'none';
 	store.collection = [];
 	store.savedCardLists = [];
-	store.currentCardListIndex = NaN;
-	await new Promise<void>((resolve, reject) => {
-		const req = indexedDB.deleteDatabase('LMdecktools');
-		req.onsuccess = () => resolve();
-		req.onerror = () => reject(req.error);
-	});
+	store.currentCardListId = null;
+	await resetDatabases();
 });
 
 describe('addAllToCollection', () => {
 	it('writes the whole list in a single transaction', async () => {
 		await freshDB();
-		await createNewCardList();
-		await saveCardList('Deck', [
+		const list = await createNewCardList();
+		await replaceListCards(list.id!, [
 			listCard('a', 'Card A', 2),
 			listCard('b', 'Card B', 1),
 			listCard('c', 'Card C', 4)
 		]);
 
-		const result = await addAllToCollection();
+		let result!: { added: number; failed: number };
+		const transactions = await countTransactions(async () => {
+			result = await addAllToCollection();
+		});
 
 		expect(result).toEqual({ added: 3, failed: 0 });
-		// The point of #62: one batched write, not one per card
-		expect(batchWrite).toHaveBeenCalledTimes(1);
-		expect(batchWrite.mock.calls[0][1]).toHaveLength(3);
+		// The point of #62: one transaction, not one per card
+		expect(transactions).toBe(1);
 		expect(store.collection).toHaveLength(3);
 	});
 
 	it('respects LM_quantity rather than adding one of each', async () => {
 		await freshDB();
-		await createNewCardList();
-		await saveCardList('Deck', [listCard('a', 'Card A', 3)]);
+		const list = await createNewCardList();
+		await replaceListCards(list.id!, [listCard('a', 'Card A', 3)]);
 
 		await addAllToCollection();
 
@@ -83,8 +88,8 @@ describe('addAllToCollection', () => {
 	it('adds to what is already owned instead of replacing it', async () => {
 		await freshDB();
 		await addToCollection({ id: 'a', name: 'Card A', lang: 'en' }, 2);
-		await createNewCardList();
-		await saveCardList('Deck', [listCard('a', 'Card A', 3)]);
+		const list = await createNewCardList();
+		await replaceListCards(list.id!, [listCard('a', 'Card A', 3)]);
 
 		await addAllToCollection();
 
@@ -94,58 +99,50 @@ describe('addAllToCollection', () => {
 
 	it('accumulates when a list names the same printing twice', async () => {
 		await freshDB();
-		await createNewCardList();
-		await saveCardList('Deck', [listCard('a', 'Card A', 2), listCard('a', 'Card A', 3)]);
+		const list = await createNewCardList();
+		await replaceListCards(list.id!, [listCard('a', 'Card A', 2), listCard('a', 'Card A', 3)]);
 
 		await addAllToCollection();
 
-		// One row, both entries counted, and only one row written
+		// One row, both entries counted
 		expect(store.collection).toHaveLength(1);
 		expect(store.collection[0].quantity_owned).toBe(5);
-		expect(batchWrite.mock.calls[0][1]).toHaveLength(1);
 	});
 
 	it('leaves untouched cards in the collection alone', async () => {
 		await freshDB();
 		await addToCollection({ id: 'z', name: 'Card Z', lang: 'en' }, 7);
-		await createNewCardList();
-		await saveCardList('Deck', [listCard('a', 'Card A', 1)]);
+		const list = await createNewCardList();
+		await replaceListCards(list.id!, [listCard('a', 'Card A', 1)]);
 
 		await addAllToCollection();
 
 		expect(store.collection).toHaveLength(2);
 		expect(store.collection.find((c) => c.id === 'z')?.quantity_owned).toBe(7);
-		// Only the card the list named was written
-		expect(batchWrite.mock.calls[0][1].map((c) => c.id)).toEqual(['a']);
+		expect(store.collection.find((c) => c.id === 'a')?.quantity_owned).toBe(1);
 	});
 
 	it('does nothing, and writes nothing, for an empty list', async () => {
 		await freshDB();
 		await createNewCardList();
 
-		const result = await addAllToCollection();
+		const transactions = await countTransactions(async () => {
+			expect(await addAllToCollection()).toEqual({ added: 0, failed: 0 });
+		});
 
-		expect(result).toEqual({ added: 0, failed: 0 });
-		expect(batchWrite).not.toHaveBeenCalled();
-	});
-
-	it('reports the whole batch as failed when the write fails', async () => {
-		await freshDB();
-		await createNewCardList();
-		await saveCardList('Deck', [listCard('a', 'Card A', 1), listCard('b', 'Card B', 1)]);
-		batchWrite.mockRejectedValueOnce(new Error('quota exceeded'));
-
-		const result = await addAllToCollection();
-
-		// All-or-nothing: the transaction aborted, so nothing was added
-		expect(result).toEqual({ added: 0, failed: 2 });
+		expect(transactions).toBe(0);
 		expect(store.collection).toHaveLength(0);
 	});
 
 	it('throws before touching anything when the database is read-only', async () => {
+		await freshDB();
 		store.dbMode = 'none';
-		await expect(addAllToCollection()).rejects.toThrow('Database is read-only');
-		expect(batchWrite).not.toHaveBeenCalled();
+
+		const transactions = await countTransactions(async () => {
+			await expect(addAllToCollection()).rejects.toThrow('Database is read-only');
+		});
+
+		expect(transactions).toBe(0);
 	});
 });
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { resetDatabases } from './reset';
 import { openDatabase, getMetadata } from '../db';
 import {
 	isFileSystemAccessSupported,
@@ -43,11 +44,7 @@ describe('Handle storage with IDB', () => {
 
 	afterEach(async () => {
 		db.close();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	it('loadStoredHandle returns null when no handle is stored', async () => {

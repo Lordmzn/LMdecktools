@@ -206,6 +206,18 @@ export function readCollection(doc: Y.Doc): CollectionCard[] {
 	return out;
 }
 
+/**
+ * One collection card, without projecting the whole collection.
+ *
+ * Mutators read the document rather than the runes: the runes are rebuilt on a
+ * microtask, so between a write and the next tick they are stale — and a
+ * mutator that reads its own stale projection loses the write before it.
+ */
+export function readCollectionCard(doc: Y.Doc, cardId: string): CollectionCard | null {
+	const yCard = collectionMap(doc).get(cardId);
+	return yCard ? (readCard(yCard, cardId) as unknown as CollectionCard) : null;
+}
+
 export function readList(doc: Y.Doc, listId: string): DocumentList | null {
 	const yList = listsMap(doc).get(listId);
 	return yList ? projectList(yList, listId) : null;
@@ -435,6 +447,40 @@ export function applyRemoteUpdate(doc: Y.Doc, update: Uint8Array, origin: Change
  * a foreign lineage that has to go through the explicit union in `merge.ts`.
  * Same bytes, different results — which is why the UI has to say which.
  */
+/**
+ * Decode a payload into plain arrays without adopting it.
+ *
+ * This is the *union* path's entry point — a foreign-lineage document is not a
+ * peer, so its contents go through the explicit union in `merge.ts` rather than
+ * `applyUpdate`. Applying a stranger's document would make its guid, its
+ * history and its tombstones ours.
+ */
+export function readPayload(update: Uint8Array): {
+	meta: DocumentMeta;
+	collection: CollectionCard[];
+	cardLists: DocumentList[];
+	/**
+	 * The version claimed by a **1.0 snapshot**, which kept its metadata under a
+	 * different key. Present only for those files, and only so the import guard
+	 * can refuse them by name rather than mistaking one for a lineage-less
+	 * export: a snapshot has no guid to adopt, so restoring one would produce a
+	 * database that no other device could ever sync with.
+	 */
+	legacyVersion?: string;
+} {
+	const probe = new Y.Doc();
+	Y.applyUpdate(probe, update);
+
+	const legacy = probe.getMap('metadata').get('version');
+
+	return {
+		meta: readMeta(probe),
+		collection: readCollection(probe),
+		cardLists: readLists(probe),
+		legacyVersion: typeof legacy === 'string' ? legacy : undefined
+	};
+}
+
 export function peekPayload(update: Uint8Array): {
 	guid?: string;
 	app?: string;
