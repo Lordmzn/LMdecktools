@@ -43,11 +43,35 @@ export const ERROR_JOURNAL_STORE = 'error_journal';
 export const CARD_FACTS_STORE = 'card_facts';
 
 /**
+ * Where the database lives. The browser's own store by default; an in-memory
+ * factory in preview mode (#87), which is the whole of what makes preview mode
+ * safe — an iOS browser tab must never write to a container the installed app
+ * cannot read.
+ *
+ * Swapping the factory rather than the layer above it means preview mode runs
+ * the *same* code: same transactions, same v5 upgrade path, same cursors. There
+ * is no second implementation to drift out of parity with this one.
+ */
+let factory: IDBFactory | undefined =
+	typeof indexedDB === 'undefined' ? undefined : globalThis.indexedDB;
+
+/** Point every subsequent open at `f`. Preview mode passes an in-memory factory. */
+export function useStorageFactory(f: IDBFactory): void {
+	factory = f;
+}
+
+/** The factory in force, for callers that need to open a database of their own. */
+export function storageFactory(): IDBFactory | undefined {
+	return factory;
+}
+
+/**
  * Check local DB existence
  */
 export async function checkLocalDatabase(): Promise<boolean> {
+	if (!factory) return false;
 	try {
-		return indexedDB.databases().then(
+		return factory.databases().then(
 			(dbs) => dbs.map((db) => db.name).includes(DB_NAME),
 			() => false
 		);
@@ -62,7 +86,11 @@ export async function checkLocalDatabase(): Promise<boolean> {
  */
 export async function openDatabase(): Promise<IDBDatabase> {
 	return new Promise((resolve, reject) => {
-		const request = indexedDB.open(DB_NAME, DB_VERSION);
+		if (!factory) {
+			reject(new Error('This browser has no IndexedDB.'));
+			return;
+		}
+		const request = factory.open(DB_NAME, DB_VERSION);
 
 		request.onerror = () => {
 			reject(new Error(`Database error: ${request.error?.message}`));

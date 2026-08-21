@@ -47,6 +47,18 @@ Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wra
 
 The v4 → v5 upgrade rewrites every existing `collection` and `card_lists` row down to the whitelist and files what it strips in `card_facts`, inside the versionchange transaction so there is no half-migrated state to read (`stripStoredCards()`).
 
+### Install Context & Preview Mode
+
+`src/lib/install-context.ts` decides, once per session, **which app this is** (#87): `installed` (Home Screen icon or desktop PWA — `display-mode: standalone` or `navigator.standalone`), `ios-browser` (neither, and iOS), or `browser` (everything else). iOS detection is `maxTouchPoints > 1` plus a platform check, because iPadOS reports itself as a Mac. Every function takes an injected environment so the rules are testable without a browser.
+
+An iOS browser tab gets **preview mode**: the whole UI, fully usable, over an in-memory database that dies with the tab. This is not a nicety. Storage on iOS is isolated per browser _and per Home Screen icon_ with nothing crossing between, so a collection typed into the Safari tab is invisible from the installed app — indistinguishable from data loss, and caused by following the install instructions in the wrong order. Prompt timing cannot fix it; the only fix is that the tab never writes.
+
+- **The seam is the factory, not the store.** `db.ts` holds a module-level `IDBFactory` (`useStorageFactory()`); preview mode swaps in `fake-indexeddb`'s, dynamically imported so only iOS visitors download it. Everything above runs unchanged — same `openDatabase()`, same v5 upgrade, same transactions. A hand-written preview store would be a second code path that drifts out of parity, which is exactly what the issue's risk note forbids.
+- **Preview is impermanent, not read-only.** `dbMode` is `active`; `store.previewMode` drives the banner and nothing else. Never branch UI on it beyond that.
+- **`startSession()` in `store.svelte.ts` is the only startup call**, and it detects context _before_ anything can open IndexedDB. `tryAutoLoadDB()` stays exported but is no longer called from `+layout.svelte`.
+- The banner (`PreviewBanner.svelte`) is persistent and non-dismissible by design; `InstallSheet.svelte` carries the two facts detection cannot supply — add the icon **once** (a second icon is a third empty container), and open it from the icon, not the browser.
+- The E2E `mobile` project uses an **Android** descriptor: an iPhone user agent now means preview mode, and that project is about pointers and pixel widths. The iOS context has its own project, `ios-browser` / `install-wall.spec.ts`.
+
 ### Card Data
 
 Live Scryfall API calls (`api.scryfall.com/cards/search`, `/cards/named`, and `/cards/collection` for batch lookups). No local card database.

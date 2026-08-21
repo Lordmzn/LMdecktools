@@ -562,10 +562,13 @@ lost. Never automatic, never scheduled. (`persistent-ydoc.md` Decision 3.)
 
 ---
 
-## Install Wall + Preview Mode (planned, iOS browser tab)
+## Install Wall + Preview Mode (iOS browser tab)
 
-The most consequential planned screen: on iOS, an uninstalled browser tab shows
-a **different app**. Storage there is isolated per Home Screen icon and per
+Shipped in #87 — `install-context.ts`, `PreviewBanner.svelte`,
+`InstallSheet.svelte`.
+
+The most consequential screen in the app: on iOS, an uninstalled browser tab
+shows a **different app**. Storage there is isolated per Home Screen icon and per
 browser with nothing crossing between, so data typed into the Safari tab is
 invisible from the installed icon — indistinguishable from data loss. Rather
 than warning about the trap, preview mode removes it: the store is in-memory and

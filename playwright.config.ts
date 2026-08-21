@@ -17,16 +17,28 @@ export default defineConfig({
 		{
 			name: 'chromium',
 			use: { browserName: 'chromium' },
-			testIgnore: /mobile\.spec\.ts/
+			testIgnore: /(mobile|install-wall)\.spec\.ts/
 		},
 		{
 			// The desktop project cannot catch #76: every regression there is a
-			// consequence of `(hover: none)` and a 390px viewport, neither of which a
-			// default Chromium context has. `isMobile` + `hasTouch` is what flips the
-			// pointer media queries, so the `touch:` branch of every component is only
-			// ever exercised here.
+			// consequence of `(hover: none)` and a phone-width viewport, neither of
+			// which a default Chromium context has. `isMobile` + `hasTouch` is what
+			// flips the pointer media queries, so the `touch:` branch of every
+			// component is only ever exercised here.
+			//
+			// An Android descriptor rather than an iPhone one, deliberately: since
+			// #87 an iOS user agent puts the app in preview mode, and this project is
+			// about pointers and pixel widths, not storage. The iOS context has its
+			// own project below.
 			name: 'mobile',
 			testMatch: /mobile\.spec\.ts/,
+			use: { ...devices['Pixel 5'], browserName: 'chromium' }
+		},
+		{
+			// The only project that sees the install wall (#87): an uninstalled iOS
+			// browser tab is detected by user agent, so nothing else can reach it.
+			name: 'ios-browser',
+			testMatch: /install-wall\.spec\.ts/,
 			use: { ...devices['iPhone 13'], browserName: 'chromium' }
 		}
 	]

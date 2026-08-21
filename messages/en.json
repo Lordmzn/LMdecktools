@@ -430,5 +430,18 @@
 	"error_generic_title": "Something ran aground",
 	"error_generic_body": "The app hit an error it couldn't recover from. Your lists and collection are stored in your browser and were not affected.",
 	"error_cta_home": "Back to port",
-	"error_cta_diagnostics": "Open the log book"
+	"error_cta_diagnostics": "Open the log book",
+	"install_banner_text": "Preview — nothing here is being saved.",
+	"install_banner_cta": "How to install",
+	"install_sheet_title": "Install LM Deck Tools",
+	"install_sheet_why": "On iPhone and iPad, a website's data is deleted after 7 days without a visit. Installing moves your collection out of that rule.",
+	"install_sheet_steps_title": "Add it to your Home Screen",
+	"install_sheet_step_share": "Tap Share at the bottom of the screen.",
+	"install_sheet_step_add": "Choose \"Add to Home Screen\".",
+	"install_sheet_step_open": "Open the app from its icon — not from the browser.",
+	"install_sheet_once_title": "Add the icon once.",
+	"install_sheet_once_body": "A second icon for the same site is a third, empty copy of the app, and it cannot see the first one.",
+	"install_sheet_safari_first_title": "Open this page in Safari first.",
+	"install_sheet_safari_first_body": "Your browser may not offer \"Add to Home Screen\" on iPhone or iPad. Safari does.",
+	"install_sheet_preview_note": "Until then you're in preview: everything works, and nothing is written to this browser — so nothing can be stranded here when you install."
 }
