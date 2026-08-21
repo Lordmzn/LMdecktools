@@ -464,11 +464,18 @@ working.
 ### M0 — Correction and context gating · 2 days
 - [x] Fix `db_no_fs_access` in both message catalogues (D0) — the last place the
       "Safari 15.2+" claim still reached a user (#86)
-- [ ] Feature-detect the picker; hide the linked-file UI where absent
-- [ ] Context detection: `display-mode` / `navigator.standalone` / iOS check (D4)
-- [ ] iOS browser tab → install wall + in-memory preview mode
+- [x] Feature-detect the picker; hide the linked-file UI where absent — already
+      true: `isFileSystemAccessSupported()` gates the File DB tab, and the header
+      indicator is driven by a status that never leaves `none` without the API
+- [x] Context detection: `display-mode` / `navigator.standalone` / iOS check (D4)
+      — `src/lib/install-context.ts` (#87)
+- [x] iOS browser tab → install wall + in-memory preview mode (#87). Preview mode
+      is an in-memory `IDBFactory` swapped in at `db.ts`, not a second store: the
+      same `openDatabase()`, the same v5 upgrade, the same transactions, over
+      memory that dies with the tab
 - **Exit:** nothing can be written to the iOS Safari container; no platform is
-  promised a capability it lacks
+  promised a capability it lacks. **Met** — `install-wall.spec.ts` asserts
+  `indexedDB.databases()` never names `LMdecktools` after a card is added
 
 ### M1 — Document model · #47, collapsed
 - [x] **#84 first** — card-facts whitelist. **Done**, ahead of everything below:

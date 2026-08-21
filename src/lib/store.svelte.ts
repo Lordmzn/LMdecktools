@@ -15,10 +15,12 @@ import {
 	mergeCards,
 	putMetadata,
 	getMetadata,
+	useStorageFactory,
 	type Card,
 	type CardList,
 	type CollectionCard
 } from './db';
+import { detectInstallContext, type InstallContext } from './install-context';
 
 import {
 	logError,
@@ -119,6 +121,12 @@ class Store implements StoreInterface {
 	// DB state
 	dbMode = $state<DBMode>('none');
 
+	/**
+	 * Which app this is (#87). Set once by `startSession()`; `'browser'` until
+	 * then, since the prerendered HTML is the full app.
+	 */
+	installContext = $state<InstallContext>('browser');
+
 	// These are plain getters so they always recompute from dbMode (no reactive
 	// owner required — works in both templates and test environments).
 	get dbLoaded(): boolean {
@@ -126,6 +134,15 @@ class Store implements StoreInterface {
 	}
 	get isReadOnly(): boolean {
 		return this.dbMode !== 'active';
+	}
+
+	/**
+	 * Preview mode: the whole app over an in-memory store, nothing written to the
+	 * browser's container. Not read-only — the point is that it is fully usable,
+	 * only impermanent, so the banner is what tells the user, not disabled UI.
+	 */
+	get previewMode(): boolean {
+		return this.installContext === 'ios-browser';
 	}
 
 	// Card list state
@@ -303,6 +320,46 @@ async function loadCardData(): Promise<void> {
 }
 
 // ==================== INITIALIZATION ====================
+
+/**
+ * The one startup call, from `+layout.svelte` (#87).
+ *
+ * Detects what the app is running as *before* anything can open IndexedDB, so
+ * an iOS browser tab never gets the chance to write to a container the
+ * installed app cannot read. Everywhere else this is just `tryAutoLoadDB()`.
+ */
+export async function startSession() {
+	store.installContext = detectInstallContext();
+
+	if (store.installContext === 'ios-browser') {
+		await enterPreviewMode();
+		return;
+	}
+
+	await tryAutoLoadDB();
+}
+
+/**
+ * Run the app against an in-memory database (#87).
+ *
+ * `fake-indexeddb` is a complete `IDBFactory` that keeps everything in the
+ * heap, so this is the real storage layer — the same `openDatabase()`, the same
+ * v5 upgrade, the same transactions — over memory that dies with the tab. That
+ * is deliberate: a hand-written preview store would be a second code path
+ * through the app and would drift out of parity with the first.
+ *
+ * The import is dynamic so the ~100 KB only lands on the devices that need it,
+ * and the database is opened `active` rather than `peek`, since preview mode is
+ * meant to be fully usable — impermanent, not read-only.
+ */
+export async function enterPreviewMode() {
+	const { IDBFactory: MemoryFactory } = await import('fake-indexeddb');
+	useStorageFactory(new MemoryFactory());
+
+	db = await openDatabase();
+	store.dbMode = 'active';
+	await loadCardData();
+}
 
 /**
  * Try to auto-load the local database if the user previously connected it.

@@ -3269,3 +3269,107 @@ export const error_cta_home = () => `Torna in porto`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const error_cta_diagnostics = () => `Apri il giornale di bordo`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_banner_text = () => `Anteprima — qui non viene salvato nulla.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_banner_cta = () => `Come si installa`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_title = () => `Installa LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_why = () => `Su iPhone e iPad i dati di un sito vengono cancellati dopo 7 giorni senza visite. Installando l'app, la tua collezione esce da questa regola.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_steps_title = () => `Aggiungila alla schermata Home`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_step_share = () => `Tocca Condividi in fondo allo schermo.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_step_add = () => `Scegli "Aggiungi a Home".`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_step_open = () => `Apri l'app dalla sua icona, non dal browser.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_once_title = () => `Aggiungi l'icona una volta sola.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_once_body = () => `Una seconda icona per lo stesso sito è una terza copia vuota dell'app, e non può vedere la prima.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_safari_first_title = () => `Apri prima questa pagina in Safari.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_safari_first_body = () => `Il tuo browser potrebbe non offrire "Aggiungi a Home" su iPhone o iPad. Safari sì.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_preview_note = () => `Fino ad allora sei in anteprima: tutto funziona e non viene scritto nulla in questo browser, così quando installerai non resterà nulla intrappolato qui.`

@@ -4,13 +4,14 @@
 	import Footer from '$lib/components/Footer.svelte';
 	import LinkedFileToast from '$lib/components/LinkedFileToast.svelte';
 	import MergePreviewModal from '$lib/components/MergePreviewModal.svelte';
+	import PreviewBanner from '$lib/components/PreviewBanner.svelte';
 	import { i18n } from '$lib/i18n';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
 	import {
 		store,
 		mergeFromFile,
 		previewMergeFromFile,
-		tryAutoLoadDB,
+		startSession,
 		logAppError
 	} from '$lib/store.svelte';
 	import type { MergePreview } from '$lib/store.svelte';
@@ -52,7 +53,8 @@
 	let mergePreviewError = $state<string | null>(null);
 
 	onMount(() => {
-		tryAutoLoadDB();
+		// Decides preview vs. full app before anything can open IndexedDB (#87).
+		startSession().catch((e) => logAppError('indexeddb', e, { operation: 'startSession' }));
 
 		// SvelteKit's handleError hook never sees rejected promises that nothing
 		// awaits, and those are exactly the ones that vanish silently (#30).
@@ -138,6 +140,10 @@
 <ParaglideJS {i18n}>
 	<!-- z-2 lifts all content above the fixed film-grain layer painted on body::after -->
 	<div class="relative z-[2] flex min-h-screen flex-col text-slate-100">
+		{#if store.previewMode}
+			<PreviewBanner />
+		{/if}
+
 		<Header />
 
 		<main class="flex-1">

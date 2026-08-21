@@ -3269,3 +3269,107 @@ export const error_cta_home = () => `Back to port`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const error_cta_diagnostics = () => `Open the log book`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_banner_text = () => `Preview — nothing here is being saved.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_banner_cta = () => `How to install`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_title = () => `Install LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_why = () => `On iPhone and iPad, a website's data is deleted after 7 days without a visit. Installing moves your collection out of that rule.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_steps_title = () => `Add it to your Home Screen`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_step_share = () => `Tap Share at the bottom of the screen.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_step_add = () => `Choose "Add to Home Screen".`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_step_open = () => `Open the app from its icon — not from the browser.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_once_title = () => `Add the icon once.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_once_body = () => `A second icon for the same site is a third, empty copy of the app, and it cannot see the first one.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_safari_first_title = () => `Open this page in Safari first.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_safari_first_body = () => `Your browser may not offer "Add to Home Screen" on iPhone or iPad. Safari does.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const install_sheet_preview_note = () => `Until then you're in preview: everything works, and nothing is written to this browser — so nothing can be stranded here when you install.`
