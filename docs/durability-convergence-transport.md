@@ -56,9 +56,9 @@ wrong, and the correction matters: with Android in scope the phone is not
 necessarily a pure replica, and S1's anchor/replica split is a durability
 argument rather than a capability one.
 
-The last surviving instance of the old "Safari 15.2+" claim is
+The last surviving instance of the old "Safari 15.2+" claim was
 `db_no_fs_access` in `messages/en.json` and `messages/it-it.json` — the only
-user-visible one, and M0's first fix. The docs in this repo were corrected when
+user-visible one, fixed in #86. The docs in this repo were corrected when
 this document landed; `project-vision.md` §4.2 had already been corrected
 in #58.
 
@@ -462,8 +462,8 @@ work, no compatibility shims, no phased cutover. Each milestone leaves the app
 working.
 
 ### M0 — Correction and context gating · 2 days
-- [ ] Fix `db_no_fs_access` in both message catalogues (D0) — the last place the
-      "Safari 15.2+" claim still reaches a user
+- [x] Fix `db_no_fs_access` in both message catalogues (D0) — the last place the
+      "Safari 15.2+" claim still reached a user (#86)
 - [ ] Feature-detect the picker; hide the linked-file UI where absent
 - [ ] Context detection: `display-mode` / `navigator.standalone` / iOS check (D4)
 - [ ] iOS browser tab → install wall + in-memory preview mode
