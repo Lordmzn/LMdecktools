@@ -11,6 +11,8 @@ import {
 	type CollectionCard
 } from './db';
 import { detectInstallContext, type InstallContext } from './install-context';
+import { connectTabs, type TabSync } from './tab-sync';
+import { claimLeadership, type Leadership } from './leader';
 import * as Y from 'yjs';
 import type { IndexeddbPersistence } from 'y-indexeddb';
 import {
@@ -128,6 +130,8 @@ async function ensureDB(): Promise<IDBDatabase> {
 let doc: Y.Doc | null = null;
 let persistence: IndexeddbPersistence | null = null;
 let stopObserving: (() => void) | null = null;
+let tabs: TabSync | null = null;
+let leadership: Leadership | null = null;
 
 /** The guid lives in device-local metadata; the lineage it names lives in the document. */
 const GUID_KEY = 'documentGuid';
@@ -216,6 +220,24 @@ async function openDocument(options: { persist: boolean }): Promise<Y.Doc> {
 		triggerAutoSave();
 	});
 
+	// The other tabs of this browser are the first transport (C2), and they are
+	// live from the moment there is a document — no persistence required, which
+	// is why preview mode gets this too.
+	tabs = connectTabs(doc);
+
+	// One tab owns the file handle (C3). The rest edit freely and their changes
+	// reach the file through the leader, over the channel above.
+	if (options.persist) {
+		leadership = claimLeadership((isLeader) => {
+			store.isLeaderTab = isLeader;
+			if (isLeader) {
+				// Promoted mid-session — the previous leader may have closed with the
+				// file behind the document.
+				void initLinkedFile().then(() => triggerAutoSave());
+			}
+		});
+	}
+
 	projectDocument();
 	return doc;
 }
@@ -228,6 +250,11 @@ async function openDocument(options: { persist: boolean }): Promise<Y.Doc> {
  * connection blocks — silently, until something times out.
  */
 async function closeDocument(): Promise<void> {
+	tabs?.disconnect();
+	tabs = null;
+	leadership?.release();
+	leadership = null;
+	store.isLeaderTab = false;
 	stopObserving?.();
 	stopObserving = null;
 	await persistence?.destroy();
@@ -285,6 +312,13 @@ class Store implements StoreInterface {
 	 * then, since the prerendered HTML is the full app.
 	 */
 	installContext = $state<InstallContext>('browser');
+
+	/**
+	 * Whether this tab owns the exclusive resources — today the linked file,
+	 * tomorrow the peer connection (#47, C3). Every tab edits regardless; a
+	 * follower's changes reach the file through the leader.
+	 */
+	isLeaderTab = $state(false);
 
 	// These are plain getters so they always recompute from dbMode (no reactive
 	// owner required — works in both templates and test environments).
@@ -728,8 +762,24 @@ function performWrite(handle: FileSystemFileHandle): Promise<void> {
 	});
 }
 
+/**
+ * Watch the file for changes made outside this app — leader only.
+ *
+ * A follower polling would re-read and re-apply what the leader has already
+ * applied and broadcast, and would hold a second read of the file open on every
+ * tick for nothing.
+ */
+function startPollingAsLeader(handle: FileSystemFileHandle): void {
+	if (leadership && !leadership.isLeader) return;
+	startPolling(handle, handleExternalChange);
+}
+
 function triggerAutoSave(): void {
 	if (store.linkedFileStatus !== 'active' || !linkedHandle) return;
+	// Only the leader writes the file (C3). A follower's edit still gets there:
+	// it reaches the leader over the tab channel, and the leader's own `update`
+	// handler schedules the write.
+	if (leadership && !leadership.isLeader) return;
 
 	store.linkedFileWriting = true;
 	scheduleDebouncedWrite(linkedHandle, () => documentUpdate(), applyWriteSuccess, applyWriteError);
@@ -769,7 +819,7 @@ export async function initLinkedFile(): Promise<void> {
 			} catch {
 				// File may not exist yet — that's fine
 			}
-			startPolling(handle, handleExternalChange);
+			startPollingAsLeader(handle);
 		} else {
 			store.linkedFileStatus = 'reconnect';
 		}
@@ -794,7 +844,7 @@ export async function linkFile(): Promise<void> {
 	// Write current state to the file immediately
 	await performWrite(handle);
 
-	startPolling(handle, handleExternalChange);
+	startPollingAsLeader(handle);
 }
 
 /**
@@ -889,7 +939,7 @@ export async function linkExistingFile(): Promise<void> {
 	updateLastKnownModified(modified);
 	store.linkedFileLastSaved = modified;
 
-	startPolling(handle, handleExternalChange);
+	startPollingAsLeader(handle);
 }
 
 export async function unlinkFile(): Promise<void> {
@@ -943,7 +993,7 @@ export async function reconnectFile(): Promise<void> {
 		} catch {
 			// File may not exist yet
 		}
-		startPolling(linkedHandle, handleExternalChange);
+		startPollingAsLeader(linkedHandle);
 		// Retry the write that previously failed
 		triggerAutoSave();
 	} else {
