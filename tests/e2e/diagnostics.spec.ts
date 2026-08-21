@@ -16,7 +16,7 @@ test.beforeEach(async ({ page }) => {
 async function createDatabase(page: Page) {
 	await page.goto('./');
 	await page.waitForLoadState('networkidle');
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
 	await page.getByRole('button', { name: 'Delete and Create New' }).click();

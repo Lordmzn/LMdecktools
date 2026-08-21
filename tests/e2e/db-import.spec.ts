@@ -25,7 +25,7 @@ async function resetDB(page: import('@playwright/test').Page) {
 async function setupWithDB(page: import('@playwright/test').Page) {
 	await resetDB(page);
 
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByText('Start from scratch')).toBeVisible({ timeout: 5000 });
 	await page.getByRole('button', { name: 'Create New Database', exact: true }).click();
@@ -37,7 +37,7 @@ async function setupWithDB(page: import('@playwright/test').Page) {
 // Helper: open DB modal
 async function openDBModal(page: import('@playwright/test').Page) {
 	await page.waitForLoadState('networkidle');
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await expect(dbButton).toBeVisible();
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await expect(page.getByRole('button', { name: 'In-browser DB', exact: true })).toBeVisible({
@@ -61,7 +61,7 @@ async function openRestorePanel(page: import('@playwright/test').Page) {
 
 async function setupWithDBAndRestorePanel(page: import('@playwright/test').Page) {
 	await setupWithDB(page);
-	const dbButton = page.locator('button', { hasText: /Choose DB|Database/ });
+	const dbButton = page.getByTestId('db-modal-toggle');
 	await dbButton.evaluate((btn) => (btn as HTMLElement).click());
 	await openRestorePanel(page);
 }
