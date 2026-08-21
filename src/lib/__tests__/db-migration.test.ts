@@ -1,10 +1,15 @@
 /**
- * The v4 → v5 upgrade (#84): every stored record loses the Scryfall payload it
- * was carrying, and what it loses is kept in the card-facts cache so the app
- * does not have to go back to the network for a database it already had.
+ * The v5 → v6 upgrade (#47): the `card_lists` and `collection` stores are
+ * dropped, because the user's data is the document now.
+ *
+ * The alpha owes no backward compatibility, but "seed from scratch" and "throw
+ * the maintainer's own collection away" are not the same sentence — so the
+ * upgrade reads the rows out before deleting the stores, and the store seeds
+ * the document from them. Nothing here survives that one run.
  */
 import { describe, it, expect, afterEach } from 'vitest';
-import { openDatabase, loadAllCardLists, loadCollection } from '../db';
+import { openDatabase, takeLegacySeed } from '../db';
+import { resetDatabases } from './reset';
 import { loadCardFacts } from '../card-facts';
 
 const DB_NAME = 'LMdecktools';
@@ -73,43 +78,66 @@ async function seedV4Database(): Promise<void> {
 	db.close();
 }
 
-describe('v4 → v5 migration', () => {
+describe('v5 → v6 migration', () => {
+	let open: IDBDatabase | null = null;
+
 	afterEach(async () => {
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase(DB_NAME);
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		// Closed here rather than at the end of each test: a failing assertion
+		// would otherwise leave the connection open and block the delete.
+		open?.close();
+		open = null;
+		await resetDatabases();
 	});
 
-	it('strips existing records to the whitelist and keeps their facts', async () => {
+	it('drops the legacy stores', async () => {
 		await seedV4Database();
 
-		const db = await openDatabase();
+		const db = (open = await openDatabase());
 
-		const collection = await loadCollection(db);
-		expect(collection).toHaveLength(1);
-		expect(collection[0]).toEqual({
-			id: 'bolt',
-			name: 'Lightning Bolt',
-			set: 'mh3',
-			collector_number: '42',
-			lang: 'en',
-			mana_cost: '{1}{R}',
-			type_line: 'Instant',
-			quantity_owned: 4
-		});
+		// The user's data lives in the document now; what stays here is
+		// device-local and must never sync (#47).
+		expect([...db.objectStoreNames].sort()).toEqual(['card_facts', 'error_journal', 'metadata']);
+	});
 
-		const lists = await loadAllCardLists(db);
-		expect(lists[0].cards.map((card) => card.LM_quantity)).toEqual([4, 3]);
-		for (const card of lists[0].cards) {
+	it('rescues the rows it drops, so an existing database is not thrown away', async () => {
+		await seedV4Database();
+
+		open = await openDatabase();
+		const seed = takeLegacySeed();
+
+		expect(seed).not.toBeNull();
+		expect(seed!.collection).toEqual([
+			{
+				id: 'bolt',
+				name: 'Lightning Bolt',
+				set: 'mh3',
+				collector_number: '42',
+				lang: 'en',
+				mana_cost: '{1}{R}',
+				type_line: 'Instant',
+				quantity_owned: 4
+			}
+		]);
+
+		expect(seed!.cardLists).toHaveLength(1);
+		expect(seed!.cardLists[0].name).toBe('Burn');
+		expect(seed!.cardLists[0].cards.map((card) => card.LM_quantity)).toEqual([4, 3]);
+		// The autoIncrement key means nothing on another machine; the document
+		// assigns a UUID on the way in.
+		expect(seed!.cardLists[0].id).toBeUndefined();
+
+		for (const card of seed!.cardLists[0].cards) {
 			expect(card).not.toHaveProperty('image_uris');
 			expect(card).not.toHaveProperty('legalities');
 			expect(card).not.toHaveProperty('oracle_text');
 		}
+	});
 
-		// Everything stripped that the UI still needs is now in the cache — a
-		// migrated database draws its cards without asking Scryfall for anything.
+	it('files the facts it strips, so nothing needs refetching on day one', async () => {
+		await seedV4Database();
+
+		const db = (open = await openDatabase());
+
 		const facts = await loadCardFacts(db);
 		expect(Object.keys(facts).sort()).toEqual(['bolt', 'rift']);
 		expect(facts.bolt).toEqual({
@@ -117,31 +145,12 @@ describe('v4 → v5 migration', () => {
 			set_name: 'Modern Horizons 3',
 			image_uris: { small: 'bolt-s.jpg', normal: 'bolt-n.jpg' }
 		});
-
-		db.close();
 	});
 
-	it('leaves the list identity and settings alone', async () => {
-		await seedV4Database();
+	it('hands back nothing for a database that never held anything', async () => {
+		open = await openDatabase();
 
-		const db = await openDatabase();
-		const [list] = await loadAllCardLists(db);
-
-		expect(list.id).toBe(1);
-		expect(list.name).toBe('Burn');
-		expect(list.cardMatching).toBe('generic');
-		expect(list.languageMatching).toBe('any');
-		expect(list.created_at).toBe(1);
-
-		db.close();
-	});
-
-	it('creates an empty facts store for a database that never held anything', async () => {
-		const db = await openDatabase();
-
-		expect(await loadCardFacts(db)).toEqual({});
-		expect(await loadCollection(db)).toEqual([]);
-
-		db.close();
+		expect(takeLegacySeed()).toBeNull();
+		expect(await loadCardFacts(open)).toEqual({});
 	});
 });

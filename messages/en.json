@@ -205,6 +205,11 @@
 	"merge_delta_new_list_one": "new list, {count} card",
 	"merge_delta_new_list_other": "new list, {count} cards",
 	"merge_delta_settings": "matching settings updated",
+	"merge_delta_removed_one": "{count} card removed",
+	"merge_delta_removed_other": "{count} cards removed",
+	"merge_delta_list_removed": "list deleted on the other device",
+	"merge_preview_op_merge": "This file is a copy of this database. Merging brings over everything that changed on the other device — including anything deleted there.",
+	"merge_preview_op_union": "This file comes from a different database. Its lists and cards are added to yours, and nothing of yours is removed.",
 
 	"compare_meta_title": "Compare Lists · LM Deck Tools",
 	"compare_meta_description": "Lay two Magic: The Gathering card lists side by side and see what each one holds alone and what they share.",

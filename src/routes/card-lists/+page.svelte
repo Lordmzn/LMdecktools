@@ -142,8 +142,10 @@
 		}
 	}
 
-	function handleSwitchList(index: number) {
-		store.currentCardListIndex = index;
+	// By id, not by position (#47): a remote replica can insert or delete a list,
+	// and an index would then select a different deck than the one clicked.
+	function handleSwitchList(listId: string) {
+		store.currentCardListId = listId;
 	}
 
 	async function handleImport() {
@@ -491,15 +493,17 @@
 			<div class="flex w-full flex-wrap items-center gap-3 sm:w-auto">
 				<span class="text-lg font-semibold text-slate-400">{m.lists_label()}</span>
 				<select
-					onchange={(e) => handleSwitchList(parseInt((e.currentTarget as HTMLSelectElement).value))}
+					onchange={(e) => handleSwitchList((e.currentTarget as HTMLSelectElement).value)}
 					disabled={!store.dbLoaded || store.savedCardLists.length === 0}
 					class="field min-w-0 flex-1 disabled:cursor-not-allowed disabled:opacity-50 sm:min-w-[200px] sm:flex-none"
 				>
 					{#if store.savedCardLists.length === 0}
-						<option value={-1}>{m.lists_none()}</option>
+						<option value="">{m.lists_none()}</option>
 					{:else}
 						{#each store.savedCardLists as cardList, i (cardList.id ?? i)}
-							<option value={i} selected={store.currentCardListIndex === i}>{cardList.name}</option>
+							<option value={cardList.id} selected={store.currentCardListId === cardList.id}>
+								{cardList.name}
+							</option>
 						{/each}
 					{/if}
 				</select>

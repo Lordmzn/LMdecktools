@@ -1,14 +1,21 @@
 import { test, expect } from '@playwright/test';
+import { persistedDocument } from './base';
 
-// Helper: wipe IndexedDB and land on a page with no database at all
+// Helper: wipe IndexedDB and land on a page with no database at all.
+// Both databases since #47 — device-local state and the document — because
+// deleting only the first leaves the previous test's lists to be replayed.
 async function resetDB(page: import('@playwright/test').Page) {
 	await page.goto('./');
-	await page.evaluate(() => {
-		return new Promise<void>((resolve) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => resolve();
-		});
+	await page.evaluate(async () => {
+		const drop = (name: string) =>
+			new Promise<void>((resolve) => {
+				const req = indexedDB.deleteDatabase(name);
+				req.onsuccess = () => resolve();
+				req.onerror = () => resolve();
+				req.onblocked = () => resolve();
+			});
+		await drop('LMdecktools');
+		await drop('lmdecktools-doc');
 	});
 	await page.goto('./');
 	await page.waitForLoadState('networkidle');
@@ -66,7 +73,7 @@ const restoreFileInput = (page: import('@playwright/test').Page) =>
 const genuineExport = (listName = 'Restored Deck') =>
 	JSON.stringify({
 		app: 'LM Deck Tools',
-		version: '1.0',
+		version: '2',
 		exported_at: 1_755_000_000_000,
 		cardLists: [
 			{
@@ -97,21 +104,8 @@ test.describe('Restore from file validation', () => {
 		await expect(page.getByText(/not an LM Deck Tools export/)).toBeVisible();
 		await expect(restoreButton(page)).toBeDisabled();
 
-		// Nothing was written: the DB is still the empty one we created
-		const listCount = await page.evaluate(async () => {
-			const db = await new Promise<IDBDatabase>((resolve, reject) => {
-				const req = indexedDB.open('LMdecktools');
-				req.onsuccess = () => resolve(req.result);
-				req.onerror = () => reject(req.error);
-			});
-			const count = await new Promise<number>((resolve) => {
-				const req = db.transaction('card_lists').objectStore('card_lists').count();
-				req.onsuccess = () => resolve(req.result);
-			});
-			db.close();
-			return count;
-		});
-		expect(listCount).toBe(0);
+		// Nothing was written: the document is still the empty one we created
+		expect((await persistedDocument(page)).lists).toHaveLength(0);
 	});
 
 	test('an export from another app is refused by name', async ({ page }) => {
@@ -136,7 +130,7 @@ test.describe('Restore from file validation', () => {
 			buffer: Buffer.from(genuineExport())
 		});
 
-		await expect(page.getByTestId('restore-preview')).toContainText('LM Deck Tools v1.0');
+		await expect(page.getByTestId('restore-preview')).toContainText('LM Deck Tools v2');
 		await expect(page.getByTestId('restore-preview')).toContainText('1 list, 0 collection cards');
 
 		// The database created by setupWithDB is empty, so there is nothing to
@@ -169,19 +163,7 @@ test.describe('Restore from file validation', () => {
 		await page.getByRole('button', { name: 'Cancel', exact: true }).click();
 		await expect(page.getByText('Restore over your database?')).not.toBeVisible();
 
-		const names = await page.evaluate(async () => {
-			const db = await new Promise<IDBDatabase>((resolve, reject) => {
-				const req = indexedDB.open('LMdecktools');
-				req.onsuccess = () => resolve(req.result);
-				req.onerror = () => reject(req.error);
-			});
-			const all = await new Promise<{ name: string }[]>((resolve) => {
-				const req = db.transaction('card_lists').objectStore('card_lists').getAll();
-				req.onsuccess = () => resolve(req.result);
-			});
-			db.close();
-			return all.map((l) => l.name);
-		});
+		const names = (await persistedDocument(page)).lists.map((l) => l.name);
 		expect(names).toEqual(['Keep Me']);
 	});
 });
@@ -208,19 +190,7 @@ test.describe('Database Import', () => {
 		await expect(page.getByText(/Restored 1 list successfully/)).toBeVisible();
 		await expect(page.getByRole('button', { name: 'Database', exact: true })).toBeVisible();
 
-		const names = await page.evaluate(async () => {
-			const db = await new Promise<IDBDatabase>((resolve, reject) => {
-				const req = indexedDB.open('LMdecktools');
-				req.onsuccess = () => resolve(req.result);
-				req.onerror = () => reject(req.error);
-			});
-			const all = await new Promise<{ name: string }[]>((resolve) => {
-				const req = db.transaction('card_lists').objectStore('card_lists').getAll();
-				req.onsuccess = () => resolve(req.result);
-			});
-			db.close();
-			return all.map((l) => l.name);
-		});
+		const names = (await persistedDocument(page)).lists.map((l) => l.name);
 		expect(names).toEqual(['Imported Red Deck']);
 	});
 
@@ -258,19 +228,7 @@ test.describe('Database Import', () => {
 		await restoreButton(page).click();
 		await expect(page.getByText(/Restored 1 list successfully/)).toBeVisible();
 
-		const names = await page.evaluate(async () => {
-			const db = await new Promise<IDBDatabase>((resolve, reject) => {
-				const req = indexedDB.open('LMdecktools');
-				req.onsuccess = () => resolve(req.result);
-				req.onerror = () => reject(req.error);
-			});
-			const all = await new Promise<{ name: string }[]>((resolve) => {
-				const req = db.transaction('card_lists').objectStore('card_lists').getAll();
-				req.onsuccess = () => resolve(req.result);
-			});
-			db.close();
-			return all.map((l) => l.name);
-		});
+		const names = (await persistedDocument(page)).lists.map((l) => l.name);
 		expect(names).toEqual(['Round Trip']);
 	});
 });

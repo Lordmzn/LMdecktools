@@ -1557,6 +1557,46 @@ export const merge_delta_settings = () => `impostazioni di corrispondenza aggior
 
 
 /**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_removed_one = (params) => `${params.count} carta rimossa`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_removed_other = (params) => `${params.count} carte rimosse`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_delta_list_removed = () => `lista eliminata sull'altro dispositivo`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_op_merge = () => `Questo file è una copia di questo database. Unendolo arriva tutto ciò che è cambiato sull'altro dispositivo, comprese le eliminazioni.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const merge_preview_op_union = () => `Questo file viene da un altro database. Le sue liste e le sue carte si aggiungono alle tue e non viene rimosso nulla di tuo.`
+
+
+/**
  * 
  * @returns {string}
  */

@@ -1,21 +1,27 @@
+/**
+ * What `db.ts` is left holding after #47.
+ *
+ * The lists and the collection moved to the document, and with them every CRUD
+ * function this file used to exercise — those behaviours are now in
+ * `ydoc.test.ts` (the model) and the store tests (the app's use of it). What
+ * stays here is deliberately small and deliberately device-local: the auto-load
+ * preference, the linked-file handle, the document guid, the error journal and
+ * the card-facts cache. None of it may ever sync.
+ */
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { resetDatabases } from './reset';
 import {
+	CARD_FACTS_STORE,
+	ERROR_JOURNAL_STORE,
+	databaseExists,
+	getMetadata,
 	openDatabase,
-	createEmptyCardList,
-	saveCardList,
-	loadAllCardLists,
-	deleteCardList,
-	clearDatabase,
-	loadCollection,
-	saveCollectionCard,
-	saveCollectionCards,
-	deleteCollectionCard,
-	getCollectionCard,
-	type CardList,
-	type CollectionCard
+	putMetadata,
+	storageFactory,
+	useStorageFactory
 } from '../db';
 
-describe('Database Operations', () => {
+describe('the device-local database', () => {
 	let db: IDBDatabase;
 
 	beforeEach(async () => {
@@ -24,267 +30,74 @@ describe('Database Operations', () => {
 
 	afterEach(async () => {
 		db.close();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
+		await resetDatabases();
+	});
+
+	it('holds only what must not sync', () => {
+		expect([...db.objectStoreNames].sort()).toEqual([
+			CARD_FACTS_STORE,
+			ERROR_JOURNAL_STORE,
+			'metadata'
+		]);
+	});
+
+	it('is version 6', () => {
+		expect(db.version).toBe(6);
+	});
+
+	describe('metadata', () => {
+		it('round-trips a value with a timestamp', async () => {
+			const before = Date.now();
+			await putMetadata(db, 'autoLoadDB', true);
+
+			const entry = await getMetadata(db, 'autoLoadDB');
+			expect(entry.value).toBe(true);
+			expect(entry.timestamp).toBeGreaterThanOrEqual(before);
+		});
+
+		it('overwrites a key rather than accumulating', async () => {
+			await putMetadata(db, 'documentGuid', 'first');
+			await putMetadata(db, 'documentGuid', 'second');
+
+			expect((await getMetadata(db, 'documentGuid')).value).toBe('second');
+		});
+
+		it('answers null for a key that was never written', async () => {
+			expect(await getMetadata(db, 'never-set')).toBeNull();
 		});
 	});
 
-	describe('createEmptyCardList', () => {
-		it('returns a card list with default values', () => {
-			const cardList = createEmptyCardList();
-
-			expect(cardList.name).toBe('A list');
-			expect(cardList.cards).toEqual([]);
-			expect(cardList.cardMatching).toBe('generic');
-			expect(cardList.languageMatching).toBe('any');
-			expect(cardList.created_at).toBeTypeOf('number');
-			expect(cardList.updated_at).toBeTypeOf('number');
-			expect(cardList.id).toBeUndefined();
-		});
-	});
-
-	describe('CardList CRUD', () => {
-		it('saves and loads a card list', async () => {
-			const cardList = createEmptyCardList();
-			const id = await saveCardList(db, cardList);
-
-			expect(id).toBeTypeOf('number');
-
-			const cardLists = await loadAllCardLists(db);
-			expect(cardLists).toHaveLength(1);
-			expect(cardLists[0].name).toBe('A list');
-			expect(cardLists[0].id).toBe(id);
+	describe('databaseExists', () => {
+		it('finds a database that is open', async () => {
+			expect(await databaseExists('LMdecktools')).toBe(true);
 		});
 
-		it('updates an existing card list', async () => {
-			const cardList = createEmptyCardList();
-			const id = await saveCardList(db, cardList);
-
-			const updated: CardList = { ...cardList, id, name: 'Updated List' };
-			await saveCardList(db, updated);
-
-			const cardLists = await loadAllCardLists(db);
-			expect(cardLists).toHaveLength(1);
-			expect(cardLists[0].name).toBe('Updated List');
-		});
-
-		it('deletes a card list', async () => {
-			const cardList = createEmptyCardList();
-			const id = await saveCardList(db, cardList);
-
-			await deleteCardList(db, id);
-
-			const cardLists = await loadAllCardLists(db);
-			expect(cardLists).toHaveLength(0);
-		});
-
-		it('saves a card list with cards', async () => {
-			const cardList: CardList = {
-				...createEmptyCardList(),
-				cards: [
-					{ id: 'card-1', name: 'Lightning Bolt', LM_quantity: 4 },
-					{ id: 'card-2', name: 'Counterspell', LM_quantity: 3 }
-				]
-			};
-
-			const _id = await saveCardList(db, cardList);
-			const cardLists = await loadAllCardLists(db);
-
-			expect(cardLists[0].cards).toHaveLength(2);
-			expect(cardLists[0].cards[0].LM_quantity).toBe(4);
-		});
-
-		it('strips the cards it is given down to the whitelist (#84)', async () => {
-			const cardList: CardList = {
-				...createEmptyCardList(),
-				cards: [
-					{
-						id: 'card-1',
-						name: 'Lightning Bolt',
-						LM_quantity: 4,
-						mana_cost: '{R}',
-						image_uris: { normal: 'bolt.jpg' },
-						card_faces: [{ image_uris: { normal: 'front.jpg' } }],
-						prices: { usd: '1.23' }
-					}
-				] as unknown as CardList['cards']
-			};
-
-			await saveCardList(db, cardList);
-			const [saved] = await loadAllCardLists(db);
-
-			expect(saved.cards[0]).toEqual({
-				id: 'card-1',
-				name: 'Lightning Bolt',
-				mana_cost: '{R}',
-				LM_quantity: 4
-			});
-		});
-	});
-
-	describe('clearDatabase', () => {
-		it('removes all card lists and collection cards', async () => {
-			await saveCardList(db, createEmptyCardList());
-			await saveCollectionCard(db, {
-				id: 'card-1',
-				name: 'Lightning Bolt',
-				quantity_owned: 2
-			});
-
-			await clearDatabase(db);
-
-			const cardLists = await loadAllCardLists(db);
-			const collection = await loadCollection(db);
-			expect(cardLists).toHaveLength(0);
-			expect(collection).toHaveLength(0);
+		it('does not invent one that is not', async () => {
+			// The question has two answers since #47 — this one and the document's
+			// — and the store is what puts them together.
+			expect(await databaseExists('lmdecktools-doc')).toBe(false);
 		});
 	});
 });
 
-describe('Collection Operations', () => {
-	let db: IDBDatabase;
-
-	beforeEach(async () => {
-		db = await openDatabase();
+describe('the storage factory', () => {
+	afterEach(() => {
+		useStorageFactory(globalThis.indexedDB);
 	});
 
-	afterEach(async () => {
+	it('is swappable, which is the whole of preview mode (#87)', async () => {
+		const { IDBFactory } = await import('fake-indexeddb');
+		const memory = new IDBFactory();
+
+		useStorageFactory(memory);
+		expect(storageFactory()).toBe(memory);
+
+		const db = await openDatabase();
+		expect(db.name).toBe('LMdecktools');
 		db.close();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
-	});
 
-	it('saves and loads a collection card', async () => {
-		const card: CollectionCard = {
-			id: 'scryfall-123',
-			name: 'Lightning Bolt',
-			quantity_owned: 4,
-			set: 'lea',
-			collector_number: '161'
-		};
-
-		await saveCollectionCard(db, card);
-
-		const collection = await loadCollection(db);
-		expect(collection).toHaveLength(1);
-		expect(collection[0].name).toBe('Lightning Bolt');
-		expect(collection[0].quantity_owned).toBe(4);
-	});
-
-	it('stores only the whitelist, whatever the caller hands it (#84)', async () => {
-		// The DB layer is the last gate before disk: a caller holding a whole
-		// Scryfall object must not be able to put one in the file.
-		await saveCollectionCard(db, {
-			id: 'scryfall-123',
-			name: 'Lightning Bolt',
-			quantity_owned: 4,
-			set: 'lea',
-			image_uris: { normal: 'bolt.jpg' },
-			legalities: { modern: 'legal' },
-			prices: { usd: '1.23' }
-		} as unknown as CollectionCard);
-
-		const [stored] = await loadCollection(db);
-		expect(stored).toEqual({
-			id: 'scryfall-123',
-			name: 'Lightning Bolt',
-			quantity_owned: 4,
-			set: 'lea'
-		});
-	});
-
-	it('updates quantity when saving same card again', async () => {
-		const card: CollectionCard = {
-			id: 'scryfall-123',
-			name: 'Lightning Bolt',
-			quantity_owned: 2
-		};
-		await saveCollectionCard(db, card);
-
-		const updated = { ...card, quantity_owned: 5 };
-		await saveCollectionCard(db, updated);
-
-		const collection = await loadCollection(db);
-		expect(collection).toHaveLength(1);
-		expect(collection[0].quantity_owned).toBe(5);
-	});
-
-	it('saves many cards in one batch', async () => {
-		const cards: CollectionCard[] = [
-			{ id: 'a', name: 'Card A', quantity_owned: 1 },
-			{ id: 'b', name: 'Card B', quantity_owned: 2 },
-			{ id: 'c', name: 'Card C', quantity_owned: 3 }
-		];
-
-		await saveCollectionCards(db, cards);
-
-		const collection = await loadCollection(db);
-		expect(collection).toHaveLength(3);
-		expect(collection.map((c) => c.quantity_owned).sort()).toEqual([1, 2, 3]);
-	});
-
-	it('upserts in a batch, leaving other rows alone', async () => {
-		await saveCollectionCard(db, { id: 'a', name: 'Card A', quantity_owned: 1 });
-		await saveCollectionCard(db, { id: 'z', name: 'Card Z', quantity_owned: 9 });
-
-		await saveCollectionCards(db, [
-			{ id: 'a', name: 'Card A', quantity_owned: 4 },
-			{ id: 'b', name: 'Card B', quantity_owned: 2 }
-		]);
-
-		const collection = await loadCollection(db);
-		expect(collection).toHaveLength(3);
-		expect(collection.find((c) => c.id === 'a')?.quantity_owned).toBe(4);
-		expect(collection.find((c) => c.id === 'z')?.quantity_owned).toBe(9);
-	});
-
-	it('writes nothing for an empty batch', async () => {
-		await expect(saveCollectionCards(db, [])).resolves.toEqual([]);
-		expect(await loadCollection(db)).toHaveLength(0);
-	});
-
-	it('resolves only once the batch has committed', async () => {
-		// A read opened after the promise settles must already see every row
-		await saveCollectionCards(db, [
-			{ id: 'a', name: 'Card A', quantity_owned: 1 },
-			{ id: 'b', name: 'Card B', quantity_owned: 1 }
-		]);
-
-		expect(await loadCollection(db)).toHaveLength(2);
-	});
-
-	it('deletes a collection card', async () => {
-		await saveCollectionCard(db, {
-			id: 'scryfall-123',
-			name: 'Lightning Bolt',
-			quantity_owned: 4
-		});
-
-		await deleteCollectionCard(db, 'scryfall-123');
-
-		const collection = await loadCollection(db);
-		expect(collection).toHaveLength(0);
-	});
-
-	it('gets a specific collection card', async () => {
-		await saveCollectionCard(db, {
-			id: 'scryfall-123',
-			name: 'Lightning Bolt',
-			quantity_owned: 4
-		});
-
-		const card = await getCollectionCard(db, 'scryfall-123');
-		expect(card).not.toBeNull();
-		expect(card!.name).toBe('Lightning Bolt');
-	});
-
-	it('returns null for non-existent card', async () => {
-		const card = await getCollectionCard(db, 'does-not-exist');
-		expect(card).toBeNull();
+		// Opened, used, and invisible to the browser's own store.
+		const real = (await globalThis.indexedDB.databases()).map((d) => d.name);
+		expect(real).not.toContain('LMdecktools');
 	});
 });

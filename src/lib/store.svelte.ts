@@ -1,18 +1,8 @@
 import {
 	openDatabase,
-	clearDatabase,
 	checkLocalDatabase,
-	loadAllCardLists,
-	saveCardList as dbSaveCardList,
-	deleteCardList as dbDeleteCardList,
-	createEmptyCardList,
-	loadCollection as dbLoadCollection,
-	saveCollectionCard,
-	saveCollectionCards,
-	deleteCollectionCard,
-	getCollectionCard,
-	findCardListByName,
-	mergeCards,
+	databaseExists,
+	takeLegacySeed,
 	putMetadata,
 	getMetadata,
 	useStorageFactory,
@@ -21,6 +11,35 @@ import {
 	type CollectionCard
 } from './db';
 import { detectInstallContext, type InstallContext } from './install-context';
+import * as Y from 'yjs';
+import type { IndexeddbPersistence } from 'y-indexeddb';
+import {
+	DOC_PERSISTENCE_NAME,
+	applyRemoteUpdate,
+	attachPersistence,
+	createDocument,
+	createList as docCreateList,
+	destroyPersistence,
+	observeDocument,
+	peekPayload,
+	readCollection as docReadCollection,
+	readCollectionCard as docReadCollectionCard,
+	readList as docReadList,
+	readLists as docReadLists,
+	readMeta,
+	readPayload,
+	removeCollectionCard as docRemoveCollectionCard,
+	removeList as docRemoveList,
+	removeListCard as docRemoveListCard,
+	seedDocument,
+	setCollectionQuantity as docSetCollectionQuantity,
+	setListCardQuantity as docSetListCardQuantity,
+	updateFor,
+	updateList as docUpdateList,
+	upsertCollectionCard as docUpsertCollectionCard,
+	upsertListCard as docUpsertListCard,
+	type DocumentList
+} from './ydoc';
 
 import {
 	logError,
@@ -42,8 +61,7 @@ import {
 	missingFactIds,
 	type CardFactsIndex
 } from './card-facts';
-import { exportWithMetadata, importWithMetadata } from './yjs-integration';
-import { mergeCardListSets, mergeCollections } from './merge';
+import { diffProjections, mergeCardListSets, mergeCollections } from './merge';
 import type { CardsDelta, ListMergeDetail } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
 import {
@@ -85,7 +103,8 @@ import {
 export type { LinkedFileStatus } from './linked-file';
 export { isFileSystemAccessSupported } from './linked-file';
 
-// Database reference
+// Device-local database: the auto-load preference, the linked-file handle, the
+// document guid, the error journal, the card-facts cache. No user data (#47).
 let db: IDBDatabase | null = null;
 
 /** Ensure db is open, re-opening if needed (e.g. after HMR or race condition). */
@@ -94,6 +113,146 @@ async function ensureDB(): Promise<IDBDatabase> {
 		db = await openDatabase();
 	}
 	return db;
+}
+
+// ==================== THE DOCUMENT (#47) ====================
+
+/**
+ * The user's lists and collection, as one long-lived `Y.Doc`.
+ *
+ * Authoritative: `store.savedCardLists` and `store.collection` are projections
+ * of it, rebuilt by an observer. Mutators write here and let the observer do the
+ * assigning, which is why there is no longer a `triggerAutoSave()` at fourteen
+ * call sites — the document knows when it changed.
+ */
+let doc: Y.Doc | null = null;
+let persistence: IndexeddbPersistence | null = null;
+let stopObserving: (() => void) | null = null;
+
+/** The guid lives in device-local metadata; the lineage it names lives in the document. */
+const GUID_KEY = 'documentGuid';
+
+function requireDoc(): Y.Doc {
+	if (!doc) throw new Error('No document is open.');
+	return doc;
+}
+
+/**
+ * The document's own view of the data, for the mutators.
+ *
+ * They must not read `store.*`: the runes are rebuilt on a microtask, so
+ * between one write and the next tick they are stale, and a mutator reading its
+ * own stale projection would lose the write before it. The runes are for
+ * rendering; the document is the authority.
+ */
+function liveLists(): CardList[] {
+	return docReadLists(requireDoc()) as CardList[];
+}
+
+function liveCollection(): CollectionCard[] {
+	return docReadCollection(requireDoc());
+}
+
+function liveList(listId: string | null): DocumentList | null {
+	return listId ? docReadList(requireDoc(), listId) : null;
+}
+
+/** Rebuild the runes from the document. Whole arrays, coalesced per microtask. */
+function projectDocument(): void {
+	const current = requireDoc();
+	store.savedCardLists = docReadLists(current) as CardList[];
+	store.collection = docReadCollection(current);
+
+	// A list can vanish under the selection now — a remote replica may have
+	// deleted the one this tab was looking at.
+	if (
+		store.currentCardListId &&
+		!store.savedCardLists.some((l) => l.id === store.currentCardListId)
+	) {
+		store.currentCardListId = store.savedCardLists[0]?.id ?? null;
+	} else if (!store.currentCardListId && store.savedCardLists.length > 0) {
+		store.currentCardListId = store.savedCardLists[0].id ?? null;
+	}
+}
+
+/**
+ * Open the document for this session and start projecting it.
+ *
+ * `persist` is false in two cases: preview mode, where nothing may be written
+ * to the browser's container (#87), and peek mode, which is a look at the data
+ * without adopting it.
+ */
+async function openDocument(options: { persist: boolean }): Promise<Y.Doc> {
+	if (doc) return doc;
+
+	const _db = await ensureDB();
+	const stored = await getMetadata(_db, GUID_KEY);
+	const guid = (stored?.value as string | undefined) ?? crypto.randomUUID();
+
+	doc = createDocument(guid);
+	if (!stored?.value && options.persist) await putMetadata(_db, GUID_KEY, guid);
+
+	if (options.persist) {
+		persistence = attachPersistence(doc);
+		await persistence.whenSynced;
+	}
+
+	// One-time, expiring with the v6 upgrade: rows rescued from the stores that
+	// upgrade dropped. A database created after #47 never has any.
+	const seed = takeLegacySeed();
+	if (seed) {
+		seedDocument(doc, seed);
+		await cacheCardFacts([...seed.collection, ...seed.cardLists.flatMap((l) => l.cards)], _db);
+	}
+
+	stopObserving?.();
+	stopObserving = observeDocument(doc, projectDocument);
+
+	// One subscription in place of fourteen `triggerAutoSave()` calls. Remote
+	// applies are excluded: writing back what just arrived is how a merge loop
+	// starts.
+	doc.on('update', (_update: Uint8Array, origin: unknown) => {
+		if (origin === 'file') return;
+		triggerAutoSave();
+	});
+
+	projectDocument();
+	return doc;
+}
+
+/**
+ * Close the document without destroying anything it has written.
+ *
+ * The provider's teardown is awaited rather than fired and forgotten: it holds
+ * an open IndexedDB connection, and a `deleteDatabase()` behind a live
+ * connection blocks — silently, until something times out.
+ */
+async function closeDocument(): Promise<void> {
+	stopObserving?.();
+	stopObserving = null;
+	await persistence?.destroy();
+	persistence = null;
+	doc?.destroy();
+	doc = null;
+}
+
+/** The whole document, as the bytes a file or a peer receives (T0). */
+export function documentUpdate(): Uint8Array {
+	return updateFor(requireDoc());
+}
+
+/** The lineage this database belongs to, for the two-way import classification (C4). */
+export function documentGuid(): string | null {
+	return doc ? (readMeta(doc).guid ?? doc.guid) : null;
+}
+
+/**
+ * The live document, for the transports that sit on the port — the
+ * BroadcastChannel provider, the peer connection — and for tests that need to
+ * count transactions. Null before a database is open.
+ */
+export function currentDocument(): Y.Doc | null {
+	return doc;
 }
 
 /** Total number of physical copies in a set of cards (sum of LM_quantity). */
@@ -147,10 +306,24 @@ class Store implements StoreInterface {
 
 	// Card list state
 	savedCardLists = $state<CardList[]>([]);
-	currentCardListIndex = $state(NaN);
-	currentCardList = $derived(
-		!isNaN(this.currentCardListIndex) ? this.savedCardLists[this.currentCardListIndex] : null
-	);
+
+	/**
+	 * The selected list, by id rather than by position (#47).
+	 *
+	 * It used to be an index into `savedCardLists`. Once a remote replica can
+	 * insert or delete a list, a position is not a selection — it silently
+	 * reselects a different deck under the user.
+	 */
+	currentCardListId = $state<string | null>(null);
+
+	// A plain getter, for the same reason `dbLoaded` and `isReadOnly` are: it
+	// recomputes on every read, with no reactive owner required. A `$derived`
+	// here kept returning a list that had just been deleted whenever it was read
+	// outside a component — which is every test in this repo.
+	get currentCardList(): CardList | null {
+		if (!this.currentCardListId) return null;
+		return this.savedCardLists.find((list) => list.id === this.currentCardListId) ?? null;
+	}
 	listCards = $derived(this.currentCardList?.cards || []);
 	listNames = $derived(this.savedCardLists.map((list) => list.name));
 	totalCards = $derived(countCards(this.listCards));
@@ -309,12 +482,12 @@ async function loadCardFactsIndex(): Promise<void> {
 }
 
 /**
- * Load everything the UI reads: the user's data from IndexedDB, then the facts
- * that make it drawable. The refetch of what the cache is missing is deliberately
- * not awaited — it needs the network, and the lists are readable without it.
+ * Load everything the UI reads: the document, then the facts that make it
+ * drawable. The refetch of what the cache is missing is deliberately not
+ * awaited — it needs the network, and the lists are readable without it.
  */
-async function loadCardData(): Promise<void> {
-	await Promise.all([loadCardLists(), loadCollection()]);
+async function loadCardData(options: { persist?: boolean } = {}): Promise<void> {
+	await openDocument({ persist: options.persist ?? true });
 	await loadCardFactsIndex();
 	void hydrateCardFacts();
 }
@@ -351,6 +524,10 @@ export async function startSession() {
  * The import is dynamic so the ~100 KB only lands on the devices that need it,
  * and the database is opened `active` rather than `peek`, since preview mode is
  * meant to be fully usable — impermanent, not read-only.
+ *
+ * The document gets no persistence provider here (#47): `y-indexeddb` reaches
+ * for the global `indexedDB` rather than the injected factory, so the only way
+ * to keep it out of the browser's container is not to attach it at all.
  */
 export async function enterPreviewMode() {
 	const { IDBFactory: MemoryFactory } = await import('fake-indexeddb');
@@ -358,7 +535,19 @@ export async function enterPreviewMode() {
 
 	db = await openDatabase();
 	store.dbMode = 'active';
-	await loadCardData();
+	await loadCardData({ persist: false });
+}
+
+/**
+ * Does this browser already hold something of the user's?
+ *
+ * Two databases since #47 — device-local state and the document — and either
+ * one being present means yes. The DB modal asks through here rather than
+ * calling `checkLocalDatabase()` directly, which only ever knew about the
+ * first of them.
+ */
+export async function localDatabaseExists(): Promise<boolean> {
+	return (await checkLocalDatabase()) || (await databaseExists(DOC_PERSISTENCE_NAME));
 }
 
 /**
@@ -368,8 +557,7 @@ export async function enterPreviewMode() {
 export async function tryAutoLoadDB() {
 	if (store.dbMode !== 'none') return;
 
-	const exists = await checkLocalDatabase();
-	if (!exists) return;
+	if (!(await localDatabaseExists())) return;
 
 	db = await openDatabase();
 	const autoLoad = await getMetadata(db, 'autoLoadDB');
@@ -387,7 +575,11 @@ export async function tryAutoLoadDB() {
 }
 
 /**
- * Open database in read-only peek mode (data visible, writes blocked)
+ * Open database in read-only peek mode (data visible, writes blocked).
+ *
+ * The document is persisted as usual — peek is about not *mutating* the data,
+ * and `assertWritable()` is what enforces that. Reading the stored updates is
+ * the entire point of peeking, and `y-indexeddb` is the only thing that can.
  */
 export async function peekDB() {
 	db = await openDatabase();
@@ -413,22 +605,43 @@ export async function initDB() {
 	console.log('initDB done');
 }
 
+/**
+ * Erase the user's data.
+ *
+ * Under the document model this is not a `store.clear()` — it destroys the
+ * lineage. A fresh guid follows, because the emptied database is not a replica
+ * of the one that came before it: any peer still holding the old lineage must
+ * re-seed rather than helpfully syncing everything back.
+ *
+ * `error_journal` and `card_facts` survive, as they always have — diagnostics
+ * and a refetchable cache are not the user's data.
+ */
 export async function clearDB() {
 	const _db = await ensureDB();
-	await clearDatabase(_db);
-	console.log('clearDB done');
+
+	await closeDocument();
+	await destroyPersistence();
+
+	const guid = crypto.randomUUID();
+	await putMetadata(_db, GUID_KEY, guid);
+	await putMetadata(_db, 'last_clear', Date.now());
+
+	store.currentCardListId = null;
+	await openDocument({ persist: store.dbMode === 'active' || store.dbMode === 'peek' });
 }
 
-/** Close the IndexedDB connection (used in tests to allow deleteDatabase) */
-export function closeDB() {
+/** Close both connections (used in tests to allow deleteDatabase) */
+export async function closeDB(): Promise<void> {
+	await closeDocument();
 	if (db) {
 		db.close();
 		db = null;
 	}
 }
 
-export function exportDB() {
-	return exportWithMetadata(store);
+/** The whole document — what a linked file holds and what a peer receives. */
+export function exportDB(): Uint8Array {
+	return documentUpdate();
 }
 
 // ==================== ERROR JOURNAL ====================
@@ -505,7 +718,7 @@ function performWrite(handle: FileSystemFileHandle): Promise<void> {
 	store.linkedFileWriting = true;
 	return enqueueWrite(async () => {
 		try {
-			await writeWithRetry(handle, exportWithMetadata(store));
+			await writeWithRetry(handle, documentUpdate());
 			const ts = Date.now();
 			updateLastKnownModified(ts);
 			applyWriteSuccess(ts);
@@ -519,12 +732,7 @@ function triggerAutoSave(): void {
 	if (store.linkedFileStatus !== 'active' || !linkedHandle) return;
 
 	store.linkedFileWriting = true;
-	scheduleDebouncedWrite(
-		linkedHandle,
-		() => exportWithMetadata(store),
-		applyWriteSuccess,
-		applyWriteError
-	);
+	scheduleDebouncedWrite(linkedHandle, () => documentUpdate(), applyWriteSuccess, applyWriteError);
 }
 
 export async function saveNow(): Promise<void> {
@@ -590,40 +798,75 @@ export async function linkFile(): Promise<void> {
 }
 
 /**
- * Merge a snapshot read from the linked file into the local database, then
- * reload the store.
+ * Bring an incoming payload into the document, by whichever of the two
+ * operations its lineage calls for (C4).
  *
- * Additive only: the database is never cleared and no record is deleted, so a
- * card that exists only locally always survives the merge (#46). Only the
- * records the merge actually touches are written back.
+ * **Same guid** — the file is a replica of this database. Applying its update
+ * is a true merge: concurrent edits reconcile, and deletions propagate, because
+ * both sides share history and tombstones.
+ *
+ * **Different guid** — a friend's file, or one from a compacted lineage. Those
+ * documents are not peers, so applying the update would adopt a stranger's
+ * history wholesale. It goes through the explicit union in `merge.ts` instead,
+ * written back as ordinary local edits.
+ *
+ * Same bytes, different results — which is why the UI has to say which one a
+ * file is getting.
  */
-async function mergeSnapshotIntoDB(
-	_db: IDBDatabase,
-	remoteLists: CardList[],
-	remoteCollection: CollectionCard[]
-): Promise<void> {
-	// Read local state from the DB rather than the store: it is authoritative
-	// and free of Svelte proxies, which IndexedDB cannot serialize.
-	const [localLists, localCollection] = await Promise.all([
-		loadAllCardLists(_db),
-		dbLoadCollection(_db)
-	]);
+async function applyPayloadToDocument(data: Uint8Array): Promise<void> {
+	const current = requireDoc();
+	const incoming = peekPayload(data);
 
-	// Same as the restore path: a snapshot written before #84 still carries the
-	// facts, and this is the last moment they exist before the write strips them.
-	await cacheCardFacts([...remoteCollection, ...remoteLists.flatMap((list) => list.cards)], _db);
+	if (incoming.guid && incoming.guid === documentGuid()) {
+		applyRemoteUpdate(current, data, 'file');
+		await cacheCardFacts(allHeldCards(), db ?? undefined);
+		return;
+	}
 
+	const payload = readPayload(data);
+
+	// A file written before #84 still carries the card facts, and this is the
+	// last moment they exist — the document takes the whitelist only.
+	await cacheCardFacts(
+		[...payload.collection, ...payload.cardLists.flatMap((list) => list.cards)],
+		db ?? undefined
+	);
+
+	unionIntoDocument(payload.cardLists, payload.collection);
+}
+
+/**
+ * The union path, written into the document as local edits.
+ *
+ * Nothing is ever removed here — that is the whole point of the union, and the
+ * reason it survives the arrival of a real CRDT.
+ */
+function unionIntoDocument(remoteLists: CardList[], remoteCollection: CollectionCard[]): void {
+	const current = requireDoc();
+
+	const localLists = liveLists();
 	const lists = mergeCardListSets(localLists, remoteLists);
-	for (const list of lists.changed) {
-		await dbSaveCardList(_db, list);
-	}
+	const collection = mergeCollections(liveCollection(), remoteCollection);
 
-	const collection = mergeCollections(localCollection, remoteCollection);
-	for (const card of collection.changed) {
-		await saveCollectionCard(_db, card);
-	}
+	// One transaction: a union is one act, and the observer should rebuild once.
+	current.transact(() => {
+		for (const list of lists.changed) {
+			const existing = localLists.find((l) => l.name === list.name);
+			const listId = existing?.id ?? docCreateList(current, list.name, list);
+			docUpdateList(current, listId, {
+				name: list.name,
+				cardMatching: list.cardMatching,
+				languageMatching: list.languageMatching
+			});
+			for (const card of list.cards) {
+				docUpsertListCard(current, listId, card, card.LM_quantity);
+			}
+		}
 
-	await loadCardData();
+		for (const card of collection.changed) {
+			docUpsertCollectionCard(current, card, card.quantity_owned);
+		}
+	});
 }
 
 export async function linkExistingFile(): Promise<void> {
@@ -635,12 +878,9 @@ export async function linkExistingFile(): Promise<void> {
 	store.linkedFileStatus = 'active';
 	store.linkedFileError = null;
 
-	// Read existing file and merge into current DB
+	// Read the existing file in, by whichever path its lineage calls for
 	try {
-		const fileData = await readFileData(handle);
-		const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
-
-		await mergeSnapshotIntoDB(_db, remoteLists, remoteCollection);
+		await applyPayloadToDocument(await readFileData(handle));
 	} catch {
 		// File may be empty — that's fine, we'll write to it on next save
 	}
@@ -717,51 +957,84 @@ export interface MergePreview {
 	collection: CardsDelta;
 	/** One entry per list the merge would touch, in merge order. */
 	lists: ListMergeDetail[];
-	/** True when the snapshot holds nothing the local database is missing. */
+	/** True when the file holds nothing the local document is missing. */
 	unchanged: boolean;
+	/**
+	 * Which of the two operations this file gets (C4). `merge` can remove things;
+	 * `union` never does. The user is entitled to know which — same bytes,
+	 * different results.
+	 */
+	operation: 'merge' | 'union';
 }
 
 /**
- * Run the merge without writing anything, to show what it would bring in.
+ * Show what the file would do, without doing it.
  *
- * `mergeCardListSets` / `mergeCollections` are pure, so this costs one file
- * read and one DB read and touches neither IndexedDB nor the store. The commit
- * path re-reads the file rather than reusing this result: the file could have
- * changed again while the modal was open, and merging the newer snapshot is
- * both cheap and the safer of the two outcomes — the merge is additive either
- * way, so a stale preview can only understate what arrives.
+ * Both paths are computed without touching the live document. The union is pure
+ * arithmetic over two arrays. The merge is run against a **throwaway clone** of
+ * the document — the only honest way to preview an operation whose result
+ * depends on history and tombstones, and the only way to see the removals a
+ * union could never produce.
+ *
+ * The commit path re-reads the file rather than reusing this result: it may have
+ * changed again while the modal was open, and the newer state is the one worth
+ * applying.
  */
 export async function previewMergeFromFile(): Promise<MergePreview | null> {
-	if (!linkedHandle || !db) return null;
+	if (!linkedHandle || !doc) return null;
 
 	const fileData = await readFileData(linkedHandle);
-	const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
+	return previewPayload(fileData);
+}
 
-	const [localLists, localCollection] = await Promise.all([
-		loadAllCardLists(db),
-		dbLoadCollection(db)
-	]);
+/** The preview for a payload from any transport — the linked file, an upload, a peer. */
+export function previewPayload(data: Uint8Array): MergePreview {
+	const current = requireDoc();
+	const before = { collection: liveCollection(), cardLists: liveLists() };
 
-	const lists = mergeCardListSets(localLists, remoteLists);
-	const collection = mergeCollections(localCollection, remoteCollection);
+	const incoming = peekPayload(data);
+
+	if (incoming.guid && incoming.guid === documentGuid()) {
+		const clone = createDocument(current.guid);
+		applyRemoteUpdate(clone, updateFor(current), 'file');
+		applyRemoteUpdate(clone, data, 'file');
+
+		const after = {
+			collection: docReadCollection(clone),
+			cardLists: docReadLists(clone) as CardList[]
+		};
+		const diff = diffProjections(before, after);
+		clone.destroy();
+
+		return {
+			collection: diff.collection,
+			lists: diff.lists,
+			unchanged:
+				diff.lists.length === 0 && diff.collection.added === 0 && diff.collection.removed === 0,
+			operation: 'merge'
+		};
+	}
+
+	const payload = readPayload(data);
+	const lists = mergeCardListSets(before.cardLists, payload.cardLists);
+	const collection = mergeCollections(before.collection, payload.collection);
 
 	return {
 		collection: collection.delta,
 		lists: lists.details,
-		unchanged: lists.details.length === 0 && collection.changed.length === 0
+		unchanged: lists.details.length === 0 && collection.changed.length === 0,
+		operation: 'union'
 	};
 }
 
 export async function mergeFromFile(): Promise<void> {
-	if (!linkedHandle || !db) return;
+	if (!linkedHandle || !doc) return;
 
-	const fileData = await readFileData(linkedHandle);
-	const { cardLists: remoteLists, collection: remoteCollection } = importWithMetadata(fileData);
+	await applyPayloadToDocument(await readFileData(linkedHandle));
 
-	await mergeSnapshotIntoDB(db, remoteLists, remoteCollection);
-
-	// Write merged result back to file. Reloading the store above fires autosaves,
-	// so this must go through the same queue rather than racing them.
+	// Write the result back. The apply itself does not trigger an autosave —
+	// writing back what just arrived is how a merge loop starts — so the push is
+	// explicit here, through the same queue rather than racing it.
 	cancelDebouncedWrite();
 	await performWrite(linkedHandle);
 	store.linkedFileExternalChange = false;
@@ -780,132 +1053,105 @@ export async function inspectImportFile(file: File): Promise<ImportPayload> {
 }
 
 /**
- * Load database from a file (JSON or Yjs format).
- * Clears existing data, imports from the file, then reloads the store.
+ * Restore from a file: adopt what it holds, in place of what is here.
+ *
+ * Destructive, and differently so than before. "Restore" no longer means clear
+ * the stores and refill them — for a document it means **adopt the file's
+ * lineage wholesale**, guid and all, so the restored database is a replica of
+ * the one the file came from rather than a stranger holding the same values.
+ * Anything else would leave every other device unable to sync with it.
  */
 export async function loadFromFile(
 	file: File,
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
 	const _db = await ensureDB();
+	const data = new Uint8Array(await file.arrayBuffer());
 
-	const buffer = await file.arrayBuffer();
-	const data = new Uint8Array(buffer);
+	// Validated before anything is destroyed: a file that is not one of ours, or
+	// one that decodes to nothing, must not reach the point of clearing (#52).
+	const payload = parseImportFile(data);
+	assertRestorable(payload);
 
-	// importDatabase validates before it writes; leave dbMode alone until it
-	// succeeds, so a rejected file changes nothing at all (#52)
-	const result = await importDatabase(_db, data, false, onProgress);
+	const result = await adoptPayload(_db, payload, data, onProgress);
+
 	store.dbMode = 'active';
-	await loadCardData();
 	await putMetadata(_db, 'autoLoadDB', true);
+	await loadCardFactsIndex();
+	void hydrateCardFacts();
 	triggerAutoSave();
 	return result;
 }
 
 /**
- * Import database from a file (supports both JSON and Yjs formats)
- * Automatically detects format and handles accordingly
+ * Replace the local lineage with the file's.
+ *
+ * A document payload is adopted whole — its guid becomes ours, which is what
+ * makes the restored database a peer of every other replica of that document.
+ * A plain-JSON payload has no lineage to adopt, so it seeds a fresh one.
  */
-export async function importDatabase(
-	db: IDBDatabase,
+async function adoptPayload(
+	_db: IDBDatabase,
+	payload: ImportPayload,
 	data: Uint8Array,
-	merge: boolean = false,
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
-	// Validate before destroying anything: parseImportFile throws for a file that
-	// is not one of our exports, and assertRestorable throws for an empty payload,
-	// both before the first write. Restoring is destructive; being wrong is fatal (#52).
+	// The facts, before the whitelist drops them on the way into the document.
+	await cacheCardFacts(
+		[...payload.collection, ...payload.cardLists.flatMap((list) => list.cards)],
+		_db
+	);
+
+	await closeDocument();
+	await destroyPersistence();
+
+	const guid = payload.guid ?? crypto.randomUUID();
+	await putMetadata(_db, GUID_KEY, guid);
+	store.currentCardListId = null;
+
+	const adopted = await openDocument({ persist: true });
+
+	if (payload.format === 'document') {
+		applyRemoteUpdate(adopted, data, 'file');
+	} else {
+		seedDocument(adopted, { collection: payload.collection, cardLists: payload.cardLists });
+	}
+
+	onProgress?.(payload.cardLists.length, payload.cardLists.length);
+	return { imported: payload.cardLists.length, merged: 0, errors: 0 };
+}
+
+/**
+ * Import a payload without destroying anything — the additive path, used by the
+ * DB modal's merge option. Same two-way classification as the linked file.
+ */
+export async function importDatabase(
+	data: Uint8Array,
+	merge: boolean = true,
+	onProgress?: (current: number, total: number) => void
+): Promise<{ imported: number; merged: number; errors: number }> {
+	const _db = await ensureDB();
 	const payload = parseImportFile(data);
-	if (!merge) {
-		assertRestorable(payload);
+	if (!merge) assertRestorable(payload);
+
+	if (!merge) return adoptPayload(_db, payload, data, onProgress);
+
+	const before = liveLists().length;
+
+	if (payload.format === 'document') {
+		await applyPayloadToDocument(data);
+	} else {
+		await cacheCardFacts(
+			[...payload.collection, ...payload.cardLists.flatMap((list) => list.cards)],
+			_db
+		);
+		unionIntoDocument(payload.cardLists, payload.collection);
 	}
 
-	const cardLists = payload.cardLists;
-	const collection = payload.collection;
+	onProgress?.(payload.cardLists.length, payload.cardLists.length);
 
-	// A file written before #84 carries whole Scryfall objects. The write path
-	// strips them, so harvest the facts on the way in — otherwise restoring an
-	// old backup would send the app back to Scryfall for cards it just read.
-	await cacheCardFacts([...collection, ...cardLists.flatMap((list) => list.cards)], db);
-
-	let imported = 0;
-	let merged = 0;
-	let errors = 0;
-
-	if (!merge) {
-		await clearDatabase(db);
-	}
-
-	// Import card lists
-	const total = cardLists.length;
-	let current = 0;
-	for (const cardList of cardLists) {
-		try {
-			if (merge) {
-				// Check if list with same name exists
-				const existing = await findCardListByName(db, cardList.name);
-				if (existing) {
-					// Merge cards
-					const mergedCards = mergeCards(existing.cards, cardList.cards);
-					await dbSaveCardList(db, {
-						...existing,
-						cards: mergedCards,
-						updated_at: Date.now()
-					});
-					merged++;
-				} else {
-					await dbSaveCardList(db, {
-						...cardList,
-						id: undefined, // Let autoIncrement assign new ID
-						created_at: cardList.created_at || Date.now(),
-						updated_at: Date.now()
-					});
-					imported++;
-				}
-			} else {
-				await dbSaveCardList(db, {
-					...cardList,
-					id: undefined,
-					created_at: cardList.created_at || Date.now(),
-					updated_at: Date.now()
-				});
-				imported++;
-			}
-		} catch (error) {
-			logAppError('import', error, { operation: 'importCardList', listName: cardList.name, merge });
-			errors++;
-		}
-		current++;
-		onProgress?.(current, total);
-	}
-
-	// Import collection cards
-	for (const card of collection) {
-		try {
-			if (merge) {
-				const existing = await getCollectionCard(db, card.id);
-				if (existing) {
-					await saveCollectionCard(db, {
-						...card,
-						quantity_owned: existing.quantity_owned + card.quantity_owned
-					});
-				} else {
-					await saveCollectionCard(db, card);
-				}
-			} else {
-				await saveCollectionCard(db, card);
-			}
-		} catch (error) {
-			logAppError('import', error, {
-				operation: 'importCollectionCard',
-				cardName: card.name,
-				merge
-			});
-			errors++;
-		}
-	}
-
-	return { imported, merged, errors };
+	const added = Math.max(0, liveLists().length - before);
+	return { imported: added, merged: payload.cardLists.length - added, errors: 0 };
 }
 
 // ==================== SCRYFALL BATCH FETCH ====================
@@ -1040,110 +1286,69 @@ async function fetchCardsByIds(
 }
 
 // ==================== COLLECTION FUNCTIONS ====================
+//
+// Every mutator below writes to the document and stops. The runes are rebuilt
+// by the observer, and the linked-file save is triggered by `doc.on('update')`
+// — which is why none of these assigns to `store.*` or calls
+// `triggerAutoSave()` any more. Fourteen call sites collapsed into one
+// subscription; the document knows when it changed.
 
-/**
- * Load collection from database
- */
+/** Re-read the collection from the document. */
 export async function loadCollection() {
-	const _db = await ensureDB();
-
-	const cards = await dbLoadCollection(_db);
-	store.collection = cards;
-	return cards;
+	projectDocument();
+	return store.collection;
 }
 
-/**
- * Add card to collection
- */
+/** Add copies to the collection, on top of whatever is already owned. */
 export async function addToCollection(card: any, quantity: number = 1) {
 	assertWritable();
-	const _db = await ensureDB();
+	const current = requireDoc();
 
-	const existingCard = await getCollectionCard(_db, card.id);
+	await cacheCardFacts([card]);
 
-	// The record keeps the whitelist and the quantity; what the search result
-	// carries beyond that goes to the facts cache instead (#84).
-	const cardData = toStoredCollectionCard(
-		card,
-		existingCard ? existingCard.quantity_owned + quantity : quantity
-	);
+	const existing = docReadCollectionCard(current, card.id);
+	const owned = (existing?.quantity_owned ?? 0) + quantity;
+	docUpsertCollectionCard(current, card, owned);
 
-	await cacheCardFacts([card], _db);
-	await saveCollectionCard(_db, cardData);
-
-	if (existingCard) {
-		const newCollection = store.collection.map((c) => (c.id === card.id ? cardData : c));
-		store.collection = newCollection;
-	} else {
-		store.collection = [...store.collection, cardData];
-	}
-
-	triggerAutoSave();
-	return cardData;
+	return toStoredCollectionCard(card, owned);
 }
 
-/**
- * Remove card from collection
- */
+/** Remove copies; the card itself goes when the last one does. */
 export async function removeFromCollection(card: any, quantity: number = 1) {
 	assertWritable();
-	const _db = await ensureDB();
+	const current = requireDoc();
 
-	const existingCard = store.collection.find((c) => c.id === card.id);
-
-	if (!existingCard) {
+	const existing = docReadCollectionCard(current, card.id);
+	if (!existing) {
 		throw new Error('Card not in collection');
 	}
 
-	const newQuantity = existingCard.quantity_owned - quantity;
+	const owned = existing.quantity_owned - quantity;
 
-	if (newQuantity <= 0) {
-		// Remove card entirely
-		await deleteCollectionCard(_db, card.id);
-		const newCollection = store.collection.filter((c) => c.id !== card.id);
-		store.collection = newCollection;
-		triggerAutoSave();
+	if (owned <= 0) {
+		// A real deletion, and a propagating one: the document carries a tombstone,
+		// so this removal reaches every replica instead of being resurrected by the
+		// next merge (#46).
+		docRemoveCollectionCard(current, card.id);
 		return null;
-	} else {
-		// Update quantity
-		const cardData = toStoredCollectionCard(existingCard, newQuantity);
-
-		await saveCollectionCard(_db, cardData);
-
-		const newCollection = store.collection.map((c) => (c.id === card.id ? cardData : c));
-		store.collection = newCollection;
-		triggerAutoSave();
-		return cardData;
 	}
+
+	docSetCollectionQuantity(current, card.id, owned);
+	return toStoredCollectionCard(existing, owned);
 }
 
-/**
- * Update card quantity in collection
- */
+/** Set the owned count outright — an assertion about the shelf, not an increment. */
 export async function updateCollectionQuantity(card: any, quantity: number) {
 	assertWritable();
-	const _db = await ensureDB();
 
 	if (quantity <= 0) {
-		return removeFromCollection(card, 9999);
+		return removeFromCollection(card, Number.MAX_SAFE_INTEGER);
 	}
 
-	const cardData = toStoredCollectionCard(card, quantity);
+	await cacheCardFacts([card]);
+	docUpsertCollectionCard(requireDoc(), card, quantity);
 
-	await cacheCardFacts([card], _db);
-	await saveCollectionCard(_db, cardData);
-
-	const existingIndex = store.collection.findIndex((c) => c.id === card.id);
-	if (existingIndex >= 0) {
-		const newCollection = [...store.collection];
-		newCollection[existingIndex] = cardData;
-		store.collection = newCollection;
-	} else {
-		store.collection = [...store.collection, cardData];
-	}
-
-	triggerAutoSave();
-	return cardData;
+	return toStoredCollectionCard(card, quantity);
 }
 
 /**
@@ -1332,9 +1537,10 @@ export async function importCardsToNewList(
 		}
 	}
 
-	// Create a new list, switch to it, then save with the imported cards
-	await createNewCardList();
-	await saveCardList(listName, newCards);
+	// Create a new list, switch to it, then fill it with the imported cards
+	const created = await createNewCardList();
+	docUpdateList(requireDoc(), created.id!, { name: listName });
+	await replaceListCards(created.id!, newCards);
 
 	return { success: newCards.length, failed, notFound };
 }
@@ -1369,151 +1575,115 @@ export function exportCollectionPreview(
 
 // ==================== CARD LIST FUNCTIONS ====================
 
-/**
- * Load all card lists from database
- */
+/** Re-read the lists from the document. */
 export async function loadCardLists() {
-	const _db = await ensureDB();
-
-	store.savedCardLists = await loadAllCardLists(_db);
-
-	// A database with no lists stays with no lists — one is created lazily the
-	// first time the user adds a card (see addCardToList).
-	store.currentCardListIndex = store.savedCardLists.length === 0 ? NaN : 0;
+	projectDocument();
+	return store.savedCardLists;
 }
 
-/**
- * Create new card list
- */
+/** A new, empty list, selected. Its UUID is stable for life (#47). */
 export async function createNewCardList() {
 	assertWritable();
-	const _db = await ensureDB();
+	const current = requireDoc();
 
-	const newList = createEmptyCardList();
-	const listId = await dbSaveCardList(_db, newList);
+	const id = docCreateList(current, 'A list');
+	store.currentCardListId = id;
 
-	const listWithId = { ...newList, id: listId };
-	const newLists = [...store.savedCardLists, listWithId];
-
-	store.savedCardLists = newLists;
-	store.currentCardListIndex = newLists.length - 1;
-
-	triggerAutoSave();
-	return listWithId;
+	return docReadList(current, id) as CardList;
 }
 
 /**
- * Save current card list with given name and cards
+ * Reconcile one list's cards to exactly this array.
+ *
+ * Per-card operations rather than a whole-row rewrite: two replicas touching
+ * two different cards in one deck commute this way, where a row rewrite made
+ * them a conflict. Cards absent from `cards` are deleted, which is a tombstone
+ * and therefore propagates.
  */
-export async function saveCardList(name: string, cards: any[]) {
-	assertWritable();
-	const _db = await ensureDB();
+export async function replaceListCards(listId: string, cards: Card[]): Promise<void> {
+	const current = requireDoc();
 
-	const index = store.currentCardListIndex;
-	const currentListData = store.savedCardLists[index];
+	// A list holds each printing once — it is a map keyed by card id. An import
+	// that names the same printing on two lines means four copies plus three,
+	// not "three, and forget the four", so duplicates accumulate here rather
+	// than the last one silently winning.
+	// eslint-disable-next-line svelte/prefer-svelte-reactivity -- local scratch collection, not reactive state
+	const incoming = new Map<string, Card>();
+	for (const card of cards) {
+		const seen = incoming.get(card.id);
+		incoming.set(
+			card.id,
+			seen ? { ...seen, LM_quantity: seen.LM_quantity + card.LM_quantity } : card
+		);
+	}
+	const existing = docReadList(current, listId)?.cards ?? [];
 
-	if (!currentListData) throw new Error('No card list selected');
+	current.transact(() => {
+		for (const card of existing) {
+			if (!incoming.has(card.id)) docRemoveListCard(current, listId, card.id);
+		}
+		for (const card of incoming.values()) {
+			docUpsertListCard(current, listId, card, card.LM_quantity);
+		}
+	});
 
-	// `toStoredListCard` is what drops Svelte's reactive proxies here — every
-	// whitelisted value is a primitive, so the copy is structured-cloneable
-	// without the `JSON.parse(JSON.stringify(...))` round trip this used to make
-	// over whole Scryfall objects (#84).
-	const updatedList: CardList = {
-		...$state.snapshot(currentListData),
-		name,
-		cards: cards.map((card) => toStoredListCard(card)),
-		updated_at: Date.now()
-	};
-
-	await dbSaveCardList(_db, updatedList);
-
-	const newLists = [...store.savedCardLists];
-	newLists[index] = updatedList;
-	store.savedCardLists = newLists;
-
-	triggerAutoSave();
-	return updatedList;
+	// Every mutator settles with the runes already rebuilt: the observer's
+	// microtask was queued inside the transaction above, so it runs before this
+	// continuation does. Callers get one contract, not two.
+	await Promise.resolve();
 }
 
-/**
- * Delete current card list
- */
+/** Delete the selected list. The tombstone is what makes it stay deleted. */
 export async function deleteCardList() {
 	assertWritable();
-	const _db = await ensureDB();
 
-	const index = store.currentCardListIndex;
-	const listToDelete = store.savedCardLists[index];
-
-	if (!listToDelete) {
+	const listId = store.currentCardListId;
+	if (!listId || !liveList(listId)) {
 		throw new Error('No card list selected');
 	}
 
-	if (listToDelete.id) {
-		await dbDeleteCardList(_db, listToDelete.id);
-	}
-
-	const remaining = store.savedCardLists.filter((_, i) => i !== index);
-	store.savedCardLists = remaining;
-	store.currentCardListIndex = remaining.length === 0 ? NaN : Math.max(0, index - 1);
-	triggerAutoSave();
+	docRemoveList(requireDoc(), listId);
+	// The observer picks the next list; clearing here keeps the intervening
+	// microtask from rendering a selection that no longer exists.
+	store.currentCardListId = null;
 }
 
 /**
- * Add all cards in the current list to the collection, respecting LM_quantity.
- * Returns counts of added and failed cards.
+ * Add every card in the current list to the collection, respecting LM_quantity.
  *
- * Deliberately not `addToCollection` in a loop (#62). That cost two IndexedDB
- * transactions per card, an O(n) copy of `store.collection` per card, and — via
- * the reassignment — a full ownership re-check and grid repaint per card, which
- * is what made a long list appear to cycle through itself. Here the merge
- * happens in memory against the collection we already hold, the whole batch
- * goes to disk in one transaction, and `store.collection` is assigned exactly
- * once, so the UI updates a single time.
- *
- * The batch is all-or-nothing, as an IndexedDB transaction is. The old
- * per-card `try/catch` could only ever have caught DB-level failures that would
- * have taken every other card down too, so nothing partial is lost by this.
+ * One transaction, so the observer rebuilds once and the grid repaints once —
+ * the same reason this was a single batched write before (#62), now expressed
+ * as a document transaction instead of an IndexedDB one.
  */
 export async function addAllToCollection(): Promise<{ added: number; failed: number }> {
 	assertWritable();
-	// Read the list off plain state rather than the `listCards` derived: this is a
-	// mutation path, not a render path, and it is the same value either way.
-	const currentList = store.savedCardLists[store.currentCardListIndex];
-	const cards = $state.snapshot(currentList?.cards ?? []) as any[];
+	const cards = liveList(store.currentCardListId)?.cards ?? [];
 	if (cards.length === 0) return { added: 0, failed: 0 };
 
 	try {
-		const _db = await ensureDB();
+		const current = requireDoc();
+		const merge = mergeCardsIntoCollection(liveCollection(), cards, toStoredCollectionCard);
 
-		const merge = mergeCardsIntoCollection(
-			$state.snapshot(store.collection) as CollectionCard[],
-			cards,
-			toStoredCollectionCard
-		);
-
-		// Only the touched rows need writing; the rest of the collection is untouched.
-		await saveCollectionCards(_db, merge.touched);
-
-		store.collection = merge.collection;
-		triggerAutoSave();
+		current.transact(() => {
+			for (const card of merge.touched) {
+				docUpsertCollectionCard(current, card, card.quantity_owned);
+			}
+		});
 
 		return { added: cards.length, failed: 0 };
 	} catch (e) {
-		logAppError('indexeddb', e, {
-			operation: 'addAllToCollection',
-			cardCount: cards.length
-		});
+		logAppError('indexeddb', e, { operation: 'addAllToCollection', cardCount: cards.length });
 		return { added: 0, failed: cards.length };
 	}
 }
 
-/**
- * Update list name
- */
+/** Rename the selected list. A rename is a rename: the id does not move. */
 export async function updateListName(name: string) {
 	assertWritable();
-	return saveCardList(name, $state.snapshot(store.listCards) as any[]);
+	const listId = store.currentCardListId;
+	if (!listId) throw new Error('No card list selected');
+
+	docUpdateList(requireDoc(), listId, { name });
 }
 
 /**
@@ -1521,84 +1691,42 @@ export async function updateListName(name: string) {
  */
 export async function updateListParams(params: Partial<OwnershipCheckParams>) {
 	assertWritable();
-	const _db = await ensureDB();
+	const listId = store.currentCardListId;
+	if (!listId) throw new Error('No card list selected');
 
-	const index = store.currentCardListIndex;
-	const currentListData = store.savedCardLists[index];
-
-	if (!currentListData) throw new Error('No card list selected');
-
-	const updatedList: CardList = {
-		...$state.snapshot(currentListData),
-		...params,
-		updated_at: Date.now()
-	};
-
-	await dbSaveCardList(_db, updatedList);
-
-	const newLists = [...store.savedCardLists];
-	newLists[index] = updatedList;
-	store.savedCardLists = newLists;
-
-	return updatedList;
+	docUpdateList(requireDoc(), listId, params);
 }
 
-/**
- * Add card to current list
- */
+/** Add one copy of a card to the current list, creating a list if there is none. */
 export async function addCardToList(card: any) {
 	assertWritable();
 
-	// No list yet (fresh or list-less database): create one on demand
 	if (!store.currentCardList) await createNewCardList();
+	const listId = store.currentCardListId!;
 
 	// Unconditionally, even when the card is already in the list: the list may
 	// have come from a file whose facts this device has never seen (#84).
 	await cacheCardFacts([card]);
 
-	const cards = store.listCards;
-	const name = store.currentCardList?.name || 'Nuovo mazzo';
-
-	const existingIndex = cards.findIndex((item) => item.id === card.id);
-	let newCards;
-
-	if (existingIndex !== -1) {
-		newCards = [...cards];
-		newCards[existingIndex] = {
-			...newCards[existingIndex],
-			LM_quantity: newCards[existingIndex].LM_quantity + 1
-		};
-	} else {
-		newCards = [...cards, toStoredListCard(card, 1)];
-	}
-
-	return saveCardList(name, newCards);
+	const existing = liveList(listId)?.cards.find((item) => item.id === card.id);
+	docUpsertListCard(requireDoc(), listId, card, (existing?.LM_quantity ?? 0) + 1);
 }
 
-/**
- * Remove card from current list
- */
+/** Remove one copy; the card itself goes when the last copy does. */
 export async function removeCardFromList(card: any) {
 	assertWritable();
-	const cards = store.listCards;
-	const name = store.currentCardList?.name || 'Nuovo mazzo';
 
-	const existingIndex = cards.findIndex((item) => item.id === card.id);
-	if (existingIndex === -1) return;
+	const listId = store.currentCardListId;
+	if (!listId) return;
 
-	let newCards;
+	const existing = liveList(listId)?.cards.find((item) => item.id === card.id);
+	if (!existing) return;
 
-	if (cards[existingIndex].LM_quantity > 1) {
-		newCards = [...cards];
-		newCards[existingIndex] = toStoredListCard(
-			newCards[existingIndex],
-			newCards[existingIndex].LM_quantity - 1
-		);
+	if (existing.LM_quantity > 1) {
+		docSetListCardQuantity(requireDoc(), listId, card.id, existing.LM_quantity - 1);
 	} else {
-		newCards = cards.filter((_, i) => i !== existingIndex);
+		docRemoveListCard(requireDoc(), listId, card.id);
 	}
-
-	return saveCardList(name, newCards);
 }
 
 /**
@@ -1659,7 +1787,11 @@ export async function importListFromText(
 	}
 	const newCards = [...cardMap.values()];
 
-	return saveCardList(newName, newCards);
+	const listId = store.currentCardListId!;
+	docUpdateList(requireDoc(), listId, { name: newName });
+	await replaceListCards(listId, newCards);
+
+	return docReadList(requireDoc(), listId) as CardList;
 }
 
 /**

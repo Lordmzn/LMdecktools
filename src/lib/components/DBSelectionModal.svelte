@@ -2,7 +2,7 @@
 	import { onMount } from 'svelte';
 	let { show = $bindable(false) } = $props();
 	import BrandMark from '$lib/components/BrandMark.svelte';
-	import { checkLocalDatabase } from '$lib/db';
+	import { localDatabaseExists } from '$lib/store.svelte';
 	import { getImageCacheStats, clearImageCache, formatBytes } from '$lib/image-cache';
 	import {
 		store,
@@ -156,7 +156,7 @@
 			now = Date.now();
 		}, 60_000);
 		if (store.dbMode === 'none') {
-			checkLocalDatabase().then(
+			localDatabaseExists().then(
 				(res) => {
 					if (res) {
 						peekDB();

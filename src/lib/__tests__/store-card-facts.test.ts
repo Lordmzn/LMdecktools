@@ -6,6 +6,7 @@
  * draws after a reload, without its art ever entering the user's data file.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { resetDatabases } from './reset';
 import { openDatabase } from '../db';
 import { loadCardFacts } from '../card-facts';
 import {
@@ -40,17 +41,13 @@ function searchResult(id: string, name: string) {
 
 afterEach(async () => {
 	vi.restoreAllMocks();
-	closeDB();
+	await closeDB();
 	store.dbMode = 'none';
 	store.collection = [];
 	store.savedCardLists = [];
-	store.currentCardListIndex = NaN;
+	store.currentCardListId = null;
 	store.cardFacts = {};
-	await new Promise<void>((resolve, reject) => {
-		const req = indexedDB.deleteDatabase('LMdecktools');
-		req.onsuccess = () => resolve();
-		req.onerror = () => reject(req.error);
-	});
+	await resetDatabases();
 });
 
 describe('adding a card', () => {
@@ -81,7 +78,7 @@ describe('adding a card', () => {
 
 	it('keeps the facts across a reload of the database', async () => {
 		await addToCollection(searchResult('bolt', 'Lightning Bolt'), 1);
-		closeDB();
+		await closeDB();
 
 		const db = await openDatabase();
 		expect(await loadCardFacts(db)).toHaveProperty('bolt');

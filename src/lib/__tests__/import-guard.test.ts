@@ -7,46 +7,55 @@ import {
 	APP_NAME
 } from '../import-guard';
 import * as Y from 'yjs';
+import { DOC_SCHEMA_VERSION, createDocument, seedDocument, updateFor } from '../ydoc';
+
+const CURRENT_VERSION = String(DOC_SCHEMA_VERSION);
 
 function encode(value: unknown): Uint8Array {
 	return new TextEncoder().encode(JSON.stringify(value));
 }
 
-/** A minimal genuine export, as `exportWithMetadata()` writes it. */
-function yjsExport(options: {
+/**
+ * A document payload, as a linked file or a peer now carries it (#47).
+ *
+ * `app` and `version` are overridable so the foreign-file cases can build one
+ * that claims to be something else — which a real stranger's file would.
+ */
+function documentExport(options: {
 	app?: string;
 	version?: string;
+	guid?: string;
 	lists?: { name: string }[];
 	cards?: { id: string; name: string }[];
-	totalLists?: number;
-	totalCards?: number;
+	createdAt?: number;
 }): Uint8Array {
-	const ydoc = new Y.Doc();
-	const meta = ydoc.getMap('metadata');
-	if (options.app !== undefined) meta.set('app', options.app);
-	if (options.version !== undefined) meta.set('version', options.version);
-	meta.set('exported_at', 1_755_000_000_000);
-	if (options.totalLists !== undefined) meta.set('total_lists', options.totalLists);
-	if (options.totalCards !== undefined) meta.set('total_cards', options.totalCards);
+	const doc = createDocument(options.guid);
 
-	const yLists = ydoc.getMap('card_lists');
-	for (const list of options.lists ?? []) {
-		const yList = new Y.Map();
-		yList.set('name', list.name);
-		yList.set('cards', new Y.Map());
-		yLists.set(list.name, yList);
-	}
+	const meta = doc.getMap('meta');
+	doc.transact(() => {
+		if (options.app === undefined) meta.delete('app');
+		else meta.set('app', options.app);
 
-	const yCollection = ydoc.getMap('collection');
-	for (const card of options.cards ?? []) {
-		const yCard = new Y.Map();
-		yCard.set('id', card.id);
-		yCard.set('name', card.name);
-		yCard.set('quantity_owned', 1);
-		yCollection.set(card.id, yCard);
-	}
+		if (options.version === undefined) meta.delete('schema_version');
+		else meta.set('schema_version', Number(options.version));
 
-	return Y.encodeStateAsUpdate(ydoc);
+		meta.set('created_at', options.createdAt ?? 1_755_000_000_000);
+	});
+
+	seedDocument(doc, {
+		cardLists: (options.lists ?? []).map((list, i) => ({
+			id: `list-${i}`,
+			name: list.name,
+			cards: [],
+			cardMatching: 'generic' as const,
+			languageMatching: 'any' as const,
+			created_at: i,
+			updated_at: i
+		})),
+		collection: (options.cards ?? []).map((card) => ({ ...card, quantity_owned: 1 }))
+	});
+
+	return updateFor(doc);
 }
 
 describe('parseImportFile — foreign files are refused', () => {
@@ -80,14 +89,42 @@ describe('parseImportFile — foreign files are refused', () => {
 		expect(() => parseImportFile(data)).toThrow(/version 9\.9/);
 	});
 
-	it('rejects a Yjs document that names another application', () => {
-		const data = yjsExport({ app: 'Archidekt', version: '1.0', lists: [{ name: 'Deck' }] });
+	it('rejects a document that names another application', () => {
+		const data = documentExport({
+			app: 'Archidekt',
+			version: CURRENT_VERSION,
+			lists: [{ name: 'Deck' }]
+		});
 
 		expect(() => parseImportFile(data)).toThrow(/exported by "Archidekt"/);
 	});
 
-	it('rejects a Yjs document with neither app metadata nor content', () => {
-		expect(() => parseImportFile(yjsExport({}))).toThrow(new RegExp(`not an ${APP_NAME} export`));
+	it('rejects a document with neither app metadata nor content', () => {
+		expect(() => parseImportFile(documentExport({ app: undefined, version: undefined }))).toThrow(
+			new RegExp(`not an ${APP_NAME} export`)
+		);
+	});
+
+	it('rejects a document written by a schema this build predates', () => {
+		const data = documentExport({ app: APP_NAME, version: '99', lists: [{ name: 'Deck' }] });
+
+		expect(() => parseImportFile(data)).toThrow(/version 99/);
+	});
+
+	it('rejects the retired 1.0 snapshot format', () => {
+		// A snapshot has no lineage to adopt, and the alpha owes it no support:
+		// restoring one would produce a database no other device could sync with.
+		const snapshot = new Y.Doc();
+		const meta = snapshot.getMap('metadata');
+		meta.set('app', APP_NAME);
+		meta.set('version', '1.0');
+		const lists = snapshot.getMap('card_lists');
+		const list = new Y.Map();
+		list.set('name', 'Commander');
+		list.set('cards', new Y.Map());
+		lists.set('Commander', list);
+
+		expect(() => parseImportFile(Y.encodeStateAsUpdate(snapshot))).toThrow(/version 1\.0/);
 	});
 
 	it('every rejection names the file and says nothing was changed', () => {
@@ -105,24 +142,41 @@ describe('parseImportFile — foreign files are refused', () => {
 });
 
 describe('parseImportFile — genuine exports are accepted', () => {
-	it('accepts a current Yjs export and reports its metadata', () => {
-		const data = yjsExport({
+	it('accepts a current document export and reports its metadata', () => {
+		const data = documentExport({
 			app: APP_NAME,
-			version: '1.0',
+			version: CURRENT_VERSION,
 			lists: [{ name: 'Commander' }],
-			cards: [{ id: 'id-bolt', name: 'Lightning Bolt' }],
-			totalLists: 1,
-			totalCards: 1
+			cards: [{ id: 'id-bolt', name: 'Lightning Bolt' }]
 		});
 
 		const payload = parseImportFile(data);
 
-		expect(payload.format).toBe('yjs');
+		expect(payload.format).toBe('document');
 		expect(payload.app).toBe(APP_NAME);
-		expect(payload.version).toBe('1.0');
+		expect(payload.version).toBe(CURRENT_VERSION);
 		expect(payload.exportedAt).toBe(1_755_000_000_000);
 		expect(payload.cardLists).toHaveLength(1);
 		expect(payload.collection).toHaveLength(1);
+	});
+
+	it('reports the lineage, which is what decides merge from union (C4)', () => {
+		const payload = parseImportFile(
+			documentExport({
+				app: APP_NAME,
+				version: CURRENT_VERSION,
+				guid: 'known-lineage',
+				lists: [{ name: 'Commander' }]
+			})
+		);
+
+		expect(payload.guid).toBe('known-lineage');
+	});
+
+	it('reports no lineage for a plain-JSON payload, which has none', () => {
+		const payload = parseImportFile(encode({ app: APP_NAME, cardLists: [{ name: 'Deck' }] }));
+
+		expect(payload.guid).toBeNull();
 	});
 
 	it('accepts a legacy JSON export with no app field but recognisable keys', () => {
@@ -141,9 +195,12 @@ describe('parseImportFile — genuine exports are accepted', () => {
 		expect(payload.cardLists).toHaveLength(1);
 	});
 
-	it('accepts a Yjs export from before total_lists/total_cards were written', () => {
+	it('carries no declared counts for a document, which cannot be truncated silently', () => {
+		// A truncated Yjs update fails to decode, which the guard turns into
+		// "unrecognised format" — the declared-count check belongs to the JSON
+		// path, where a file really can lie about what it holds.
 		const payload = parseImportFile(
-			yjsExport({ app: APP_NAME, version: '1.0', lists: [{ name: 'Commander' }] })
+			documentExport({ app: APP_NAME, version: CURRENT_VERSION, lists: [{ name: 'Commander' }] })
 		);
 
 		expect(payload.declaredLists).toBeNull();
@@ -153,35 +210,32 @@ describe('parseImportFile — genuine exports are accepted', () => {
 
 describe('parseImportFile — declared counts guard truncation', () => {
 	it('rejects a file that declares more lists than it carries', () => {
-		const data = yjsExport({
+		const data = encode({
 			app: APP_NAME,
-			version: '1.0',
-			lists: [{ name: 'Commander' }],
-			totalLists: 4
+			cardLists: [{ name: 'Commander' }],
+			total_lists: 4
 		});
 
 		expect(() => parseImportFile(data)).toThrow(/declares 4 card lists but contains 1/);
 	});
 
 	it('rejects a file that declares more collection cards than it carries', () => {
-		const data = yjsExport({
+		const data = encode({
 			app: APP_NAME,
-			version: '1.0',
-			cards: [{ id: 'id-bolt', name: 'Lightning Bolt' }],
-			totalCards: 312
+			collection: [{ id: 'id-bolt', name: 'Lightning Bolt' }],
+			total_cards: 312
 		});
 
 		expect(() => parseImportFile(data)).toThrow(/declares 312 collection cards but contains 1/);
 	});
 
 	it('accepts a file whose declared counts match', () => {
-		const data = yjsExport({
+		const data = encode({
 			app: APP_NAME,
-			version: '1.0',
-			lists: [{ name: 'Commander' }],
-			cards: [{ id: 'id-bolt', name: 'Lightning Bolt' }],
-			totalLists: 1,
-			totalCards: 1
+			cardLists: [{ name: 'Commander' }],
+			collection: [{ id: 'id-bolt', name: 'Lightning Bolt' }],
+			total_lists: 1,
+			total_cards: 1
 		});
 
 		expect(() => parseImportFile(data)).not.toThrow();
@@ -208,9 +262,9 @@ describe('assertRestorable', () => {
 describe('describeImport', () => {
 	it('summarises what the user is about to restore', () => {
 		const payload = parseImportFile(
-			yjsExport({
+			documentExport({
 				app: APP_NAME,
-				version: '1.0',
+				version: CURRENT_VERSION,
 				lists: [{ name: 'Commander' }, { name: 'Modern' }],
 				cards: [{ id: 'id-bolt', name: 'Lightning Bolt' }]
 			})
@@ -218,7 +272,7 @@ describe('describeImport', () => {
 
 		const summary = describeImport(payload);
 
-		expect(summary).toContain(`${APP_NAME} v1.0`);
+		expect(summary).toContain(`${APP_NAME} v${CURRENT_VERSION}`);
 		expect(summary).toContain('2 lists, 1 collection card');
 	});
 

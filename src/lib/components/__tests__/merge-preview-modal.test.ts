@@ -34,9 +34,10 @@ function rows(): [string, string][] {
 
 function preview(overrides: Partial<MergePreview> = {}): MergePreview {
 	return {
-		collection: { added: 0, fromNewCards: 0 },
+		collection: { added: 0, fromNewCards: 0, removed: 0 },
 		lists: [],
 		unchanged: false,
+		operation: 'union',
 		...overrides
 	};
 }
@@ -47,12 +48,12 @@ describe('MergePreviewModal', () => {
 	it('names the collection first, ahead of every list', () => {
 		show(
 			preview({
-				collection: { added: 12, fromNewCards: 9 },
+				collection: { added: 12, fromNewCards: 9, removed: 0 },
 				lists: [
 					{
 						name: 'Atraxa',
 						status: 'updated',
-						delta: { added: 4, fromNewCards: 3 },
+						delta: { added: 4, fromNewCards: 3, removed: 0 },
 						settingsChanged: false
 					}
 				]
@@ -69,7 +70,7 @@ describe('MergePreviewModal', () => {
 					{
 						name: 'Atraxa',
 						status: 'updated',
-						delta: { added: 4, fromNewCards: 3 },
+						delta: { added: 4, fromNewCards: 3, removed: 0 },
 						settingsChanged: false
 					}
 				]
@@ -86,13 +87,13 @@ describe('MergePreviewModal', () => {
 					{
 						name: 'All New',
 						status: 'updated',
-						delta: { added: 4, fromNewCards: 4 },
+						delta: { added: 4, fromNewCards: 4, removed: 0 },
 						settingsChanged: false
 					},
 					{
 						name: 'Top Ups',
 						status: 'updated',
-						delta: { added: 4, fromNewCards: 0 },
+						delta: { added: 4, fromNewCards: 0, removed: 0 },
 						settingsChanged: false
 					}
 				]
@@ -112,7 +113,7 @@ describe('MergePreviewModal', () => {
 					{
 						name: 'Modern Burn',
 						status: 'added',
-						delta: { added: 60, fromNewCards: 60 },
+						delta: { added: 60, fromNewCards: 60, removed: 0 },
 						settingsChanged: false
 					}
 				]
@@ -129,7 +130,7 @@ describe('MergePreviewModal', () => {
 					{
 						name: 'Atraxa',
 						status: 'updated',
-						delta: { added: 0, fromNewCards: 0 },
+						delta: { added: 0, fromNewCards: 0, removed: 0 },
 						settingsChanged: true
 					}
 				]
@@ -146,7 +147,7 @@ describe('MergePreviewModal', () => {
 					{
 						name: 'Atraxa',
 						status: 'updated',
-						delta: { added: 1, fromNewCards: 1 },
+						delta: { added: 1, fromNewCards: 1, removed: 0 },
 						settingsChanged: false
 					}
 				]
@@ -174,20 +175,69 @@ describe('MergePreviewModal', () => {
 		expect(failed.getByTestId('merge-preview-error')).toHaveTextContent('boom');
 	});
 
-	it('promises that nothing is removed, which is the reassurance the merge rests on', () => {
+	/**
+	 * Same bytes, two operations (#47, C4). A union never removes anything; a
+	 * merge with this database's own lineage can, and the modal has to say which
+	 * one the user is looking at before they commit to it.
+	 */
+	it('promises that nothing is removed when the file is unioned in', () => {
 		const { getByRole } = show(
 			preview({
+				operation: 'union',
 				lists: [
 					{
 						name: 'Atraxa',
 						status: 'updated',
-						delta: { added: 1, fromNewCards: 1 },
+						delta: { added: 1, fromNewCards: 1, removed: 0 },
 						settingsChanged: false
 					}
 				]
 			})
 		);
 
-		expect(within(getByRole('dialog')).getByText(/Nothing will be removed/)).toBeInTheDocument();
+		expect(
+			within(getByRole('dialog')).getByText(/nothing of yours is removed/)
+		).toBeInTheDocument();
+	});
+
+	it('warns that a merge carries deletions across', () => {
+		const { getByRole } = show(
+			preview({
+				operation: 'merge',
+				lists: [
+					{
+						name: 'Atraxa',
+						status: 'updated',
+						delta: { added: 0, fromNewCards: 0, removed: 3 },
+						settingsChanged: false
+					}
+				]
+			})
+		);
+
+		const dialog = within(getByRole('dialog'));
+		expect(dialog.getByText(/including anything deleted there/)).toBeInTheDocument();
+		// The change users will not expect, spelled out rather than netted off.
+		expect(dialog.getByText('3 cards removed')).toBeInTheDocument();
+	});
+
+	it('names a list deleted on the other device', () => {
+		const { getByRole } = show(
+			preview({
+				operation: 'merge',
+				lists: [
+					{
+						name: 'Retired Deck',
+						status: 'removed',
+						delta: { added: 0, fromNewCards: 0, removed: 60 },
+						settingsChanged: false
+					}
+				]
+			})
+		);
+
+		expect(
+			within(getByRole('dialog')).getByText(/list deleted on the other device/)
+		).toBeInTheDocument();
 	});
 });

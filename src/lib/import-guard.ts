@@ -10,21 +10,36 @@
 
 import type { CardList, CollectionCard } from './db';
 import * as m from './paraglide/messages';
-import { importWithMetadata } from './yjs-integration';
+import { DOC_SCHEMA_VERSION, readPayload } from './ydoc';
 
 export const APP_NAME = 'LM Deck Tools';
 
-/** Export format versions this build can read. `exportWithMetadata()` writes the last one. */
-export const SUPPORTED_VERSIONS = ['1.0'];
+/**
+ * Payload versions this build can read.
+ *
+ * `1.0` was the snapshot format — a fresh `Y.Doc` per save, no history and no
+ * lineage. `2` is the document (#47). The alpha owes no backward compatibility,
+ * so 1.0 is gone rather than supported: a snapshot has no guid to adopt, and
+ * pretending otherwise would produce a database that no other device could
+ * ever sync with.
+ */
+export const SUPPORTED_VERSIONS = [String(DOC_SCHEMA_VERSION)];
 
 export interface ImportPayload {
-	format: 'json' | 'yjs';
+	format: 'json' | 'document';
 	cardLists: CardList[];
 	collection: CollectionCard[];
 	/** Metadata as found in the file. Null where the file does not carry the field. */
 	app: string | null;
 	version: string | null;
 	exportedAt: number | null;
+	/**
+	 * The lineage the payload belongs to (#47). Equal to the local document's
+	 * guid means the file is a replica of this database and applying it is a
+	 * *merge*; anything else is a foreign lineage and gets the *union*. Null for
+	 * a plain-JSON payload, which has no lineage at all.
+	 */
+	guid: string | null;
 	/** Counts the file claims for itself, used as a truncation check. Absent in pre-#52 exports. */
 	declaredLists: number | null;
 	declaredCards: number | null;
@@ -117,34 +132,56 @@ function parseJSONPayload(raw: unknown): ImportPayload {
 		app,
 		version,
 		exportedAt: asNumber(source.exported_at),
+		guid: null,
 		declaredLists: asNumber(source.total_lists),
 		declaredCards: asNumber(source.total_cards)
 	};
 }
 
-function parseYjsPayload(data: Uint8Array): ImportPayload {
-	let decoded: ReturnType<typeof importWithMetadata>;
+/**
+ * Decode a document payload, without adopting it.
+ *
+ * The guid comes out with the rest, which is what lets `inspectImportFile()`
+ * tell the DB modal whether this file will be merged into the local lineage or
+ * unioned in as a stranger's — same bytes, different results (C4).
+ */
+function parseDocumentPayload(data: Uint8Array): ImportPayload {
+	let decoded: ReturnType<typeof readPayload>;
 	try {
-		decoded = importWithMetadata(data);
+		decoded = readPayload(data);
 	} catch {
 		throw new ImportValidationError(m.import_error_unrecognised_format());
 	}
 
-	const { cardLists, collection, metadata } = decoded;
-	const app = asString(metadata.app);
-	const version = asString(metadata.version);
+	const { cardLists, collection, meta, legacyVersion } = decoded;
+
+	// A 1.0 snapshot decodes cleanly and carries lists — it just has no lineage.
+	// Refused by name rather than accepted as a legacy export, because adopting
+	// one would leave the database unable to sync with the device it came from.
+	if (legacyVersion !== undefined && !SUPPORTED_VERSIONS.includes(legacyVersion)) {
+		throw new ImportValidationError(
+			m.import_error_unsupported_version({
+				version: legacyVersion,
+				supported: SUPPORTED_VERSIONS.join(', ')
+			})
+		);
+	}
+
+	const app = asString(meta.app);
+	const version = meta.schema_version === undefined ? null : String(meta.schema_version);
 	// A foreign binary that happens to decode yields empty maps and no app name
 	checkIdentity(app, version, cardLists.length > 0 || collection.length > 0);
 
 	return {
-		format: 'yjs',
-		cardLists,
+		format: 'document',
+		cardLists: cardLists as CardList[],
 		collection,
 		app,
 		version,
-		exportedAt: asNumber(metadata.exported_at),
-		declaredLists: asNumber(metadata.total_lists),
-		declaredCards: asNumber(metadata.total_cards)
+		exportedAt: asNumber(meta.created_at),
+		guid: asString(meta.guid),
+		declaredLists: null,
+		declaredCards: null
 	};
 }
 
@@ -157,7 +194,7 @@ export function parseImportFile(data: Uint8Array): ImportPayload {
 	try {
 		json = JSON.parse(new TextDecoder().decode(data));
 	} catch {
-		return checkedPayload(parseYjsPayload(data));
+		return checkedPayload(parseDocumentPayload(data));
 	}
 
 	return checkedPayload(parseJSONPayload(json));

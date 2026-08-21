@@ -1,12 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { resetDatabases } from './reset';
 import { exportCollectionToText, exportCollectionToCSV } from '../store.svelte';
-import {
-	openDatabase,
-	saveCardList,
-	loadAllCardLists,
-	createEmptyCardList,
-	type CardList
-} from '../db';
+import { openDatabase } from '../db';
+import { createDocument, destroyPersistence, seedDocument, updateFor } from '../ydoc';
 
 // Mock the store's collection for the export functions
 // They read `store.collection` internally (a rune), so we mock the module and
@@ -114,31 +110,40 @@ describe('exportCollectionToCSV', () => {
 // See store-guards.test.ts for write guard and dbMode transition tests.
 // They live in a separate file to avoid vi.mock conflicts with the mock above.
 
-// ==================== PLANNED: Database Import ====================
+// ==================== Database Import ====================
 
 describe('Database Import', () => {
 	let db: IDBDatabase;
 
 	beforeEach(async () => {
 		db = await openDatabase();
+		const { initDB } = await import('../store.svelte');
+		await initDB();
 	});
 
 	afterEach(async () => {
+		const { closeDB, store } = await import('../store.svelte');
+		await closeDB();
+		store.dbMode = 'none';
+		store.savedCardLists = [];
+		store.collection = [];
+		store.currentCardListId = null;
 		db.close();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await destroyPersistence();
+		await resetDatabases();
 	});
 
-	// #52 — restoring is destructive, so an unusable file must not reach clearDatabase()
+	// #52 — restoring is destructive, so an unusable file must never reach the
+	// point where the local lineage is thrown away.
 	async function seedOneList(): Promise<void> {
-		await saveCardList(db, {
-			...createEmptyCardList(),
-			name: 'Precious Local List',
-			cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]
-		});
+		const { createNewCardList, updateListName, replaceListCards } = await import('../store.svelte');
+		const list = await createNewCardList();
+		await updateListName('Precious Local List');
+		await replaceListCards(list.id!, [{ id: 'c1', name: 'Bolt', LM_quantity: 4 }]);
+	}
+
+	function localListNames(lists: { name: string }[]): string[] {
+		return lists.map((l) => l.name);
 	}
 
 	it('leaves the database untouched when the file belongs to another app', async () => {
@@ -147,99 +152,89 @@ describe('Database Import', () => {
 			JSON.stringify({ app: 'Moxfield', cardLists: [{ name: 'Theirs' }] })
 		);
 
-		const { importDatabase } = await import('../store.svelte');
-		await expect(importDatabase(db, foreign, false)).rejects.toThrow(/not LM Deck Tools/);
+		const { importDatabase, store } = await import('../store.svelte');
+		await expect(importDatabase(foreign, false)).rejects.toThrow(/not LM Deck Tools/);
 
-		const survivors = await loadAllCardLists(db);
-		expect(survivors.map((l) => l.name)).toEqual(['Precious Local List']);
+		expect(localListNames(store.savedCardLists)).toEqual(['Precious Local List']);
 	});
 
 	it('leaves the database untouched when the file is unrelated JSON', async () => {
 		await seedOneList();
 		const unrelated = new TextEncoder().encode(JSON.stringify({ tasks: ['buy milk'] }));
 
-		const { importDatabase } = await import('../store.svelte');
-		await expect(importDatabase(db, unrelated, false)).rejects.toThrow(/not an LM Deck Tools/);
+		const { importDatabase, store } = await import('../store.svelte');
+		await expect(importDatabase(unrelated, false)).rejects.toThrow(/not an LM Deck Tools/);
 
-		expect(await loadAllCardLists(db)).toHaveLength(1);
+		expect(store.savedCardLists).toHaveLength(1);
 	});
 
 	it('leaves the database untouched when the export is empty', async () => {
 		await seedOneList();
 		const empty = new TextEncoder().encode(
-			JSON.stringify({ app: 'LM Deck Tools', version: '1.0', cardLists: [], collection: [] })
+			JSON.stringify({ app: 'LM Deck Tools', version: '2', cardLists: [], collection: [] })
 		);
 
-		const { importDatabase } = await import('../store.svelte');
-		await expect(importDatabase(db, empty, false)).rejects.toThrow(/Create New Database/);
+		const { importDatabase, store } = await import('../store.svelte');
+		await expect(importDatabase(empty, false)).rejects.toThrow(/Create New Database/);
 
-		expect(await loadAllCardLists(db)).toHaveLength(1);
+		expect(store.savedCardLists).toHaveLength(1);
 	});
 
-	// [planned] Import a database from a .yjs file
-	it('imports card lists from a Yjs binary file', async () => {
-		// First, export card lists to get binary data via a different path
-		const { exportCardListsAsYjs } = await import('../yjs-integration');
-		const cardLists: CardList[] = [
-			{
-				name: 'Imported List',
-				cards: [{ id: 'c1', name: 'Sol Ring', LM_quantity: 1 }],
-				cardMatching: 'generic',
-				languageMatching: 'any',
-				created_at: Date.now(),
-				updated_at: Date.now()
-			}
-		];
-		const yjsData = exportCardListsAsYjs(cardLists);
+	it('adopts the lineage of a restored document rather than copying its values', async () => {
+		await seedOneList();
 
-		// importDatabase should handle Yjs binary format
-		// Currently it throws "Invalid file format" for non-JSON data
-		const { importDatabase } = await import('../store.svelte');
-		const result = await importDatabase(db, yjsData, false);
-
-		expect(result.imported).toBe(1);
-		expect(result.errors).toBe(0);
-
-		const loaded = await loadAllCardLists(db);
-		expect(loaded).toHaveLength(1);
-		expect(loaded[0].name).toBe('Imported List');
-	});
-
-	// [planned] Import with merge
-	it('merges imported card lists with existing data', async () => {
-		// Save an existing list
-		const existing: CardList = {
-			...createEmptyCardList(),
-			name: 'Existing List',
-			cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 2 }]
-		};
-		await saveCardList(db, existing);
-
-		// Create JSON import data with same list name
-		const importData = JSON.stringify({
+		// A file from another device: its own guid, which the restore must take on
+		// — otherwise the restored database is a stranger to every replica of it.
+		const source = createDocument();
+		seedDocument(source, {
 			cardLists: [
 				{
-					name: 'Existing List',
+					id: 'list-imported',
+					name: 'Imported List',
+					cards: [{ id: 'c1', name: 'Sol Ring', LM_quantity: 1 }],
+					cardMatching: 'generic',
+					languageMatching: 'any',
+					created_at: 1,
+					updated_at: 2
+				}
+			],
+			collection: []
+		});
+
+		const { importDatabase, documentGuid, store } = await import('../store.svelte');
+		const result = await importDatabase(updateFor(source), false);
+
+		expect(result.errors).toBe(0);
+		expect(localListNames(store.savedCardLists)).toEqual(['Imported List']);
+		expect(documentGuid()).toBe(source.guid);
+	});
+
+	it('unions a foreign document in when merging rather than replacing', async () => {
+		await seedOneList();
+
+		const source = createDocument();
+		seedDocument(source, {
+			cardLists: [
+				{
+					id: 'list-theirs',
+					name: 'Precious Local List',
 					cards: [{ id: 'c1', name: 'Bolt', LM_quantity: 3 }],
 					cardMatching: 'generic',
 					languageMatching: 'any',
-					created_at: Date.now(),
-					updated_at: Date.now()
+					created_at: 1,
+					updated_at: 2
 				}
-			]
+			],
+			collection: []
 		});
-		const data = new TextEncoder().encode(importData);
 
-		const { importDatabase } = await import('../store.svelte');
-		const result = await importDatabase(db, data, true);
+		const { importDatabase, store } = await import('../store.svelte');
+		const result = await importDatabase(updateFor(source), true);
 
-		expect(result.merged).toBe(1);
 		expect(result.errors).toBe(0);
-
-		const loaded = await loadAllCardLists(db);
-		expect(loaded).toHaveLength(1);
-		// Merged quantities: 2 + 3 = 5
-		expect(loaded[0].cards[0].LM_quantity).toBe(5);
+		expect(store.savedCardLists).toHaveLength(1);
+		// Union semantics: the higher count wins, and nothing local is lost.
+		expect(store.savedCardLists[0].cards[0].LM_quantity).toBe(4);
 	});
 });
 

@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { resetDatabases } from './reset';
 import { openDatabase } from '../db';
 import {
 	logError,
@@ -24,11 +25,7 @@ describe('Error Journal', () => {
 
 	afterEach(async () => {
 		db.close();
-		await new Promise<void>((resolve, reject) => {
-			const req = indexedDB.deleteDatabase('LMdecktools');
-			req.onsuccess = () => resolve();
-			req.onerror = () => reject(req.error);
-		});
+		await resetDatabases();
 	});
 
 	/** Write an entry straight to the store so its timestamp can be backdated. */

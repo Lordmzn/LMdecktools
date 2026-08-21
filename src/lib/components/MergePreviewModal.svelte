@@ -30,6 +30,16 @@
 
 	/** "4 cards added (3 new)" — the parenthetical only where it says something. */
 	function describeDelta(delta: CardsDelta): string {
+		const removed =
+			delta.removed === 1
+				? m.merge_delta_removed_one({ count: delta.removed })
+				: m.merge_delta_removed_other({ count: delta.removed });
+
+		// Removals are the class of change the app could never produce before #47,
+		// so they are the one a user will not expect — never folded into a net
+		// number, and never left out.
+		if (delta.added === 0 && delta.removed > 0) return removed;
+
 		const added =
 			delta.added === 1
 				? m.merge_delta_added_one({ count: delta.added })
@@ -37,12 +47,19 @@
 
 		// All copies new: "(4 new)" after "4 cards added" is noise. None new: every
 		// copy tops up a card already held, which "N cards added" alone implies wrongly.
-		if (delta.fromNewCards === delta.added) return added;
-		if (delta.fromNewCards === 0) return `${added} ${m.merge_delta_all_copies()}`;
-		return `${added} ${m.merge_delta_new({ count: delta.fromNewCards })}`;
+		const gained =
+			delta.fromNewCards === delta.added
+				? added
+				: delta.fromNewCards === 0
+					? `${added} ${m.merge_delta_all_copies()}`
+					: `${added} ${m.merge_delta_new({ count: delta.fromNewCards })}`;
+
+		return delta.removed > 0 ? `${gained} · ${removed}` : gained;
 	}
 
 	function describeList(detail: MergePreview['lists'][number]): string {
+		if (detail.status === 'removed') return m.merge_delta_list_removed();
+
 		if (detail.status === 'added') {
 			return detail.delta.added === 1
 				? m.merge_delta_new_list_one({ count: detail.delta.added })
@@ -51,7 +68,7 @@
 
 		// A list can be in the merge purely because the newer side owns the
 		// matching settings, with not a single card moving.
-		if (detail.delta.added === 0) return m.merge_delta_settings();
+		if (detail.delta.added === 0 && detail.delta.removed === 0) return m.merge_delta_settings();
 		if (detail.settingsChanged) {
 			return `${describeDelta(detail.delta)} · ${m.merge_delta_settings()}`;
 		}
@@ -59,7 +76,9 @@
 	}
 
 	let hasChanges = $derived(preview !== null && !preview.unchanged);
-	let showsCollection = $derived(preview !== null && preview.collection.added > 0);
+	let showsCollection = $derived(
+		preview !== null && (preview.collection.added > 0 || preview.collection.removed > 0)
+	);
 
 	function handleKeydown(event: KeyboardEvent) {
 		if (show && event.key === 'Escape') oncancel();
@@ -120,7 +139,9 @@
 							<span
 								class="text-right text-xs whitespace-nowrap {detail.status === 'added'
 									? 'text-success'
-									: 'text-slate-400'}"
+									: detail.status === 'removed'
+										? 'text-warning'
+										: 'text-slate-400'}"
 							>
 								{describeList(detail)}
 							</span>
@@ -128,7 +149,13 @@
 					{/each}
 				</ul>
 
-				<p class="mb-5 text-xs text-slate-500">{m.merge_preview_additive()}</p>
+				<!-- Same bytes, two different operations (C4). A file from this
+				     database's own lineage is a *merge* and can delete things; a
+				     stranger's file is a *union* and never can. The user is entitled
+				     to know which one they are about to run. -->
+				<p class="mb-5 text-xs text-slate-500" data-testid="merge-preview-operation">
+					{preview.operation === 'merge' ? m.merge_preview_op_merge() : m.merge_preview_op_union()}
+				</p>
 			{/if}
 
 			<div class="flex gap-3">

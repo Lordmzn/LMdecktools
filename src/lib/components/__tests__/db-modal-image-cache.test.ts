@@ -13,6 +13,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, cleanup, waitFor, fireEvent } from '@testing-library/svelte';
 import DBSelectionModal from '../DBSelectionModal.svelte';
 import { getImageCacheStats, clearImageCache } from '$lib/image-cache';
+import { store } from '$lib/store.svelte';
 
 vi.mock('$lib/image-cache', () => ({
 	getImageCacheStats: vi.fn(async () => ({ count: 0, bytes: 0 })),
@@ -25,7 +26,7 @@ const stats = vi.mocked(getImageCacheStats);
 /**
  * The Cache tab is not the default section, so open it to read the indicator.
  * `onMount` picks the default section asynchronously (it waits on
- * `checkLocalDatabase`), so let that settle first or it overwrites the click.
+ * `localDatabaseExists`), so let that settle first or it overwrites the click.
  */
 async function openCacheTab(queries: {
 	getByRole: (role: string, opts: object) => HTMLElement;
@@ -37,6 +38,10 @@ async function openCacheTab(queries: {
 }
 
 beforeEach(() => {
+	// An open database, as every path to these panels implies. Without it the
+	// modal peeks on mount, and peeking projects the (empty) document over
+	// whatever the test seeded (#47).
+	store.dbMode = 'active';
 	stats.mockClear();
 	vi.mocked(clearImageCache).mockClear();
 	stats.mockResolvedValue({ count: 0, bytes: 0 });
@@ -44,6 +49,7 @@ beforeEach(() => {
 
 afterEach(() => {
 	cleanup();
+	store.dbMode = 'none';
 });
 
 describe('image cache indicator', () => {

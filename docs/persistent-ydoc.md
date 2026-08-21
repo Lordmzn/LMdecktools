@@ -249,6 +249,22 @@ needs a phone, a Dropbox account and an afternoon — not a simulation.
 
 ## Target model
 
+> **Shipped** (#47, M1). The model below is `src/lib/ydoc.ts` as built: same
+> topology, same identity rules, same LWW quantities. Three notes from the
+> build, none of which change a decision here:
+>
+> - `y-indexeddb` opens `lmdecktools-doc`, a **fixed** name rather than one per
+>   guid — adopting a foreign document replaces the lineage in place, so a
+>   second store would only ever hold an orphan. `clearDB()` destroys it and
+>   mints a new guid.
+> - The guid is written **inside** the document's `meta` map as well as being
+>   persisted device-side, because `encodeStateAsUpdate()` does not carry it and
+>   a file with no lineage cannot be classified (C4).
+> - The change reporter emits **one report per transaction**, not one per
+>   subtree: the collection and list observers both fire for a single apply, and
+>   a user told twice about one file pull would reasonably conclude it happened
+>   twice.
+
 ### Document topology
 
 One long-lived document, one stable `guid`, mutated in place:

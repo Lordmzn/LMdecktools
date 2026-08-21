@@ -481,13 +481,27 @@ working.
 - [x] **#84 first** — card-facts whitelist. **Done**, ahead of everything below:
       `card-fields.ts` holds the whitelist, `card_facts` (DB v5) holds the rest.
       The document model inherits it; there is nothing to re-measure here
-- [ ] Persistent `Y.Doc` — stable `guid`, per-session `clientID`, tombstones
-- [ ] **Breaking schema change.** Drop legacy stores in the same commit. Seed the
-      document from scratch; no dual-write, no phased read flip
-- [ ] Runes derive from the document
-- [ ] Transport port (T0)
+- [x] Persistent `Y.Doc` — stable `guid`, per-session `clientID`, tombstones —
+      `src/lib/ydoc.ts`, persisted by `y-indexeddb` in its own database
+- [x] **Breaking schema change.** DB v6 drops `card_lists` and `collection` in
+      the same commit that seeds the document. No dual-write, no phased read
+      flip. One departure from "from scratch": the upgrade reads the rows out
+      before dropping the stores and seeds the document from them, which expires
+      with that upgrade — losing the maintainer's own collection was never what
+      the alpha licence was for
+- [x] Runes derive from the document — `observeDocument()` → whole-array rebuild,
+      coalesced per microtask. Mutators write to the document and read from it,
+      never from the runes they are about to invalidate
+- [x] Transport port (T0) — `stateVector` / `updateFor` / `applyRemoteUpdate`,
+      already carrying the linked file
+- [x] Two-way import classification (C4) — same guid merges, foreign guid unions,
+      and `MergePreviewModal` states which. Brought forward from M3 because the
+      file path had to work at the flip, and a preview that cannot say "3 cards
+      removed" would have been lying from the first merge
 - [ ] BroadcastChannel provider (C2) + `navigator.locks` leader (C3)
-- **Exit:** the app runs entirely off the document; two tabs converge live
+- **Exit:** the app runs entirely off the document; two tabs converge live.
+  **First half met** — the app has no other data path; the second half is the
+  BroadcastChannel provider above
 
 ### M2 — Durability · 2 weeks
 - [ ] `persist()` on load; `persisted()` + `estimate()` in the DB modal (D2)
