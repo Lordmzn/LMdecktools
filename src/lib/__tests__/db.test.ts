@@ -95,6 +95,33 @@ describe('Database Operations', () => {
 			expect(cardLists[0].cards).toHaveLength(2);
 			expect(cardLists[0].cards[0].LM_quantity).toBe(4);
 		});
+
+		it('strips the cards it is given down to the whitelist (#84)', async () => {
+			const cardList: CardList = {
+				...createEmptyCardList(),
+				cards: [
+					{
+						id: 'card-1',
+						name: 'Lightning Bolt',
+						LM_quantity: 4,
+						mana_cost: '{R}',
+						image_uris: { normal: 'bolt.jpg' },
+						card_faces: [{ image_uris: { normal: 'front.jpg' } }],
+						prices: { usd: '1.23' }
+					}
+				] as unknown as CardList['cards']
+			};
+
+			await saveCardList(db, cardList);
+			const [saved] = await loadAllCardLists(db);
+
+			expect(saved.cards[0]).toEqual({
+				id: 'card-1',
+				name: 'Lightning Bolt',
+				mana_cost: '{R}',
+				LM_quantity: 4
+			});
+		});
 	});
 
 	describe('clearDatabase', () => {
@@ -138,7 +165,7 @@ describe('Collection Operations', () => {
 			name: 'Lightning Bolt',
 			quantity_owned: 4,
 			set: 'lea',
-			set_name: 'Limited Edition Alpha'
+			collector_number: '161'
 		};
 
 		await saveCollectionCard(db, card);
@@ -147,6 +174,28 @@ describe('Collection Operations', () => {
 		expect(collection).toHaveLength(1);
 		expect(collection[0].name).toBe('Lightning Bolt');
 		expect(collection[0].quantity_owned).toBe(4);
+	});
+
+	it('stores only the whitelist, whatever the caller hands it (#84)', async () => {
+		// The DB layer is the last gate before disk: a caller holding a whole
+		// Scryfall object must not be able to put one in the file.
+		await saveCollectionCard(db, {
+			id: 'scryfall-123',
+			name: 'Lightning Bolt',
+			quantity_owned: 4,
+			set: 'lea',
+			image_uris: { normal: 'bolt.jpg' },
+			legalities: { modern: 'legal' },
+			prices: { usd: '1.23' }
+		} as unknown as CollectionCard);
+
+		const [stored] = await loadCollection(db);
+		expect(stored).toEqual({
+			id: 'scryfall-123',
+			name: 'Lightning Bolt',
+			quantity_owned: 4,
+			set: 'lea'
+		});
 	});
 
 	it('updates quantity when saving same card again', async () => {

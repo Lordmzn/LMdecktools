@@ -1,5 +1,7 @@
 <script lang="ts">
 	import type { ComparedCard } from '$lib/compare';
+	import CardArt from '$lib/components/CardArt.svelte';
+	import { cardFactsOf } from '$lib/store.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	// Named for the column's job, not its hue — these are categorical labels, so
@@ -77,7 +79,10 @@
 	{:else}
 		<div class="space-y-2">
 			{#each cards as { card, quantityA, quantityB } (card.id + card.name)}
-				{@const isDFC = card.card_faces?.length > 1}
+				<!-- Art comes from the local facts cache, not from the saved record (#84) -->
+				{@const facts = cardFactsOf(card)}
+				{@const faces = facts.card_faces ?? []}
+				{@const isDFC = faces.length > 1 && Boolean(faces[0]?.image_uris?.small)}
 				<div class="flex items-center gap-3 rounded-lg bg-black/30 p-2">
 					<!-- Thumbnail -->
 					{#if isDFC}
@@ -87,7 +92,9 @@
 								if (!img) return;
 								const isFlipped = img.dataset.flipped === 'true';
 								const newFace = isFlipped ? 0 : 1;
-								img.src = card.card_faces[newFace].image_uris.small;
+								const face = faces[newFace]?.image_uris?.small;
+								if (!face) return;
+								img.src = face;
 								img.dataset.flipped = String(!isFlipped);
 							}}
 							class="shrink-0 cursor-pointer"
@@ -95,17 +102,18 @@
 							title={m.common_flip_card()}
 						>
 							<img
-								src={card.card_faces[0].image_uris.small}
+								src={faces[0].image_uris?.small}
 								alt={card.name}
 								data-flipped="false"
 								class="h-12 w-9 rounded object-cover"
 							/>
 						</button>
 					{:else}
-						<img
-							src={card.image_uris?.small ?? card.card_faces?.[0]?.image_uris?.small}
-							alt={card.name}
-							class="h-12 w-9 rounded object-cover"
+						<CardArt
+							thumb
+							url={facts.image_uris?.small ?? faces[0]?.image_uris?.small}
+							name={card.name}
+							set={card.set}
 						/>
 					{/if}
 

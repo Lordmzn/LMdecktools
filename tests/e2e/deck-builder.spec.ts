@@ -303,6 +303,46 @@ test.describe('Card Lists', () => {
 		).toBeVisible();
 	});
 
+	test('a card still draws after a reload, without its art being in the saved record (#84)', async ({
+		page
+	}) => {
+		await setupWithDB(page);
+		await spaGoto(page, '/card-lists');
+
+		await page.getByRole('button', { name: 'Add Cards' }).click();
+		await addCardViaSearch(page);
+		await page.locator('button[title="Close"]').click();
+
+		// What IndexedDB holds is the whitelist: no images, no legalities, no prices.
+		const stored = await page.evaluate(async () => {
+			const db = await new Promise<IDBDatabase>((resolve, reject) => {
+				const request = indexedDB.open('LMdecktools');
+				request.onsuccess = () => resolve(request.result);
+				request.onerror = () => reject(request.error);
+			});
+			const lists = await new Promise<any[]>((resolve, reject) => {
+				const request = db.transaction('card_lists', 'readonly').objectStore('card_lists').getAll();
+				request.onsuccess = () => resolve(request.result);
+				request.onerror = () => reject(request.error);
+			});
+			db.close();
+			return lists[0].cards[0];
+		});
+
+		expect(stored).not.toHaveProperty('image_uris');
+		expect(stored).not.toHaveProperty('set_name');
+		expect(stored.name).toBe('Lightning Bolt');
+
+		// And the art comes back anyway, from the local facts cache rather than
+		// from the record — a full reload, not a client-side navigation.
+		await page.reload();
+		await page.waitForLoadState('networkidle');
+		await spaGoto(page, '/card-lists');
+		await expect(
+			page.locator('[data-testid="list-cards"]').getByAltText('Lightning Bolt')
+		).toBeVisible();
+	});
+
 	test('exporting a list as text', async ({ page }) => {
 		await setupWithDB(page);
 		await spaGoto(page, '/card-lists');

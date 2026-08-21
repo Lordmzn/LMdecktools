@@ -15,6 +15,7 @@
 		updateListName,
 		addAllToCollection,
 		addToCollection,
+		cardSetLabel,
 		logAppError
 	} from '$lib/store.svelte';
 	import type { ErrorCategory } from '$lib/error-journal';
@@ -266,12 +267,12 @@
 				({ card }) =>
 					filterText === '' ||
 					card.name.toLowerCase().includes(filterText.toLowerCase()) ||
-					(card.set_name ?? '').toLowerCase().includes(filterText.toLowerCase())
+					cardSetLabel(card).toLowerCase().includes(filterText.toLowerCase())
 			)
 			.sort((a: { card: any; owned: boolean }, b: { card: any; owned: boolean }) => {
 				if (sortBy === 'name') return a.card.name.localeCompare(b.card.name);
 				if (sortBy === 'quantity') return b.card.LM_quantity - a.card.LM_quantity;
-				if (sortBy === 'set') return (a.card.set_name ?? '').localeCompare(b.card.set_name ?? '');
+				if (sortBy === 'set') return cardSetLabel(a.card).localeCompare(cardSetLabel(b.card));
 				return 0;
 			})
 	);

@@ -43,13 +43,29 @@ A singleton `Store` class in `src/lib/store.svelte.ts` using Svelte 5 class-base
 
 ### Storage Layer
 
-Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Note for the #47 work: `y-indexeddb` opens its **own** database, named after the document and separate from `LMdecktools`, which breaks the one-database assumption in `checkLocalDatabase()` (`db.ts:50`), `clearDatabase()` (`:122`) and whatever the DB modal reports as "a database exists". Database `LMdecktools` v4 with four object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle), and `error_journal` (autoIncrement, `timestamp` + `category` indexes — added in v4, see Error Journal).
+Hand-rolled IndexedDB wrapper in `src/lib/db.ts` (raw `IDBRequest` callbacks wrapped in Promises). Note for the #47 work: `y-indexeddb` opens its **own** database, named after the document and separate from `LMdecktools`, which breaks the one-database assumption in `checkLocalDatabase()` (`db.ts:50`), `clearDatabase()` (`:122`) and whatever the DB modal reports as "a database exists". Database `LMdecktools` v5 with five object stores: `card_lists` (autoIncrement; the v2 `decks` store is dropped on upgrade), `collection` (keyed by Scryfall card ID), `metadata` (key/value + timestamps — holds `autoLoadDB` and the linked-file handle), `error_journal` (autoIncrement, `timestamp` + `category` indexes — added in v4, see Error Journal), and `card_facts` (keyed by Scryfall card ID — added in v5, see Card Fields & Facts Cache).
+
+The v4 → v5 upgrade rewrites every existing `collection` and `card_lists` row down to the whitelist and files what it strips in `card_facts`, inside the versionchange transaction so there is no half-migrated state to read (`stripStoredCards()`).
 
 ### Card Data
 
 Live Scryfall API calls (`api.scryfall.com/cards/search`, `/cards/named`, and `/cards/collection` for batch lookups). No local card database.
 
 Deck **import** additionally contacts one third-party deck site on explicit user action (`src/lib/import-url.ts`): `archidekt.com/api`, exported as `URL_IMPORT_HOST` so the UI can disclose it next to the URL field before the fetch. The Moxfield fetch (`api2.moxfield.com`) was removed in #49 — it is an unofficial API, CORS-blocked in practice, so a pasted Moxfield URL now returns `moxfieldUrlMessage()` pointing at their file export instead (a function, not a constant, because the text is translated — see i18n). Any new external host must be disclosed in `docs/project-vision.md` §5.5 — the privacy claim depends on that list being exhaustive.
+
+### Card Fields & Facts Cache
+
+A stored card is a **whitelist**, defined once in `src/lib/card-fields.ts` (#84): `id`, `name`, `set`, `collector_number`, `lang`, `mana_cost`, `type_line`, `is_foil`, plus the one quantity the user authored (`quantity_owned` / `LM_quantity`). Everything else Scryfall returns — `image_uris`, `card_faces`, `legalities`, `prices`, `all_parts`, oracle text — is an immutable third-party fact, refetchable from `/cards/collection`, and goes to `card_facts` instead: local, never exported, outside `clearDatabase()`, the same rationale as the image cache.
+
+This is not a style preference. Records used to carry the whole Scryfall object, once per collection entry _and_ once per list, which made a 1,000-card database a **7.1 MB** `.yjs` file that the linked-file autosave rewrote whole on every single add — 22× larger than it needed to be, and the same 22× would land on every P2P first sync under #11.
+
+Rules that keep it that way:
+
+- **Never spread a Scryfall object into a stored record.** Go through `toStoredCollectionCard()` / `toStoredListCard()`; they also strip Svelte proxies, so no `JSON.parse(JSON.stringify(...))` round trip is needed. `db.ts` re-applies the whitelist at the write boundary and `exportWithMetadata()` writes it field by field, so a fat record cannot reach disk even if a caller regresses — but do not lean on that.
+- **Fields join the whitelist one at a time and never leave.** Under #47 each one costs ~30 B per card forever, in a document that moves in full on every sync.
+- **Read facts through `cardFactsOf(card)`** (`store.svelte.ts`), never `card.image_uris`: a card fresh from a search carries its own facts, a card from the database does not. `cardSetLabel()` is the same thing for filters and sorts. `CardArt.svelte` renders the art or the name-and-printing stand-in.
+- **The import path does _not_ strip.** `fromYCard()` keeps every field a file carries so `importDatabase()` / `mergeSnapshotIntoDB()` can harvest the facts of a pre-#84 backup on the way in; the write path is what drops them.
+- Missing facts are refetched by `hydrateCardFacts()` after every load — batched, paced, fire-and-forget. Until it returns, those cards render as name and quantity. That is the agreed cost, and why `name` / `set` / `collector_number` are in the record at all.
 
 ### Collection Export
 
@@ -128,7 +144,7 @@ The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall ima
 
 **This is designed and decided, not open.** `docs/persistent-ydoc.md` settles the document model (#47) and `docs/durability-convergence-transport.md` settles what sits on top of it — durability, transports, and the decision to keep Yjs at all. Read both before changing anything in this area; several attractive-looking shortcuts are refuted there with measurements. Load-bearing consequences for day-to-day work:
 
-- **Do not spread Scryfall objects into stored records.** The card payload becomes a strict six-field whitelist plus a local, non-synced card-facts cache (#84). Every field admitted to the document costs ~30 B per card forever, and the whole document is what moves on every sync — spreading the object is exactly how the current 22× bloat happened.
+- **Do not spread Scryfall objects into stored records.** Shipped ahead of the rest as #84 — see Card Fields & Facts Cache above, which is now the reference. Every field admitted to the document costs ~30 B per card forever, and the whole document is what moves on every sync.
 - **The alpha owes no backward compatibility.** No active users, so schema changes are breaking changes: no dual-write, no legacy stores kept alive, no v1.0 snapshot support. This licence expires the moment users are invited.
 - **`merge.ts` is permanent**, not scaffolding. It becomes the _union_ path (foreign-lineage files) beside the _sync_ path (same-guid documents), and the UI must say which one a file gets — same bytes, different results.
 - **File extensions:** `.ydelta` for per-device files, `.json` for the share-sheet envelope. `.yjs` retires with the snapshot format it named.

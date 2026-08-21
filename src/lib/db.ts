@@ -3,6 +3,9 @@
  * Provides transparent IndexedDB operations with import/export capabilities
  */
 
+import { extractCardFacts, toStoredCollectionCard, toStoredListCard } from './card-fields';
+import type { StoredCard } from './card-fields';
+
 export type CardMatching = 'generic' | 'specific';
 export type LanguageMatching = 'any' | 'strict';
 
@@ -16,33 +19,28 @@ export interface CardList {
 	updated_at: number;
 }
 
-export interface Card {
-	id: string; // TODO scryfall_id would be better
+/**
+ * A card in a list, and a card in the collection. Both are `StoredCard` — the
+ * six-field Scryfall whitelist of `card-fields.ts` — plus the one quantity the
+ * user authored. No index signature on purpose (#84): the open shape is what
+ * let whole Scryfall objects into every record. Anything Scryfall returns that
+ * is not on the whitelist belongs in the card-facts cache.
+ */
+export interface Card extends StoredCard {
 	LM_quantity: number;
-	name: string; // TODO remove?
-	mana_cost?: string; // TODO remove?
-	[key: string]: any;
 }
 
-export interface CollectionCard {
-	id: string;
-	name: string;
+export interface CollectionCard extends StoredCard {
 	quantity_owned: number;
-	image_uris?: any;
-	card_faces?: any;
-	mana_cost?: string;
-	type_line?: string;
-	set?: string;
-	set_name?: string;
-	[key: string]: any;
 }
 
 const DB_NAME = 'LMdecktools';
-const DB_VERSION = 4;
+const DB_VERSION = 5;
 const STORE_NAME = 'card_lists';
 const COLLECTION_STORE = 'collection';
 const METADATA_STORE = 'metadata';
 export const ERROR_JOURNAL_STORE = 'error_journal';
+export const CARD_FACTS_STORE = 'card_facts';
 
 /**
  * Check local DB existence
@@ -112,12 +110,71 @@ export async function openDatabase(): Promise<IDBDatabase> {
 				journal.createIndex('timestamp', 'timestamp', { unique: false });
 				journal.createIndex('category', 'category', { unique: false });
 			}
+
+			// v4 → v5: card facts move out of the saved records (#84).
+			if (!db.objectStoreNames.contains(CARD_FACTS_STORE)) {
+				db.createObjectStore(CARD_FACTS_STORE, { keyPath: 'id' });
+			}
+
+			// A database that already holds records has fat ones; a brand-new
+			// database (oldVersion 0) has nothing to strip.
+			if (event.oldVersion > 0 && event.oldVersion < 5) {
+				const upgrade = (event.target as IDBOpenDBRequest).transaction;
+				if (upgrade) stripStoredCards(upgrade);
+			}
 		};
 	});
 }
 
 /**
- * Clear all data from the database
+ * v4 → v5 migration: rewrite every stored record down to the whitelist, keeping
+ * what is stripped as card facts so nothing needs refetching on day one (#84).
+ *
+ * Runs inside the versionchange transaction, so it either lands with the version
+ * bump or not at all — there is no window where the app can read half-migrated
+ * records.
+ */
+function stripStoredCards(transaction: IDBTransaction): void {
+	const facts = transaction.objectStore(CARD_FACTS_STORE);
+
+	const rememberFacts = (card: unknown) => {
+		const extracted = extractCardFacts(card);
+		if (extracted) facts.put(extracted);
+	};
+
+	const collectionCursor = transaction.objectStore(COLLECTION_STORE).openCursor();
+	collectionCursor.onsuccess = () => {
+		const cursor = collectionCursor.result;
+		if (!cursor) return;
+
+		const card = cursor.value as CollectionCard;
+		rememberFacts(card);
+		cursor.update(toStoredCollectionCard(card));
+		cursor.continue();
+	};
+
+	const listCursor = transaction.objectStore(STORE_NAME).openCursor();
+	listCursor.onsuccess = () => {
+		const cursor = listCursor.result;
+		if (!cursor) return;
+
+		const list = cursor.value as CardList;
+		const cards = (list.cards ?? []).map((card) => {
+			rememberFacts(card);
+			return toStoredListCard(card);
+		});
+		cursor.update({ ...list, cards });
+		cursor.continue();
+	};
+}
+
+/**
+ * Clear all data from the database.
+ *
+ * User data only: `error_journal` (diagnostics) and `card_facts` (a refetchable
+ * cache of Scryfall's own facts, like the image cache) are deliberately left
+ * alone. Keeping the facts means a restore right after a clear draws its cards
+ * immediately instead of waiting on the network.
  */
 export async function clearDatabase(db: IDBDatabase): Promise<void> {
 	await Promise.all([
@@ -179,8 +236,12 @@ export async function saveCardList(db: IDBDatabase, cardList: CardList): Promise
 		const transaction = db.transaction(STORE_NAME, 'readwrite');
 		const store = transaction.objectStore(STORE_NAME);
 
+		// The whitelist is applied here, at the boundary, and not only by the
+		// callers: this is the one place every list write passes through, so a
+		// caller holding a fat Scryfall object cannot put one on disk (#84).
 		const listToSave = {
 			...cardList,
+			cards: (cardList.cards ?? []).map((card) => toStoredListCard(card)),
 			updated_at: Date.now()
 		};
 
@@ -340,13 +401,16 @@ export async function saveCollectionCard(
 	db: IDBDatabase,
 	card: CollectionCard
 ): Promise<CollectionCard> {
+	// Stripped at the boundary, as in `saveCardList` — see there (#84).
+	const cardToSave = toStoredCollectionCard(card);
+
 	return new Promise((resolve, reject) => {
 		const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
 		const store = transaction.objectStore(COLLECTION_STORE);
-		const request = store.put(card);
+		const request = store.put(cardToSave);
 
 		request.onsuccess = () => {
-			resolve(card);
+			resolve(cardToSave);
 		};
 
 		request.onerror = () => {
@@ -373,16 +437,18 @@ export async function saveCollectionCards(
 ): Promise<CollectionCard[]> {
 	if (cards.length === 0) return [];
 
+	const cardsToSave = cards.map((card) => toStoredCollectionCard(card));
+
 	return new Promise((resolve, reject) => {
 		const transaction = db.transaction(COLLECTION_STORE, 'readwrite');
 		const store = transaction.objectStore(COLLECTION_STORE);
 
-		for (const card of cards) {
+		for (const card of cardsToSave) {
 			store.put(card);
 		}
 
 		transaction.oncomplete = () => {
-			resolve(cards);
+			resolve(cardsToSave);
 		};
 
 		transaction.onerror = () => {

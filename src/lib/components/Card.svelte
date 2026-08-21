@@ -1,16 +1,19 @@
 <script lang="ts">
-	import { store } from '$lib/store.svelte';
-	import { getImageUrl } from '$lib/image-cache';
+	import { store, cardFactsOf } from '$lib/store.svelte';
+	import CardArt from '$lib/components/CardArt.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	let { card, add = () => null, showOwned = true, target = 'collection' } = $props();
-	const isDFC = $derived(card.card_faces?.length > 1);
+	// Images come from the card itself when it is a fresh search result, and from
+	// the local facts cache when it was loaded from the database (#84).
+	const facts = $derived(cardFactsOf(card));
+	const isDFC = $derived((facts.card_faces?.length ?? 0) > 1);
 	let flipped = $state(false);
 	const faceIndex = $derived(flipped ? 1 : 0);
 	const imageUrl = $derived(
-		card.image_uris?.normal ??
-			card.card_faces?.[faceIndex]?.image_uris?.normal ??
-			card.card_faces?.[0]?.image_uris?.normal
+		facts.image_uris?.normal ??
+			facts.card_faces?.[faceIndex]?.image_uris?.normal ??
+			facts.card_faces?.[0]?.image_uris?.normal
 	);
 	let isAdding = $state(false);
 	let ownedQuantity = $derived(store.isCardOwned(card.id));
@@ -29,9 +32,12 @@
 >
 	<!-- Card Image -->
 	<div class="relative w-full overflow-hidden rounded-lg shadow-lg">
-		{#await getImageUrl(imageUrl) then cachedUrl}
-			<img src={cachedUrl} alt={card.name} class="h-auto w-full" />
-		{/await}
+		<CardArt
+			url={imageUrl}
+			name={card.name}
+			set={card.set}
+			collectorNumber={card.collector_number}
+		/>
 
 		<!-- Owned Badge -->
 		{#if showOwned && ownedQuantity > 0}
