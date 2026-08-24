@@ -15,6 +15,7 @@
 		logAppError
 	} from '$lib/store.svelte';
 	import type { MergePreview } from '$lib/store.svelte';
+	import { startServiceWorker } from '$lib/service-worker-client';
 	import * as m from '$lib/paraglide/messages';
 	import { page } from '$app/stores';
 	import { languageTag } from '$lib/paraglide/runtime';
@@ -55,6 +56,14 @@
 	onMount(() => {
 		// Decides preview vs. full app before anything can open IndexedDB (#87).
 		startSession().catch((e) => logAppError('indexeddb', e, { operation: 'startSession' }));
+
+		// Registers the app shell worker and asks it to re-cache (#89). Deliberately
+		// not awaited and not gated on the install context: installability is what
+		// takes the app out of WebKit's 7-day deletion window, so the tab that has
+		// not installed yet is exactly the one that needs the manifest honoured.
+		startServiceWorker().catch((e) =>
+			logAppError('unhandled', e, { operation: 'startServiceWorker' })
+		);
 
 		// SvelteKit's handleError hook never sees rejected promises that nothing
 		// awaits, and those are exactly the ones that vanish silently (#30).

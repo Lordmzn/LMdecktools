@@ -4,6 +4,22 @@
 		<meta charset="utf-8" />
 		<link rel="icon" href="%sveltekit.assets%/favicon.svg" type="image/svg+xml" />
 		<link rel="alternate icon" href="%sveltekit.assets%/favicon.png" />
+
+		<!--
+			Installability is a storage feature (#89): a Home Screen app sits outside
+			Safari's 7-day storage-deletion timer. See
+			docs/durability-convergence-transport.md D3.
+
+			Both tags are needed. iOS takes the Home Screen icon from
+			`apple-touch-icon` and ignores the manifest's `icons`; every other
+			platform reads the manifest. English-only manifest, deliberately — see
+			the endpoint that generates it.
+		-->
+		<link rel="manifest" href="%sveltekit.assets%/manifest.webmanifest" />
+		<link rel="apple-touch-icon" href="%sveltekit.assets%/apple-touch-icon.png" />
+		<meta name="apple-mobile-web-app-capable" content="yes" />
+		<meta name="apple-mobile-web-app-title" content="Deck Tools" />
+
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="theme-color" content="#0a0c10" />
 		<meta name="color-scheme" content="dark" />
