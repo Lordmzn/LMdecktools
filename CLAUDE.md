@@ -18,7 +18,7 @@ pnpm run format       # Prettier --write
 pnpm test             # Run unit/component tests (Vitest)
 pnpm test:watch       # Vitest in watch mode
 pnpm test:ui          # Vitest browser UI
-pnpm test:e2e         # Playwright E2E tests (needs dev server)
+pnpm test:e2e         # Playwright E2E tests (starts a dev server and, for pwa.spec.ts, a built preview)
 ```
 
 Requires Node 22 and pnpm 11 (see `.tool-versions`). With [asdf](https://asdf-vm.com) installed, run `asdf install` in the repo root to get both; `.nvmrc` is kept for CI and `nvm use`.
@@ -165,7 +165,24 @@ Routing: English is served at `/`, Italian at `/it-it/`, and `LanguageSwitcher.s
 
 ### Image Cache
 
-The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. (A minimal service worker is coming anyway, for installability and the Android share target; it does not take over image caching, and the two coexist. Also worth knowing: WebKit's ITP deletes the Cache API alongside IndexedDB after 7 idle days, so on Apple platforms this cache is a session-scale optimisation, not storage.) Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+The browser Cache API (`caches.open('lm-decktools-images')`) stores Scryfall image HTTP responses after their first fetch. Subsequent renders read from the cache directly, skipping the network. No service worker required — the `caches` API is available on the window in all modern browsers. There is a service worker since #89, but it is for installability and it **ignores cross-origin requests entirely**, so this cache keeps exactly one owner; see Installability below. (Also worth knowing: WebKit's ITP deletes the Cache API alongside IndexedDB after 7 idle days, so on Apple platforms this cache is a session-scale optimisation, not storage.) Cache management is exposed in the DB Selection Modal: `getImageCacheStats()` returns `{ count, bytes }`, rendered as `412 images · 86.4 MB` (#51). Sizing prefers each response's `Content-Length` and falls back to hydrating the blob, which is O(cache) — so it runs on modal open only, and the result is memoised for the session and reused while the entry count is unchanged (the cache is append-only). `clearImageCache()` drops the memo and goes through `caches.delete()`. A dedicated `src/lib/image-cache.ts` module wraps these operations.
+
+### Installability (#89)
+
+**The manifest and the service worker are a storage feature.** WebKit's tracking prevention deletes every script-writable store — IndexedDB and the image cache alike — after 7 days without interaction, and a week between sessions is an ordinary rhythm for a deck tool. A Home Screen web app sits outside Safari with its own days-of-use counter, and Apple documents its first-party data as not expected to be deleted, so **installing is what converts the 7-day timer into indefinite storage**. Offline support is a by-product. `docs/durability-convergence-transport.md` D3 and `docs/deployment.md` carry the rest.
+
+Three files: `src/routes/manifest.webmanifest/+server.ts`, `src/service-worker.ts`, and `src/lib/service-worker-client.ts`, which registers it from `+layout.svelte`'s `onMount`.
+
+- **The manifest is a prerendered endpoint, not a file in `static/`** — same rationale as `sitemap.xml`. `start_url`, `scope` and every icon path carry `BASE_PATH`, and a hand-written copy drifts silently: nothing throws, nothing logs, the install prompt just stops appearing. `manifest.test.ts` fails instead.
+- **`display` must stay `standalone`** — `install-context.ts` detects the installed app with `matchMedia('(display-mode: standalone)')`, which is false under `minimal-ui` or `browser`. Weaken it and an installed Android app falls back to the browser context and preview mode's logic.
+- **`id` is fixed and independent of `start_url`.** It is how the browser decides an install is _this_ app rather than a second one, and a second Home Screen icon is a third empty storage container — the failure `InstallSheet.svelte` warns about in prose.
+- **The worker never touches cross-origin requests**, so `image-cache.ts` keeps one owner, and its `activate` sweep is prefix-scoped to `lm-decktools-shell-` so it cannot delete `lm-decktools-images`.
+- **HTML is network-first, only content-hashed assets are cache-first.** Prerendered pages keep their filename across deploys while pointing at newly hashed assets, so a cache-first shell pins a visitor to an old build. No `skipWaiting()` either: a deploy removes the old build's chunks, so a worker taking over mid-session would 404 a running page's lazy imports.
+- **Registration is manual** (`kit.serviceWorker.register: false`). SvelteKit's automatic one also fires in dev, where `$service-worker`'s `build` and `prerendered` are empty — a live fetch handler caching nothing, inside a Playwright suite that runs on `pnpm dev`. `service-worker-client.ts` returns early under `import.meta.env.DEV` for the same reason.
+- **Re-caching on launch is the point, not housekeeping.** WebKit's sweep leaves the registration alive and the cache empty; nothing would refill it until a deploy changed `version`. Every launch posts a message asking.
+- **The worker may only import `$service-worker` and `$env/static/public`** — a shared constant in `$lib` is a build error, which is why `RECACHE_MESSAGE` is spelled out in both files.
+- `tests/e2e/pwa.spec.ts` is **the only spec that runs against the production build** (a second `webServer` in `playwright.config.ts`, port 4174, which builds first so a stale `build/` cannot pass for the current commit). Nothing here exists on the dev server.
+- Icons are rendered from `docs/app-icon.html`; the command is in `docs/deployment.md`. `any` and `maskable` are separate images because a maskable icon must keep its content inside a circle of 80% diameter, and one file drawn to that margin looks shrunken everywhere that does not crop. **iOS reads `apple-touch-icon` and ignores manifest icons.**
 
 ### The Document (#47)
 
@@ -231,6 +248,7 @@ Anything that reads a restore file must go through `parseImportFile()` / `assert
 - **List order is `created_at`, then id.** Two lists created in the same millisecond tie, so fixtures that care must set `created_at` explicitly — never index into `savedCardLists` expecting insertion order.
 - **Paraglide imports:** Vitest uses the paraglide Vite plugin (already in `vite.config.ts`) to resolve `$paraglide/runtime` imports
 - **E2E DB button:** The DB modal button requires `evaluate((btn) => btn.click())` rather than Playwright's `.click()` due to layout; see `openDBModal` helper in E2E tests
+- **`pwa.spec.ts` runs against the production build**, on its own `webServer` (port 4174) that builds first — the only spec that does. There is no service worker on the dev server at all, so anything about the worker, the precache or installability belongs in that spec and nowhere else.
 
 ### Adding tests for new user stories
 

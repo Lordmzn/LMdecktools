@@ -510,8 +510,15 @@ working.
 
 ### M2 — Durability · 2 weeks
 - [ ] `persist()` on load; `persisted()` + `estimate()` in the DB modal (D2)
-- [ ] `manifest.webmanifest`, icons, minimal service worker (D3)
-- [ ] Re-cache critical assets on launch
+- [x] `manifest.webmanifest`, icons, minimal service worker (D3) — the manifest
+      is a prerendered endpoint rather than a file in `static/`, so `start_url`,
+      `scope` and every icon path derive from `BASE_PATH` and cannot drift into
+      the silent failure where the install prompt simply stops appearing.
+      `share_target` deferred to M3 with the rest of the file transports: the
+      manifest entry is trivial, the receiving half is not
+- [x] Re-cache critical assets on launch — the worker's registration survives
+      WebKit's 7-day sweep while its cache does not, so nothing would refill it
+      until a deploy changed `version`. The launch asks, every time
 - [ ] `deviceId` in `metadata`; copy registry (kind, label, last-seen)
 - [ ] Header widget: count + age per copy; one-copy warning state (D1)
 - [ ] First-run gate after first meaningful import

@@ -93,33 +93,78 @@ app does not have to. Two consequences encoded in `static/.htaccess`:
   the main site.** So it reads `/decktools/404.html`; a bare `/404.html` would
   serve the main site's error page.
 
-## Planned: manifest and service worker
+## Manifest and service worker
 
-Not built yet, and the shape is constrained enough to record before it is.
 `docs/durability-convergence-transport.md` D3 makes installation a **storage**
-feature — on iOS it is the only way site data survives a week — so this lands as
-part of the app, not as PWA garnish.
+feature — on iOS it is the only way site data survives a week — so this is part
+of the app, not PWA garnish. Shipped in #89:
+`src/routes/manifest.webmanifest/+server.ts`, `src/service-worker.ts`, and
+`src/lib/service-worker-client.ts`, which registers it.
 
-Three things bite on this host specifically:
+Three things bite on this host specifically, and all three are now encoded:
 
 - **Scope is the base path.** A service worker registered from `/decktools/`
   controls `/decktools/` and below. That is what we want, and it is also why it
   must be served from inside the app directory rather than the domain root — a
   worker at `/sw.js` would claim the whole of `lordmzn.it`, which is somebody
-  else's site.
-- **`.webmanifest` needs a MIME type.** Apache will not know
-  `application/manifest+json` on its own; it goes in `static/.htaccess` beside
-  the existing cache rules. Without it some browsers refuse the manifest and the
+  else's site. The manifest's `scope` says the same thing for the install.
+- **`.webmanifest` needs a MIME type.** Apache does not know
+  `application/manifest+json` on its own; `AddType` for it is in
+  `static/.htaccess`. Without it some browsers refuse the manifest and the
   install prompt silently never appears.
 - **The worker script must not be cached.** It falls under the same rule as HTML
   below — same filename across deploys, different contents — and a service worker
   pinned by a stale `Cache-Control` is the classic way to strand users on an old
-  build with no way to push a fix. `must-revalidate`, explicitly.
+  build with no way to push a fix. There is a `<Files "service-worker.js">`
+  override with `must-revalidate`, and **it must stay below the `\.(js|css|woff2?)$`
+  block**: `service-worker.js` matches that pattern too, Apache applies these
+  sections in source order, and `Header set` replaces rather than merges. Reverse
+  them and the worker quietly goes back to a one-year `immutable`.
+  `manifest.test.ts` asserts the order.
 
-The Android `share_target` entry in the manifest requires the worker to have a
-fetch handler. The existing decision to cache card images through
-`caches.open()` *without* a worker (`project-vision.md` §4.1) is unaffected —
-the two coexist, and the worker is not there to cache images.
+Registration is explicit rather than SvelteKit's automatic one
+(`kit.serviceWorker.register` is `false`), because the automatic version also
+fires on the dev server, where the precache lists are empty — a live fetch
+handler caching nothing, inside a Playwright suite that runs on `pnpm dev`.
+
+The Android `share_target` entry needs the worker's fetch handler, which is why
+this issue built one; the manifest entry and the receiving route land with the
+rest of the file transports in #91. The existing decision to cache card images
+through `caches.open()` *without* a worker (`project-vision.md` §4.1) is
+unaffected — the worker ignores cross-origin requests entirely, and its
+`activate` sweep is prefix-scoped so it cannot delete `lm-decktools-images`.
+
+`tests/e2e/pwa.spec.ts` is the only spec that runs against the production build
+(a second `webServer` in `playwright.config.ts`, on port 4174), for the same
+reason registration is manual: none of this exists in dev.
+
+## App icons
+
+`static/icon-192.png`, `icon-512.png`, `icon-maskable-512.png` and
+`apple-touch-icon.png` are rendered from `docs/app-icon.html`, the same headless
+Chrome route as the OG image:
+
+```sh
+CHROME="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+"$CHROME" --headless --disable-gpu --force-device-scale-factor=1 --hide-scrollbars \
+  --window-size=512,512 --screenshot=icon-512.png docs/app-icon.html
+"$CHROME" --headless --disable-gpu --force-device-scale-factor=1 --hide-scrollbars \
+  --window-size=512,512 --screenshot=icon-maskable-512.png "docs/app-icon.html?maskable"
+sips -z 192 192 icon-512.png --out static/icon-192.png
+sips -z 180 180 icon-512.png --out static/apple-touch-icon.png
+mv icon-512.png icon-maskable-512.png static/
+```
+
+PNG rather than JPEG, against the OG image's choice: these are flat vector art
+with hard edges, where JPEG's ringing shows and its size advantage does not.
+
+Two variants because platforms crop differently. The `maskable` one draws the
+glyph at 52% so it survives inside the guaranteed-safe circle of 80% diameter
+that Android's arbitrary launcher masks respect; the plain one fills 72% and is
+what iOS and desktop show as given. One file serving both looks shrunken
+everywhere that does not crop. **iOS reads `apple-touch-icon` and ignores the
+manifest's `icons` entirely** — dropping that tag costs the icon on the one
+platform where installing is the whole point.
 
 ## Caching
 
