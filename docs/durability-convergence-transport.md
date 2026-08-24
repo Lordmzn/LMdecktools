@@ -509,7 +509,16 @@ working.
   `navigator.locks.query()` reports exactly one holder and one waiter
 
 ### M2 — Durability · 2 weeks
-- [ ] `persist()` on load; `persisted()` + `estimate()` in the DB modal (D2)
+- [x] `persist()` on load; `persisted()` + `estimate()` in the DB modal (D2) —
+      the request hangs off `openDocument()`'s persisting branch rather than
+      startup, so it is made exactly when there is something in the container
+      worth keeping and never in preview mode, where it would prompt about a
+      container the app refuses to write to. `persisted()` is checked first: the
+      second ask is a Firefox permission prompt, and one on every load teaches
+      the user to click Deny. The modal reports granted/not-granted and usage
+      against quota, and the copy says what the grant covers — eviction under
+      disk pressure — and, in the same breath, that clearing browsing data or
+      removing the app still takes everything
 - [x] `manifest.webmanifest`, icons, minimal service worker (D3) — the manifest
       is a prerendered endpoint rather than a file in `static/`, so `start_url`,
       `scope` and every icon path derive from `BASE_PATH` and cannot drift into

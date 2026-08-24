@@ -11,6 +11,7 @@ import {
 	type CollectionCard
 } from './db';
 import { detectInstallContext, type InstallContext } from './install-context';
+import { requestPersistentStorage } from './storage-persistence';
 import { connectTabs, type TabSync } from './tab-sync';
 import { claimLeadership, type Leadership } from './leader';
 import * as Y from 'yjs';
@@ -199,6 +200,13 @@ async function openDocument(options: { persist: boolean }): Promise<Y.Doc> {
 	if (options.persist) {
 		persistence = attachPersistence(doc);
 		await persistence.whenSynced;
+
+		// The moment there is something in the browser's container worth keeping,
+		// ask for it to be exempt from eviction under disk pressure (#88). Not
+		// awaited: on Firefox this is a permission prompt, and nothing about what
+		// the app does next depends on the answer. Preview mode never gets here —
+		// it attaches no persistence, so there is nothing to protect.
+		void requestPersistentStorage();
 	}
 
 	// One-time, expiring with the v6 upgrade: rows rescued from the stores that

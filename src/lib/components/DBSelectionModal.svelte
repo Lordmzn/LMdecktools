@@ -4,6 +4,7 @@
 	import BrandMark from '$lib/components/BrandMark.svelte';
 	import { localDatabaseExists } from '$lib/store.svelte';
 	import { getImageCacheStats, clearImageCache, formatBytes } from '$lib/image-cache';
+	import { readStorageReport, type StorageReport } from '$lib/storage-persistence';
 	import {
 		store,
 		initDB,
@@ -99,6 +100,29 @@
 			: m.db_cache_summary_other({ count: imageCacheCount, size: formatBytes(imageCacheBytes) })
 	);
 	let isClearingCache = $state(false);
+
+	/**
+	 * What the browser says about the storage this database sits in (#88): whether
+	 * it is exempt from eviction under disk pressure, and how much of the quota is
+	 * spent. Null until the first read resolves, which is the modal opening.
+	 *
+	 * Deliberately never phrased as safety. The grant defends against one thing —
+	 * the browser reclaiming space — and against clearing browsing data, a deleted
+	 * icon or a lost phone it does nothing at all.
+	 */
+	let storageReport = $state<StorageReport | null>(null);
+
+	/** e.g. "12.4 MB of 2.1 GB". Either half may be missing; `estimate()` is allowed to omit both. */
+	let storageUsageText = $derived(
+		storageReport?.usage === null || storageReport === null
+			? m.db_storage_usage_unknown()
+			: storageReport.quota === null
+				? m.db_storage_usage_partial({ used: formatBytes(storageReport.usage) })
+				: m.db_storage_usage({
+						used: formatBytes(storageReport.usage),
+						quota: formatBytes(storageReport.quota)
+					})
+	);
 	let showCreateNewConfirm = $state(false);
 	let showRestoreConfirm = $state(false);
 	/** True once a successful restore left the modal open to offer linking a file. */
@@ -148,7 +172,13 @@
 	 * unchanged cache costs a `cache.keys()` and nothing more.
 	 */
 	$effect(() => {
-		if (show) refreshImageCacheStats();
+		if (show) {
+			refreshImageCacheStats();
+			// Re-read on every open for the same reason: the grant can arrive after
+			// startup (Firefox's prompt) or lapse between sessions (WebKit drops it
+			// on browser restart), and the usage figure moves with every import.
+			readStorageReport().then((report) => (storageReport = report));
+		}
 	});
 
 	onMount(() => {
@@ -688,6 +718,54 @@
 									</div>
 								</div>
 							</div>
+						</div>
+					{/if}
+
+					<!--
+						What the browser promises about the storage underneath (#88).
+						Only where there is a database to talk about: with no DB there is
+						nothing stored, and preview mode writes to no container at all, so a
+						quota reading there would describe somewhere the app never touches.
+					-->
+					{#if store.dbLoaded && !store.previewMode}
+						<div class="mt-4 rounded-xl border border-orange-500/[0.08] p-5">
+							<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_storage_title()}</h3>
+							<div class="mb-3 space-y-2 text-sm text-slate-400">
+								<div class="flex justify-between gap-4">
+									<span class="font-medium">{m.db_storage_protection_label()}</span>
+									<span
+										class="font-mono {storageReport?.supported
+											? storageReport.persisted
+												? 'text-success'
+												: 'text-warning'
+											: ''}"
+										data-testid="storage-persistence"
+									>
+										{#if !storageReport || !storageReport.supported}
+											{m.db_storage_protection_unknown()}
+										{:else if storageReport.persisted}
+											{m.db_storage_protection_granted()}
+										{:else}
+											{m.db_storage_protection_denied()}
+										{/if}
+									</span>
+								</div>
+								<div class="flex justify-between gap-4">
+									<span class="font-medium">{m.db_storage_usage_label()}</span>
+									<span class="font-mono" data-testid="storage-usage">{storageUsageText}</span>
+								</div>
+							</div>
+							<!-- Never "your data is safe": the grant covers eviction under disk
+							     pressure and nothing else on the list (#88, D2). -->
+							<p class="text-xs text-slate-500">
+								{#if !storageReport || !storageReport.supported}
+									{m.db_storage_body_unknown()}
+								{:else if storageReport.persisted}
+									{m.db_storage_body_granted()}
+								{:else}
+									{m.db_storage_body_denied()}
+								{/if}
+							</p>
 						</div>
 					{/if}
 
