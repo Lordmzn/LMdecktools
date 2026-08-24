@@ -2081,6 +2081,102 @@ export const db_connect_local = () => `Connetti al DB locale`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const db_storage_title = () => `Spazio del browser`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_label = () => `Protezione dalla cancellazione:`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_granted = () => `Concessa`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_denied = () => `Non concessa`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_unknown = () => `Sconosciuta`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage_label = () => `Spazio usato:`
+
+
+/**
+ * @param {{ used: NonNullable<unknown>, quota: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage = (params) => `${params.used} su ${params.quota}`
+
+
+/**
+ * @param {{ used: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage_partial = (params) => `${params.used}`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage_unknown = () => `Non dichiarato`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_body_granted = () => `Questo browser ha accettato di non cancellare i tuoi dati per recuperare spazio. Possono comunque sparire: svuotare i dati di navigazione li rimuove, e lo stesso vale se rimuovi l'app. Tieni una copia da qualche altra parte.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_body_denied = () => `Questo browser può cancellare i tuoi dati per recuperare spazio quando il dispositivo ne ha poco. Tieni una copia da qualche altra parte.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_body_unknown = () => `Questo browser non dice se protegge i dati archiviati dalla cancellazione. Tieni una copia da qualche altra parte.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const db_download_title = () => `Scarica una copia`
 
 

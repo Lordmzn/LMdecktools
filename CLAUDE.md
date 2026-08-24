@@ -184,6 +184,15 @@ Three files: `src/routes/manifest.webmanifest/+server.ts`, `src/service-worker.t
 - `tests/e2e/pwa.spec.ts` is **the only spec that runs against the production build** (a second `webServer` in `playwright.config.ts`, port 4174, which builds first so a stale `build/` cannot pass for the current commit). Nothing here exists on the dev server.
 - Icons are rendered from `docs/app-icon.html`; the command is in `docs/deployment.md`. `any` and `maskable` are separate images because a maskable icon must keep its content inside a circle of 80% diameter, and one file drawn to that margin looks shrunken everywhere that does not crop. **iOS reads `apple-touch-icon` and ignores manifest icons.**
 
+### Persistent Storage (#88)
+
+`src/lib/storage-persistence.ts` asks for `navigator.storage.persist()` and reads back `persisted()` + `estimate()` for the DB modal. It is the **floor, not durability**: it defends against eviction under disk pressure and against nothing else on the list — clearing browsing data, a deleted icon, a lost or replaced phone, and (undocumented either way) WebKit's 7-day timer all still take everything. Durability is a copy count (D1, #90), which is why no string here may say "your data is safe"; the modal reports the grant and the usage figure and names what the grant does not cover.
+
+- **The request hangs off `openDocument()`'s persisting branch**, not `startSession()`. That is the moment there is something in the container worth keeping, and it is what keeps preview mode out: an iOS browser tab attaches no persistence, so a prompt there would be about a container the app refuses to write to (#87).
+- **`persisted()` is checked before `persist()`.** Chromium grants silently from engagement heuristics, but on Firefox the ask is a permission prompt — one on every load is how a user learns to click Deny.
+- **Never awaited, never gating.** The answer changes nothing about what the app does, and a browser without the API gets the app unchanged.
+- `supported: false` in the report means the browser answers neither call, which the modal renders as _unknown_ — a different fact from _not granted_, and it must stay that way.
+
 ### The Document (#47)
 
 `src/lib/ydoc.ts` is the data model and the transport port. One long-lived `Y.Doc` with a stable `guid`, mutated in place:

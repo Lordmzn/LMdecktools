@@ -2081,6 +2081,102 @@ export const db_connect_local = () => `Connect to local DB`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const db_storage_title = () => `Browser storage`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_label = () => `Eviction protection:`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_granted = () => `Granted`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_denied = () => `Not granted`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_protection_unknown = () => `Unknown`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage_label = () => `Space used:`
+
+
+/**
+ * @param {{ used: NonNullable<unknown>, quota: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage = (params) => `${params.used} of ${params.quota}`
+
+
+/**
+ * @param {{ used: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage_partial = (params) => `${params.used}`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_usage_unknown = () => `Not reported`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_body_granted = () => `This browser has agreed not to delete your data to reclaim space. It can still go: clearing browsing data removes it, and so does removing the app. Keep a copy somewhere else.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_body_denied = () => `This browser may delete your data to reclaim space when the device runs low. Keep a copy somewhere else.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_storage_body_unknown = () => `This browser does not say whether it protects stored data from being cleared. Keep a copy somewhere else.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const db_download_title = () => `Download copy`
 
 
