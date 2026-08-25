@@ -2041,6 +2041,110 @@ export const db_tab_export = () => `Export`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const db_tab_copies = () => `Copies`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_count_one = (params) => `${params.count} copy`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_count_other = (params) => `${params.count} copies`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_this_device = () => `This device`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_live = () => `live`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_warning_body = () => `Your collection exists in one place. If this device is lost, cleared, or the browser deletes it, everything here goes with it.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_save_button = () => `Save a copy`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_pair_button = () => `Pair a device`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_pair_caption = () => `Coming soon — pairing another device over a local connection.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_title = () => `One copy so far.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_body = () => `Save a second copy somewhere else, in case this one is lost.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_save = () => `Save a copy`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_dismiss = () => `Not now`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const db_local_searching = () => `Searching for local database`
 
 

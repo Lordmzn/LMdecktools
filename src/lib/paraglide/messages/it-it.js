@@ -2041,6 +2041,110 @@ export const db_tab_export = () => `Esporta`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const db_tab_copies = () => `Copie`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_count_one = (params) => `${params.count} copia`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_count_other = (params) => `${params.count} copie`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_this_device = () => `Questo dispositivo`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_live = () => `in linea`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_warning_body = () => `La tua collezione esiste in un solo posto. Se questo dispositivo viene perso, cancellato o il browser elimina i dati, perderai tutto.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_save_button = () => `Salva una copia`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_pair_button = () => `Abbina un dispositivo`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_pair_caption = () => `In arrivo — abbinamento con un altro dispositivo su una connessione locale.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_title = () => `Finora una sola copia.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_body = () => `Salva una seconda copia altrove, nel caso questa vada persa.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_save = () => `Salva una copia`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_first_run_dismiss = () => `Non ora`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const db_local_searching = () => `Ricerca del database locale`
 
 

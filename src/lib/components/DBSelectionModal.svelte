@@ -1,16 +1,19 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	let { show = $bindable(false) } = $props();
+	type Section = 'localdb' | 'link' | 'cache' | 'import' | 'export' | 'copies';
+	let { show = $bindable(false), initialSection }: { show: boolean; initialSection?: Section } =
+		$props();
 	import BrandMark from '$lib/components/BrandMark.svelte';
 	import { localDatabaseExists } from '$lib/store.svelte';
 	import { getImageCacheStats, clearImageCache, formatBytes } from '$lib/image-cache';
 	import { readStorageReport, type StorageReport } from '$lib/storage-persistence';
+	import { triggerDownload } from '$lib/download';
 	import {
 		store,
 		initDB,
 		peekDB,
 		clearDB,
-		exportDB,
+		downloadBackupCopy,
 		loadFromFile,
 		inspectImportFile,
 		exportCollectionToText,
@@ -37,7 +40,6 @@
 
 	const fsAccessSupported = isFileSystemAccessSupported();
 
-	type Section = 'localdb' | 'link' | 'cache' | 'import' | 'export';
 	let activeSection = $state<Section | null>(null);
 
 	// Import tab state
@@ -178,6 +180,9 @@
 			// startup (Firefox's prompt) or lapse between sessions (WebKit drops it
 			// on browser restart), and the usage figure moves with every import.
 			readStorageReport().then((report) => (storageReport = report));
+			// The header's copy counter opens straight to the Copies tab rather than
+			// wherever `computeDefaultSection()` would otherwise land.
+			if (initialSection) activeSection = initialSection;
 		}
 	});
 
@@ -377,21 +382,11 @@
 	let isExportingBackup = $state(false);
 	let exportBackupSuccess = $state(false);
 
-	function handleExportBackup() {
+	async function handleExportBackup() {
 		isExportingBackup = true;
 		exportBackupSuccess = false;
 		try {
-			const data = exportDB();
-			const blob = new Blob([new Uint8Array(data)], { type: 'application/octet-stream' });
-			const url = URL.createObjectURL(blob);
-			const link = document.createElement('a');
-			link.href = url;
-			const timestamp = new Date().toISOString().slice(0, 10);
-			link.download = `lm-decktools-backup-${timestamp}.yjs`;
-			document.body.appendChild(link);
-			link.click();
-			document.body.removeChild(link);
-			URL.revokeObjectURL(url);
+			await downloadBackupCopy();
 			exportBackupSuccess = true;
 		} catch (e) {
 			logAppError('indexeddb', e, { operation: 'exportBackup' });
@@ -442,17 +437,11 @@
 		const csvText = buildFullExport();
 		if (!csvText) return;
 		const isCsv = exportFormat === 'csv';
-		const blob = new Blob([csvText], {
-			type: isCsv ? 'text/csv;charset=utf-8;' : 'text/plain;charset=utf-8;'
-		});
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = isCsv ? 'mtg_collection_export.csv' : 'mtg_collection_export.txt';
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
+		triggerDownload(
+			csvText,
+			isCsv ? 'mtg_collection_export.csv' : 'mtg_collection_export.txt',
+			isCsv ? 'text/csv;charset=utf-8;' : 'text/plain;charset=utf-8;'
+		);
 	}
 
 	function closeModal() {
@@ -549,6 +538,32 @@
 						></path>
 					</svg>
 					{m.db_tab_local()}
+				</button>
+				<button
+					onclick={() => {
+						toggleSection('copies');
+						exportBackupSuccess = false;
+					}}
+					disabled={store.dbMode !== 'active'}
+					aria-expanded={activeSection === 'copies'}
+					class="relative flex min-h-11 shrink-0 flex-col items-center justify-center gap-1 rounded-lg px-2 py-2 text-[0.7rem] whitespace-nowrap transition-colors sm:px-3 sm:text-xs
+						{activeSection === 'copies'
+						? 'bg-orange-500/10 text-orange-400'
+						: 'text-slate-400 hover:text-orange-300'}
+						disabled:cursor-not-allowed disabled:opacity-40"
+				>
+					{#if store.copyCount <= 1}
+						<span class="bg-warning-solid absolute top-1 right-1 h-2 w-2 rounded-full"></span>
+					{/if}
+					<svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+						<path
+							stroke-linecap="round"
+							stroke-linejoin="round"
+							stroke-width="2"
+							d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h9a2 2 0 002-2v-3m-8-4h9a2 2 0 002-2V5a2 2 0 00-2-2h-9a2 2 0 00-2 2v9a2 2 0 002 2z"
+						></path>
+					</svg>
+					{m.db_tab_copies()}
 				</button>
 				<!-- Without the File System Access API there is no file DB to speak of;
 				     the In-browser DB section says so next to Download copy instead -->
@@ -985,6 +1000,65 @@
 									{m.db_create_button()}
 								</button>
 							</div>
+						</div>
+					</div>
+				{/if}
+
+				<!-- Copies Section (#90): durability as a copy count, not a storage setting -->
+				{#if activeSection === 'copies'}
+					<div class="space-y-4">
+						{#if store.copyCount <= 1}
+							<div
+								class="border-warning-edge bg-warning-surface text-warning rounded-lg border p-4 text-sm"
+								data-testid="copies-warning"
+							>
+								{m.db_copies_warning_body()}
+							</div>
+						{/if}
+
+						<div class="rounded-xl border border-orange-500/[0.08] p-5">
+							<h3 class="mb-3 text-lg font-semibold text-slate-100" data-testid="copies-count">
+								{store.copyCount === 1
+									? m.db_copies_count_one({ count: store.copyCount })
+									: m.db_copies_count_other({ count: store.copyCount })}
+							</h3>
+							<ul class="space-y-2 text-sm">
+								<li class="flex justify-between gap-4">
+									<span class="text-slate-200">{m.db_copies_this_device()}</span>
+									<span class="text-slate-400">{m.db_copies_live()}</span>
+								</li>
+								{#each store.copyRegistryEntries as entry (entry.id)}
+									<li class="flex justify-between gap-4">
+										<span class="text-slate-200">{entry.label}</span>
+										<span class="text-slate-400">{formatRelativeTime(entry.lastSeen)}</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+
+						{#if exportBackupSuccess}
+							<div
+								class="border-success-edge bg-success-surface text-success rounded-lg border p-3 text-sm"
+							>
+								{m.db_download_started()}
+							</div>
+						{/if}
+
+						<div class="flex gap-2">
+							<button
+								onclick={handleExportBackup}
+								disabled={isExportingBackup || store.dbMode !== 'active'}
+								class="btn btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-50"
+							>
+								{isExportingBackup ? m.db_download_preparing() : m.db_copies_save_button()}
+							</button>
+							<button
+								disabled
+								title={m.db_copies_pair_caption()}
+								class="btn btn-quiet flex-1 cursor-not-allowed opacity-40"
+							>
+								{m.db_copies_pair_button()}
+							</button>
 						</div>
 					</div>
 				{/if}

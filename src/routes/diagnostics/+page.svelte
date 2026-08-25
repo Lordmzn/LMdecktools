@@ -16,6 +16,7 @@
 		type ErrorEntry
 	} from '$lib/error-journal';
 	import PageMeta from '$lib/components/PageMeta.svelte';
+	import { triggerDownload } from '$lib/download';
 	import * as m from '$lib/paraglide/messages';
 
 	let entries = $state<ErrorEntry[]>([]);
@@ -88,15 +89,11 @@
 	}
 
 	function handleExport() {
-		const blob = new Blob([exportErrorJournal(entries)], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const link = document.createElement('a');
-		link.href = url;
-		link.download = `lm-decktools-errors-${new Date().toISOString().slice(0, 10)}.json`;
-		document.body.appendChild(link);
-		link.click();
-		document.body.removeChild(link);
-		URL.revokeObjectURL(url);
+		triggerDownload(
+			exportErrorJournal(entries),
+			`lm-decktools-errors-${new Date().toISOString().slice(0, 10)}.json`,
+			'application/json'
+		);
 	}
 
 	async function handleClear() {

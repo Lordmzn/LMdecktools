@@ -12,6 +12,9 @@ import {
 } from './db';
 import { detectInstallContext, type InstallContext } from './install-context';
 import { requestPersistentStorage } from './storage-persistence';
+import { getOrCreateDeviceId, getCopyRegistry, recordCopy, type CopyEntry } from './copy-registry';
+export type { CopyEntry } from './copy-registry';
+import { triggerDownload } from './download';
 import { connectTabs, type TabSync } from './tab-sync';
 import { claimLeadership, type Leadership } from './leader';
 import * as Y from 'yjs';
@@ -207,6 +210,12 @@ async function openDocument(options: { persist: boolean }): Promise<Y.Doc> {
 		// the app does next depends on the answer. Preview mode never gets here —
 		// it attaches no persistence, so there is nothing to protect.
 		void requestPersistentStorage();
+
+		// Same moment: this is where "how many copies exist" starts being able to
+		// answer anything (#90). Preview mode never gets here for the same reason —
+		// nothing is written to that container, so there is nothing to count.
+		store.deviceId = await getOrCreateDeviceId(_db);
+		store.copyRegistryEntries = await getCopyRegistry(_db, guid);
 	}
 
 	// One-time, expiring with the v6 upgrade: rows rescued from the stores that
@@ -344,6 +353,22 @@ class Store implements StoreInterface {
 	 */
 	get previewMode(): boolean {
 		return this.installContext === 'ios-browser';
+	}
+
+	// Copy registry (#90): this device's identity and the other copies known
+	// for the current lineage. Populated from `openDocument()`'s persisting
+	// branch, so both stay empty in preview mode — there is nothing to count.
+	deviceId = $state<string | null>(null);
+	copyRegistryEntries = $state<CopyEntry[]>([]);
+
+	/**
+	 * This device plus every registry entry. 0 until `deviceId` is provisioned —
+	 * which only happens on the persisting path, so this is naturally 0 in
+	 * preview mode without needing to check `previewMode` separately.
+	 */
+	get copyCount(): number {
+		if (!this.deviceId) return 0;
+		return this.copyRegistryEntries.length + 1;
 	}
 
 	// Card list state
@@ -686,6 +711,27 @@ export function exportDB(): Uint8Array {
 	return documentUpdate();
 }
 
+// ==================== COPY REGISTRY (#90) ====================
+
+/** Upsert a copy's last-seen time, keyed to the current lineage. A no-op with no database open. */
+async function recordCopySeen(kind: CopyEntry['kind'], id: string, label: string): Promise<void> {
+	const guid = documentGuid();
+	if (!db || !guid) return;
+	store.copyRegistryEntries = await recordCopy(db, guid, { id, kind, label, lastSeen: Date.now() });
+}
+
+/** The filename a downloaded backup gets — unrelated to T3's per-device file naming (#91). */
+function backupFilename(): string {
+	return `lm-decktools-backup-${new Date().toISOString().slice(0, 10)}.yjs`;
+}
+
+/** Download a full snapshot and record it as a copy. The `<a download>` path used everywhere else too. */
+export async function downloadBackupCopy(): Promise<void> {
+	const filename = backupFilename();
+	triggerDownload(new Uint8Array(exportDB()), filename, 'application/octet-stream');
+	await recordCopySeen('export', 'export', filename);
+}
+
 // ==================== ERROR JOURNAL ====================
 
 /**
@@ -734,6 +780,11 @@ function applyWriteSuccess(timestamp: number): void {
 	store.linkedFileLastSaved = timestamp;
 	store.linkedFileError = null;
 	store.linkedFileWriting = false;
+
+	// The linked file is a copy too — it just refreshes itself instead of aging
+	// like an export (#90). Not awaited: nothing downstream depends on when the
+	// registry write lands.
+	if (store.linkedFileName) void recordCopySeen('linked-file', 'linked-file', store.linkedFileName);
 }
 
 function applyWriteError(error: unknown): void {
