@@ -5,12 +5,14 @@
 	import LinkedFileToast from '$lib/components/LinkedFileToast.svelte';
 	import MergePreviewModal from '$lib/components/MergePreviewModal.svelte';
 	import PreviewBanner from '$lib/components/PreviewBanner.svelte';
+	import FirstRunCopyNudge from '$lib/components/FirstRunCopyNudge.svelte';
 	import { i18n } from '$lib/i18n';
 	import { ParaglideJS } from '@inlang/paraglide-sveltekit';
 	import {
 		store,
 		mergeFromFile,
 		previewMergeFromFile,
+		downloadBackupCopy,
 		startSession,
 		logAppError
 	} from '$lib/store.svelte';
@@ -53,6 +55,16 @@
 	let mergePreviewLoading = $state(false);
 	let mergePreviewError = $state<string | null>(null);
 
+	/**
+	 * The first-run gate (#90, D1): nudge once, after the first meaningful
+	 * import, if only one copy exists. `firstRunNudgeShown` is plain in-memory
+	 * state — never persisted — so a fresh page load naturally starts
+	 * un-dismissed, which is what "dismissible per session, never permanently
+	 * silenced" means without needing a storage-backed flag.
+	 */
+	let showFirstRunNudge = $state(false);
+	let firstRunNudgeShown = $state(false);
+
 	onMount(() => {
 		// Decides preview vs. full app before anything can open IndexedDB (#87).
 		startSession().catch((e) => logAppError('indexeddb', e, { operation: 'startSession' }));
@@ -82,6 +94,33 @@
 			showLinkedFileToast = true;
 		}
 	});
+
+	// "A decklist, 50 cards" (D1) — a step, not a settings page, so it fires once
+	// and only while there is genuinely one copy on record.
+	$effect(() => {
+		if (
+			!firstRunNudgeShown &&
+			!store.previewMode &&
+			store.uniqueOwnedCards >= 50 &&
+			store.copyCount <= 1
+		) {
+			firstRunNudgeShown = true;
+			showFirstRunNudge = true;
+		}
+	});
+
+	async function handleSaveCopy() {
+		showFirstRunNudge = false;
+		try {
+			await downloadBackupCopy();
+		} catch (e) {
+			logAppError('indexeddb', e, { operation: 'downloadBackupCopy' });
+		}
+	}
+
+	function handleDismissNudge() {
+		showFirstRunNudge = false;
+	}
 
 	/**
 	 * The toast's Merge does not merge — it opens the preview, and the merge is
@@ -167,6 +206,12 @@
 		fileName={store.linkedFileName ?? ''}
 		onmerge={handleMerge}
 		onignore={handleIgnore}
+	/>
+
+	<FirstRunCopyNudge
+		bind:show={showFirstRunNudge}
+		onsave={handleSaveCopy}
+		ondismiss={handleDismissNudge}
 	/>
 
 	<MergePreviewModal

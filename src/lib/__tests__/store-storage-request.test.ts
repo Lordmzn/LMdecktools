@@ -12,7 +12,7 @@
  */
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { resetDatabases } from './reset';
-import { initDB, enterPreviewMode, closeDB, store } from '../store.svelte';
+import { initDB, enterPreviewMode, closeDB, clearDB, store } from '../store.svelte';
 import { useStorageFactory } from '../db';
 
 /**
@@ -36,6 +36,8 @@ afterEach(async () => {
 	store.installContext = 'browser';
 	store.collection = [];
 	store.savedCardLists = [];
+	store.deviceId = null;
+	store.copyRegistryEntries = [];
 	useStorageFactory(globalThis.indexedDB);
 	await resetDatabases();
 	Reflect.deleteProperty(globalThis.navigator, 'storage');
@@ -60,5 +62,48 @@ describe('persistent storage request', () => {
 		await Promise.resolve();
 
 		expect(persist).not.toHaveBeenCalled();
+	});
+});
+
+/**
+ * The copy registry's app-level wiring (#90) — same seam as the persistence
+ * request above, `openDocument()`'s persisting branch.
+ */
+describe('copy registry provisioning', () => {
+	it('mints a deviceId and starts at one copy — this device, nothing else yet', async () => {
+		stubStorageManager();
+
+		await initDB();
+
+		expect(store.deviceId).not.toBeNull();
+		expect(store.copyRegistryEntries).toEqual([]);
+		expect(store.copyCount).toBe(1);
+	});
+
+	it('never counts a copy in preview mode', async () => {
+		stubStorageManager();
+
+		await enterPreviewMode();
+
+		expect(store.copyCount).toBe(0);
+	});
+
+	it('does not carry a copy record into a fresh lineage', async () => {
+		stubStorageManager();
+
+		await initDB();
+		const deviceId = store.deviceId;
+		store.copyRegistryEntries = [
+			{ id: 'export', kind: 'export', label: 'backup.yjs', lastSeen: Date.now() }
+		];
+		expect(store.copyCount).toBe(2);
+
+		await clearDB();
+
+		// The device identity survives — it names the hardware, not the lineage —
+		// but a brand-new guid has no copies recorded against it yet.
+		expect(store.deviceId).toBe(deviceId);
+		expect(store.copyRegistryEntries).toEqual([]);
+		expect(store.copyCount).toBe(1);
 	});
 });
