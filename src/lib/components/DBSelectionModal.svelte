@@ -29,13 +29,17 @@
 		saveNow,
 		importCardsToCollection,
 		importCardsToNewList,
-		logAppError
+		logAppError,
+		previewPayload,
+		importSiblingFile,
+		type MergePreview
 	} from '$lib/store.svelte';
 	import type { ExportFormat } from '$lib/export-format';
-	import { describeImport } from '$lib/import-guard';
+	import { describeImport, ImportValidationError } from '$lib/import-guard';
 	import { parseImportInput } from '$lib/import-parser';
 	import type { ParseResult } from '$lib/import-parser';
 	import { fetchDeckFromUrl, URL_IMPORT_HOST } from '$lib/import-url';
+	import MergePreviewModal from '$lib/components/MergePreviewModal.svelte';
 	import * as m from '$lib/paraglide/messages';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
@@ -93,6 +97,89 @@
 	let importError = $state<string | null>(null);
 	/** What the selected restore file says it holds, or null when it failed validation. */
 	let importPreview = $state<string | null>(null);
+
+	// Sibling import (#91, T3): read other devices' files from the same shared
+	// folder, one `MergePreviewModal` at a time — never destructive, so there is
+	// no restore-style confirmation gate, just a queue.
+	let siblingFileInput: HTMLInputElement;
+	let siblingQueue: File[] = $state([]);
+	let siblingIndex = $state(0);
+	let siblingPreview = $state<MergePreview | null>(null);
+	let siblingPreviewLoading = $state(false);
+	let siblingPreviewError = $state<string | null>(null);
+	let showSiblingPreview = $state(false);
+	let siblingResult = $state<{ imported: number; merged: number; errors: number; skipped: number }>(
+		{ imported: 0, merged: 0, errors: 0, skipped: 0 }
+	);
+	let siblingDone = $state(false);
+
+	async function advanceSiblingQueue() {
+		if (siblingIndex >= siblingQueue.length) {
+			siblingDone = true;
+			return;
+		}
+
+		const file = siblingQueue[siblingIndex];
+		showSiblingPreview = true;
+		siblingPreviewLoading = true;
+		siblingPreview = null;
+		siblingPreviewError = null;
+
+		try {
+			const data = new Uint8Array(await file.arrayBuffer());
+			siblingPreview = previewPayload(data);
+		} catch (e) {
+			if (e instanceof ImportValidationError) {
+				// Not one of ours (or unreadable) — skip it and keep going rather
+				// than blocking the rest of the batch on one stray file.
+				siblingResult.skipped++;
+				siblingIndex++;
+				showSiblingPreview = false;
+				await advanceSiblingQueue();
+				return;
+			}
+			logAppError('import', e, { operation: 'previewSiblingFile', fileName: file.name });
+			siblingPreviewError = m.merge_preview_error();
+		} finally {
+			siblingPreviewLoading = false;
+		}
+	}
+
+	function handleSiblingFilesSelect(event: Event) {
+		const target = event.target as HTMLInputElement;
+		if (!target.files || target.files.length === 0) return;
+
+		siblingQueue = Array.from(target.files);
+		siblingIndex = 0;
+		siblingResult = { imported: 0, merged: 0, errors: 0, skipped: 0 };
+		siblingDone = false;
+		void advanceSiblingQueue();
+	}
+
+	async function handleSiblingConfirm() {
+		showSiblingPreview = false;
+		const file = siblingQueue[siblingIndex];
+		try {
+			const data = new Uint8Array(await file.arrayBuffer());
+			const result = await importSiblingFile(data, file.name);
+			siblingResult.imported += result.imported;
+			siblingResult.merged += result.merged;
+			siblingResult.errors += result.errors;
+		} catch (e) {
+			logAppError('import', e, { operation: 'importSiblingFile', fileName: file.name });
+			siblingResult.errors++;
+		}
+		siblingIndex++;
+		await advanceSiblingQueue();
+	}
+
+	async function handleSiblingCancel() {
+		showSiblingPreview = false;
+		siblingResult.skipped++;
+		siblingIndex++;
+		await advanceSiblingQueue();
+	}
+
 	let imageCacheCount = $state(0);
 	let imageCacheBytes = $state(0);
 	// e.g. "412 images · 86.4 MB" — the size is what the Clear button is judged against (#51)
@@ -865,7 +952,7 @@
 								</p>
 								<input
 									type="file"
-									accept=".yjs,.json"
+									data-testid="restore-file-input"
 									bind:this={fileInput}
 									onchange={handleFileSelect}
 									disabled={isLoadingFile}
@@ -962,6 +1049,72 @@
 							{m.db_no_fs_access()}
 						</p>
 					{/if}
+
+					<!-- Separator -->
+					<div class="my-4 border-t border-orange-500/[0.08]"></div>
+
+					<!-- Read other devices' files (#91, T3) — needs no File System Access API,
+					     so it lives here rather than under the File DB tab, which is hidden
+					     entirely where that API is absent. -->
+					<div
+						class="rounded-xl border border-orange-500/[0.08] p-5 transition-colors hover:border-orange-500/20"
+					>
+						<div class="flex items-start gap-4">
+							<div
+								class="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-full bg-slate-800"
+							>
+								<svg
+									class="h-6 w-6 text-orange-400"
+									fill="none"
+									stroke="currentColor"
+									viewBox="0 0 24 24"
+								>
+									<path
+										stroke-linecap="round"
+										stroke-linejoin="round"
+										stroke-width="2"
+										d="M9 17v-2a4 4 0 014-4h4m0 0l-3-3m3 3l-3 3M4 7h16M4 7a2 2 0 00-2 2v6a2 2 0 002 2h4M4 7a2 2 0 012-2h5"
+									></path>
+								</svg>
+							</div>
+							<div class="flex-1">
+								<h3 class="mb-2 text-lg font-semibold text-slate-100">{m.db_siblings_title()}</h3>
+								<p class="mb-4 text-sm text-slate-400">
+									{m.db_siblings_body()}
+								</p>
+								<input
+									type="file"
+									multiple
+									data-testid="sibling-file-input"
+									bind:this={siblingFileInput}
+									onchange={handleSiblingFilesSelect}
+									class="hidden"
+								/>
+								{#if siblingDone && siblingQueue.length > 0}
+									<div
+										class="border-success-edge bg-success-surface text-success mb-3 rounded-lg border p-3 text-sm"
+										data-testid="sibling-summary"
+									>
+										{siblingResult.errors > 0 || siblingResult.skipped > 0
+											? m.db_siblings_summary_partial({
+													imported: siblingResult.imported,
+													skipped: siblingResult.errors + siblingResult.skipped
+												})
+											: siblingResult.imported === 1
+												? m.db_siblings_summary_one({ imported: siblingResult.imported })
+												: m.db_siblings_summary_other({ imported: siblingResult.imported })}
+									</div>
+								{/if}
+								<button
+									onclick={() => siblingFileInput.click()}
+									disabled={store.dbMode !== 'active'}
+									class="btn btn-subtle w-full disabled:cursor-not-allowed"
+								>
+									{m.db_siblings_button()}
+								</button>
+							</div>
+						</div>
+					</div>
 
 					<!-- Separator -->
 					<div class="my-4 border-t border-orange-500/[0.08]"></div>
@@ -1642,6 +1795,19 @@
 		</div>
 	</div>
 {/if}
+
+<!-- Sibling import preview (#91, T3) — one MergePreviewModal per queued file,
+     independent of the layout-level instance that drives the linked-file
+     external-change flow. -->
+<MergePreviewModal
+	bind:show={showSiblingPreview}
+	fileName={siblingQueue[siblingIndex]?.name ?? ''}
+	preview={siblingPreview}
+	loading={siblingPreviewLoading}
+	error={siblingPreviewError}
+	onconfirm={handleSiblingConfirm}
+	oncancel={handleSiblingCancel}
+/>
 
 <!-- Restore Confirmation — only shown when there is data the restore would replace -->
 {#if showRestoreConfirm}

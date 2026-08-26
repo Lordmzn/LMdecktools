@@ -2313,7 +2313,7 @@ export const db_download_preparing = () => `Preparing…`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
-export const db_download_button = () => `Download .yjs file`
+export const db_download_button = () => `Download .ydelta file`
 
 
 /**
@@ -2426,6 +2426,54 @@ export const db_restore_button = () => `Restore from file`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const db_no_fs_access = () => `Auto-save to a linked file requires desktop Chrome or Edge 86+, or Chrome on Android 132+. Safari and Firefox have never supported it, so this browser has no File DB tab. Download and restore copies here instead.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_title = () => `Read other devices' files`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_body = () => `Pick the .ydelta files other devices have saved into a shared folder (Dropbox, iCloud, OneDrive). Each one merges in — this never overwrites anything.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_button = () => `Choose files…`
+
+
+/**
+ * @param {{ imported: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_summary_one = (params) => `${params.imported} file merged.`
+
+
+/**
+ * @param {{ imported: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_summary_other = (params) => `${params.imported} files merged.`
+
+
+/**
+ * @param {{ imported: NonNullable<unknown>, skipped: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_summary_partial = (params) => `${params.imported} merged, ${params.skipped} skipped.`
 
 
 /**
@@ -3292,7 +3340,7 @@ export const import_error_truncated_cards_other = (params) => `This file looks i
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
-export const import_error_unrecognised_format = () => `Unrecognised file format. Please choose a .yjs or .json file exported from this app. Nothing was changed.`
+export const import_error_unrecognised_format = () => `Unrecognised file format. Please choose a .ydelta or .json file exported from this app. Nothing was changed.`
 
 
 /**

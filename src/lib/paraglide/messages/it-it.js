@@ -2313,7 +2313,7 @@ export const db_download_preparing = () => `Preparazione…`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
-export const db_download_button = () => `Scarica il file .yjs`
+export const db_download_button = () => `Scarica il file .ydelta`
 
 
 /**
@@ -2426,6 +2426,54 @@ export const db_restore_button = () => `Ripristina da file`
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const db_no_fs_access = () => `Il salvataggio automatico su un file collegato richiede Chrome o Edge 86+ su desktop, oppure Chrome su Android 132+. Safari e Firefox non l'hanno mai supportato, quindi questo browser non ha la scheda DB su file. Scarica e ripristina le copie da qui.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_title = () => `Leggi i file di altri dispositivi`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_body = () => `Scegli i file .ydelta che altri dispositivi hanno salvato in una cartella condivisa (Dropbox, iCloud, OneDrive). Ognuno si unisce ai tuoi dati — non sovrascrive mai nulla.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_button = () => `Scegli i file…`
+
+
+/**
+ * @param {{ imported: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_summary_one = (params) => `${params.imported} file unito.`
+
+
+/**
+ * @param {{ imported: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_summary_other = (params) => `${params.imported} file uniti.`
+
+
+/**
+ * @param {{ imported: NonNullable<unknown>, skipped: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_siblings_summary_partial = (params) => `${params.imported} uniti, ${params.skipped} saltati.`
 
 
 /**
@@ -3292,7 +3340,7 @@ export const import_error_truncated_cards_other = (params) => `Questo file sembr
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
-export const import_error_unrecognised_format = () => `Formato del file non riconosciuto. Scegli un file .yjs o .json esportato da questa app. Non è stato modificato nulla.`
+export const import_error_unrecognised_format = () => `Formato del file non riconosciuto. Scegli un file .ydelta o .json esportato da questa app. Non è stato modificato nulla.`
 
 
 /**

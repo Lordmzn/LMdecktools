@@ -19,17 +19,29 @@ export function isFileSystemAccessSupported(): boolean {
 
 const METADATA_KEY = 'linkedFile';
 
-const YJS_FILE_TYPES = [
+/**
+ * `.ydelta` is the T3 per-device file extension (#91) — `.yjs` retired with the
+ * snapshot format it named (`docs/durability-convergence-transport.md` T2b).
+ */
+const DELTA_FILE_TYPES = [
 	{
-		description: 'Yjs binary',
-		accept: { 'application/octet-stream': ['.yjs'] } as Record<string, string[]>
+		description: 'LM Deck Tools delta',
+		accept: { 'application/octet-stream': ['.ydelta'] } as Record<string, string[]>
 	}
 ];
 
-export async function pickAndLinkNewFile(db: IDBDatabase): Promise<FileSystemFileHandle> {
+/**
+ * `deviceId` (`copy-registry.ts`) names the suggested file, not `clientID` —
+ * it is what makes the T3 layout (`<deviceId>.ydelta` per device in a shared
+ * folder) self-explanatory to whoever is looking at the folder later.
+ */
+export async function pickAndLinkNewFile(
+	db: IDBDatabase,
+	deviceId: string
+): Promise<FileSystemFileHandle> {
 	const handle = await window.showSaveFilePicker({
-		suggestedName: 'lmdecktools.yjs',
-		types: YJS_FILE_TYPES
+		suggestedName: `${deviceId}.ydelta`,
+		types: DELTA_FILE_TYPES
 	});
 	await putMetadata(db, METADATA_KEY, handle);
 	return handle;
@@ -38,7 +50,7 @@ export async function pickAndLinkNewFile(db: IDBDatabase): Promise<FileSystemFil
 export async function pickAndLinkExistingFile(db: IDBDatabase): Promise<FileSystemFileHandle> {
 	const [handle] = await window.showOpenFilePicker({
 		multiple: false,
-		types: YJS_FILE_TYPES
+		types: DELTA_FILE_TYPES
 	});
 	await putMetadata(db, METADATA_KEY, handle);
 	return handle;

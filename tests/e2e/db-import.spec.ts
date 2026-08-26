@@ -67,7 +67,7 @@ async function setupWithDBAndRestorePanel(page: import('@playwright/test').Page)
 }
 
 const restoreFileInput = (page: import('@playwright/test').Page) =>
-	page.locator('input[type="file"][accept=".yjs,.json"]');
+	page.getByTestId('restore-file-input');
 
 // A valid export, small enough to inline
 const genuineExport = (listName = 'Restored Deck') =>
@@ -194,10 +194,10 @@ test.describe('Database Import', () => {
 		expect(names).toEqual(['Imported Red Deck']);
 	});
 
-	test('a downloaded .yjs copy restores into a wiped browser', async ({ page }) => {
+	test('a downloaded .ydelta copy restores into a wiped browser', async ({ page }) => {
 		// Round-trip through the real binary format: the previous version of this
 		// spec fed a one-byte buffer, which the #52 guard now rightly refuses, so
-		// the only honest .yjs fixture is one the app itself wrote.
+		// the only honest .ydelta fixture is one the app itself wrote.
 		// Seed the database from JSON rather than from Scryfall, so the round-trip
 		// stays offline and deterministic
 		await setupWithDBAndRestorePanel(page);
@@ -211,7 +211,7 @@ test.describe('Database Import', () => {
 
 		const download = await Promise.all([
 			page.waitForEvent('download'),
-			page.getByRole('button', { name: 'Download .yjs file', exact: true }).click()
+			page.getByRole('button', { name: 'Download .ydelta file', exact: true }).click()
 		]).then(([d]) => d);
 		const backupPath = await download.path();
 		expect(backupPath).toBeTruthy();
@@ -221,7 +221,7 @@ test.describe('Database Import', () => {
 		await openRestorePanel(page);
 
 		await restoreFileInput(page).setInputFiles(backupPath!);
-		// A .yjs the app wrote passes validation and names itself
+		// A .ydelta the app wrote passes validation and names itself
 		await expect(page.getByTestId('restore-preview')).toContainText('LM Deck Tools');
 		await expect(page.getByTestId('restore-preview')).toContainText('1 list');
 
