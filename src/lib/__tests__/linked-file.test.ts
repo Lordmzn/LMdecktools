@@ -16,6 +16,7 @@ import {
 	cancelDebouncedWrite,
 	startPolling,
 	stopPolling,
+	pickAndLinkNewFile,
 	_resetState
 } from '../linked-file';
 
@@ -56,6 +57,26 @@ describe('Handle storage with IDB', () => {
 		await unlinkFile(db);
 		const record = await getMetadata(db, 'linkedFile');
 		expect(record.value).toBeNull();
+	});
+
+	it('pickAndLinkNewFile suggests <deviceId>.ydelta (#91, T3)', async () => {
+		const mockHandle = { name: 'device-abc.ydelta' } as unknown as FileSystemFileHandle;
+		const showSaveFilePicker = vi.fn().mockResolvedValue(mockHandle);
+		(globalThis as any).window = globalThis;
+		(globalThis as any).showSaveFilePicker = showSaveFilePicker;
+
+		const handle = await pickAndLinkNewFile(db, 'device-abc');
+
+		expect(handle).toBe(mockHandle);
+		expect(showSaveFilePicker).toHaveBeenCalledWith(
+			expect.objectContaining({
+				suggestedName: 'device-abc.ydelta',
+				types: [expect.objectContaining({ accept: { 'application/octet-stream': ['.ydelta'] } })]
+			})
+		);
+
+		delete (globalThis as any).showSaveFilePicker;
+		delete (globalThis as any).window;
 	});
 });
 

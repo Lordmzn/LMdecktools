@@ -41,7 +41,7 @@ The current, working version of LM Deck Tools is a direct result of executing on
 
 ### How the Current Features Align with the Vision:
 
-- **Database Management (`.yjs` files):** The features for creating, loading, backing up, and restoring the local database are the direct implementation of the **User-Controlled Data** principle. The "DB Selection Modal" is the gateway to this user-centric workflow — the In-browser DB tab handles manual backup and restore, and the File DB tab handles auto-save linking. An auto-load preference remembers the user's choice to connect the local DB, so subsequent visits skip the modal entirely.
+- **Database Management (`.ydelta` files):** The features for creating, loading, backing up, and restoring the local database are the direct implementation of the **User-Controlled Data** principle. The "DB Selection Modal" is the gateway to this user-centric workflow — the In-browser DB tab handles manual backup and restore, and the File DB tab handles auto-save linking. An auto-load preference remembers the user's choice to connect the local DB, so subsequent visits skip the modal entirely.
 - **No User Accounts:** The absence of a login or signup process is a deliberate design choice that directly enforces the **Absolute Privacy** and **Zero Backend** principles.
 - **Scryfall API for Card Search:** By leveraging the excellent and free Scryfall API, the application provides comprehensive card data without needing to host and maintain a massive card database. This is a key part of the **Zero Cost** principle.
 - **Collection & Card List Management:** These core features are implemented to work entirely client-side, proving that a rich user experience is possible without a backend. State management is handled locally, reinforcing the **Privacy** principle.
@@ -53,7 +53,7 @@ The planned and experimental features below continue to align with the core prin
 
 ### 4.1 Near-term
 
-- **[done] Database backup and restore:** The In-browser DB tab in the DB modal lets users download a full `.yjs` copy and restore from one, in any browser and with or without a database already loaded (#42). This is the other half of the data ownership story, allowing users to safeguard and recover their data without needing a cloud sync. Restoring is destructive, so the file is validated before anything is cleared: one that another app wrote, or that would erase the database and put nothing back, is refused with an error and no write (#52).
+- **[done] Database backup and restore:** The In-browser DB tab in the DB modal lets users download a full `.ydelta` copy and restore from one, in any browser and with or without a database already loaded (#42). This is the other half of the data ownership story, allowing users to safeguard and recover their data without needing a cloud sync. Restoring is destructive, so the file is validated before anything is cleared: one that another app wrote, or that would erase the database and put nothing back, is refused with an error and no write (#52).
 - **[done] Compare two card lists:** This is a valuable feature that can be built entirely on the client-side, adding utility without compromising the core principles.
 - **[done] Cache card images with the browser Cache API:** After their first load, Scryfall card images are stored in the browser's native Cache storage (`caches.open()`) and served locally on every subsequent visit. This reduces Scryfall API traffic, speeds up the UI, and keeps images available across sessions — all without a service worker, a server, or any extra dependency. Cache size is reported in the DB modal and the user can clear it on demand. Fully aligned with Zero Cost, Zero Backend, and Absolute Privacy.
 
@@ -61,7 +61,7 @@ The planned and experimental features below continue to align with the core prin
 
 ### 4.2 File-Based Sync ("Bring Your Own Cloud") — Implemented
 
-The [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) (`showSaveFilePicker` / `createWritable`) enables a browser app to hold a persistent, writable handle to a file the user has explicitly chosen via the OS file picker. LM Deck Tools uses this to implement silent auto-save: every state change writes the current `.yjs` snapshot to the linked file without user intervention.
+The [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_API) (`showSaveFilePicker` / `createWritable`) enables a browser app to hold a persistent, writable handle to a file the user has explicitly chosen via the OS file picker. LM Deck Tools uses this to implement silent auto-save: every state change writes the current `.ydelta` snapshot to the linked file without user intervention.
 
 This approach aligns squarely with all three core principles:
 

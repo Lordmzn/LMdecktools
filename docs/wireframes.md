@@ -437,7 +437,7 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 | | Download copy                                        | |
 | | Full DB (collection + all card lists). A one-off     | |
 | | snapshot; File DB keeps saving itself.               | |
-| | [Download .yjs file]   (disabled when no DB active)  | |
+| | [Download .ydelta file]   (disabled when no DB active)  | |
 | +------------------------------------------------------+ |
 | -------------------------------------------------------- |
 | +------------------------------------------------------+ |
@@ -445,7 +445,7 @@ Auto-load: If the user has previously connected to the local DB, the app auto-lo
 | | Restore from file                                    | |
 | | Replaces everything stored. Always available —       | |
 | | any browser, any dbMode.                             | |
-| | [Choose file...  (.yjs, .json)]                      | |
+| | [Choose file...  (.ydelta, .json)]                      | |
 | |   app · version · exported_at · counts  (preview)    | |
 | | [Restore from file]                                  | |
 | +------------------------------------------------------+ |

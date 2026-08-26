@@ -720,9 +720,13 @@ async function recordCopySeen(kind: CopyEntry['kind'], id: string, label: string
 	store.copyRegistryEntries = await recordCopy(db, guid, { id, kind, label, lastSeen: Date.now() });
 }
 
-/** The filename a downloaded backup gets — unrelated to T3's per-device file naming (#91). */
+/**
+ * The filename a downloaded backup gets. Date-based rather than deviceId-based
+ * — T3's per-device naming is for the linked file, not a one-off export — but
+ * the extension still follows the same retirement of `.yjs` (#91, T2b).
+ */
 function backupFilename(): string {
-	return `lm-decktools-backup-${new Date().toISOString().slice(0, 10)}.yjs`;
+	return `lm-decktools-backup-${new Date().toISOString().slice(0, 10)}.ydelta`;
 }
 
 /** Download a full snapshot and record it as a copy. The `<a download>` path used everywhere else too. */
@@ -894,7 +898,8 @@ export async function initLinkedFile(): Promise<void> {
 export async function linkFile(): Promise<void> {
 	const _db = await ensureDB();
 
-	const handle = await pickAndLinkNewFile(_db);
+	const deviceId = await getOrCreateDeviceId(_db);
+	const handle = await pickAndLinkNewFile(_db, deviceId);
 	linkedHandle = handle;
 	store.linkedFileName = handle.name;
 	store.linkedFileStatus = 'active';
@@ -1261,6 +1266,24 @@ export async function importDatabase(
 
 	const added = Math.max(0, liveLists().length - before);
 	return { imported: added, merged: payload.cardLists.length - added, errors: 0 };
+}
+
+/**
+ * Import one sibling's file (T3, #91) and record it as a known copy.
+ *
+ * "Sibling" means a file another device wrote into the same shared folder —
+ * always non-destructive, same two-way classification as every other import
+ * path. The copy-registry id is prefixed so it never collides with this
+ * device's own linked-file entry (`recordCopySeen('linked-file', 'linked-file', …)`
+ * above), and a device's siblings can be told apart by filename.
+ */
+export async function importSiblingFile(
+	data: Uint8Array,
+	fileName: string
+): Promise<{ imported: number; merged: number; errors: number }> {
+	const result = await importDatabase(data, true);
+	await recordCopySeen('linked-file', `sibling:${fileName}`, fileName);
+	return result;
 }
 
 // ==================== SCRYFALL BATCH FETCH ====================
