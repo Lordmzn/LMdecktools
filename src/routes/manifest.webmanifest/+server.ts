@@ -37,9 +37,13 @@ export const prerender = true;
  * duplicate-install failure above. An Italian visitor installs and lands on the
  * English root; the footer switcher is one click from there.
  *
- * No `share_target` here — the manifest entry is trivial but the receiving half
- * (a POST intercept in the worker, a stash, the `.json` envelope and the
- * merge-vs-union import UI) belongs with the rest of the file transports in #91.
+ * **`share_target`** (#91, T2) makes the installed app a destination in
+ * Android's OS share sheet. `action` names the route that receives the POST —
+ * `src/service-worker.ts` intercepts it before it ever reaches the network,
+ * stashes the file, and 303-redirects here as a GET, which
+ * `src/routes/share-target/+page.svelte` reads back out. `accept` lists the T2b
+ * envelope's own extension and MIME type; nothing else is a valid share target
+ * for this app.
  */
 const MANIFEST = {
 	// Fixed for the lifetime of the app; see the note above.
@@ -83,7 +87,19 @@ const MANIFEST = {
 		}
 	],
 
-	categories: ['games', 'productivity', 'utilities']
+	categories: ['games', 'productivity', 'utilities'],
+
+	// method/enctype together are what makes this a POST the worker can
+	// intercept rather than a GET with the file URL-encoded onto the query
+	// string — the T2b envelope is easily past any sane URL length.
+	share_target: {
+		action: `${BASE_PATH}/share-target/`,
+		method: 'POST',
+		enctype: 'multipart/form-data',
+		params: {
+			files: [{ name: 'file', accept: ['application/json', '.json'] }]
+		}
+	}
 };
 
 export const GET: RequestHandler = () => {

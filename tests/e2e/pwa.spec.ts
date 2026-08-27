@@ -171,3 +171,83 @@ test.describe('service worker', () => {
 		expect(keys.filter((key) => key.startsWith('lm-decktools-shell-')).length).toBeLessThan(2);
 	});
 });
+
+test.describe('share target (#91, T2)', () => {
+	/**
+	 * A service worker's response to a `share_target` POST cannot be the page
+	 * itself — the browser only accepts a redirect out of it, which is what
+	 * turns the POST into a plain GET the route can render. Content validation
+	 * (a genuine `.json` envelope, merge-vs-union) is covered at the unit level
+	 * (`import-guard.test.ts`, `store-share-envelope.test.ts`) and the component
+	 * level (`share-target.test.ts`); this only has to prove the worker's own
+	 * mechanism — intercept, stash, redirect — actually runs in a real browser
+	 * against the real build.
+	 */
+	async function postShare(page: import('@playwright/test').Page, action: string, body: string) {
+		return await page.evaluate(
+			async ({ actionUrl, payload }) => {
+				const formData = new FormData();
+				formData.append('file', new File([payload], 'share.json', { type: 'application/json' }));
+				const response = await fetch(actionUrl, { method: 'POST', body: formData });
+				return { redirected: response.redirected, url: response.url, status: response.status };
+			},
+			{ actionUrl: action, payload: body }
+		);
+	}
+
+	test('intercepts the manifest-declared POST and redirects to the receiving route', async ({
+		page
+	}) => {
+		await page.goto('./');
+		await activeWorker(page);
+
+		const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();
+		const action = manifest.share_target.action as string;
+		expect(action).toBe(`${BASE}/share-target/`);
+
+		const result = await postShare(page, action, '{"hello":"world"}');
+
+		// `fetch()` does follow the worker's synthetic redirect — status 200 here
+		// can only mean the GET on the receiving route's prerendered page, since
+		// nothing else answers a POST to this path — but `Response.redirected`
+		// does not reliably reflect a redirect a service worker synthesised
+		// in-process rather than one that came over the network, so that flag is
+		// not asserted on.
+		expect(result.status).toBe(200);
+		expect(new URL(result.url).pathname).toBe(action);
+	});
+
+	test('stashes the shared file where the receiving route reads it', async ({ page }) => {
+		await page.goto('./');
+		await activeWorker(page);
+
+		const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();
+		await postShare(page, manifest.share_target.action, '{"hello":"world"}');
+
+		const stashed = await page.evaluate(async () => {
+			const cache = await caches.open('lm-decktools-share-stash');
+			const hit = await cache.match('share-payload');
+			return hit ? await hit.text() : null;
+		});
+
+		expect(stashed).toBe('{"hello":"world"}');
+	});
+
+	test('a malformed share (no file field) still redirects, rather than failing the OS share action', async ({
+		page
+	}) => {
+		await page.goto('./');
+		await activeWorker(page);
+
+		const manifest = await (await page.request.get(`${BASE}/manifest.webmanifest`)).json();
+		const action = manifest.share_target.action as string;
+
+		const result = await page.evaluate(async (actionUrl) => {
+			const response = await fetch(actionUrl, { method: 'POST', body: new FormData() });
+			return { url: response.url, status: response.status };
+		}, action);
+
+		expect(result.status).toBe(200);
+		expect(new URL(result.url).pathname).toBe(action);
+	});
+});

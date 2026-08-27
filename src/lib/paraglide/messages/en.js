@@ -1961,6 +1961,86 @@ export const diagnostics_open_issue = () => `Open GitHub issue`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const share_target_meta_title = () => `Shared file · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_meta_description = () => `Import a file shared to LM Deck Tools from another app.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_eyebrow = () => `Share Sheet`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_title = () => `Shared file`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_loading = () => `Reading the shared file…`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_empty = () => `Nothing was shared. Share a .json file to LM Deck Tools from another app to import it here.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_no_database = () => `No database is open on this device yet. Open or create one, then share the file to LM Deck Tools again.`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_done_one = (params) => `${params.count} list imported.`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_done_other = (params) => `${params.count} lists imported.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_home_link = () => `Go to LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const db_stat_lists = () => `Card lists:`
 
 
@@ -2090,6 +2170,22 @@ export const db_copies_warning_body = () => `Your collection exists in one place
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const db_copies_save_button = () => `Save a copy`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_share_button = () => `Share…`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_share_error = () => `Could not open the share sheet.`
 
 
 /**

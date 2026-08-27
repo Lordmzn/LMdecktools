@@ -80,6 +80,23 @@ const SHELL = [...build, ...files, ...PAGES];
 const RECACHE_MESSAGE = 'lm-decktools:recache';
 
 /**
+ * Must match `share_target.action` in `manifest.webmanifest/+server.ts` and
+ * the route `src/routes/share-target/+page.svelte` reads the stash from.
+ * `BASE_PATH` lives in `$lib/site.ts` and cannot be imported here for the same
+ * reason `RECACHE_MESSAGE` is duplicated rather than shared — so it is spelled
+ * out again (#91, T2).
+ */
+const SHARE_TARGET_PATH = '/decktools/share-target/';
+
+/**
+ * Must match `src/lib/share-target-stash.ts`'s constants of the same name —
+ * duplicated for the same reason `SHARE_TARGET_PATH` above is. One entry,
+ * always overwritten: a share is consumed by the very next load of the route.
+ */
+const SHARE_STASH_CACHE = 'lm-decktools-share-stash';
+const SHARE_STASH_URL = 'share-payload';
+
+/**
  * Fill the cache, tolerating individual failures.
  *
  * Deliberately not `cache.addAll()`, which is atomic: one asset 404ing would
@@ -131,18 +148,56 @@ sw.addEventListener('activate', (event) => {
 
 sw.addEventListener('fetch', (event) => {
 	const { request } = event;
-
-	// POST and friends have no cache semantics worth guessing at. When #91 adds
-	// `share_target`, its POST to the share action is handled before this line.
-	if (request.method !== 'GET') return;
-
 	const url = new URL(request.url);
+
+	// Android's share sheet POSTs the file here (T2, #91) — stash it and hand
+	// the tab a plain GET to navigate to, since a service worker's response to
+	// a share-target POST cannot itself be the page: the browser only accepts
+	// a redirect out of it.
+	if (request.method === 'POST' && url.pathname === SHARE_TARGET_PATH) {
+		event.respondWith(handleShareTarget(event));
+		return;
+	}
+
+	// POST and friends have no other cache semantics worth guessing at.
+	if (request.method !== 'GET') return;
 
 	// Scryfall's API and card art. Not ours — see the header note.
 	if (url.origin !== sw.location.origin) return;
 
 	event.respondWith(respond(event, url));
 });
+
+/**
+ * Read the shared file out of the POST body and stash it where the redirected
+ * GET can find it. Cache API rather than IndexedDB: the worker already owns
+ * two caches, a `Response` is exactly what a `File` is, and nothing here needs
+ * a schema.
+ */
+async function handleShareTarget(event: FetchEvent): Promise<Response> {
+	try {
+		const formData = await event.request.formData();
+		const file = formData.get('file');
+
+		if (file instanceof File) {
+			const cache = await caches.open(SHARE_STASH_CACHE);
+			await cache.put(
+				SHARE_STASH_URL,
+				new Response(file, {
+					headers: { 'Content-Type': file.type || 'application/json' }
+				})
+			);
+		}
+	} catch {
+		// Malformed multipart body, or no `file` field. The route finds an empty
+		// stash and says so — the redirect below still has to happen either way,
+		// or the OS is left thinking the share failed when the app just opens.
+	}
+
+	// 303: this is the POST-to-GET conversion the whole redirect exists for —
+	// a 307/308 would replay the POST against the receiving route.
+	return Response.redirect(SHARE_TARGET_PATH, 303);
+}
 
 async function respond(event: FetchEvent, url: URL): Promise<Response> {
 	const { request } = event;
