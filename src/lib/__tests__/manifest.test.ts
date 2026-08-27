@@ -72,6 +72,27 @@ describe('manifest', () => {
 		}
 	});
 
+	it('declares a share_target action inside scope, as a POST the worker can intercept', async () => {
+		const manifest = await renderManifest();
+		const shareTarget = manifest.share_target as {
+			action: string;
+			method: string;
+			enctype: string;
+			params: { files: { name: string; accept: string[] }[] };
+		};
+
+		// Same reasoning as start_url/scope: a path outside BASE_PATH would claim
+		// part of the main site, and GET/urlencoded can't carry a file at all.
+		expect(shareTarget.action.startsWith(`${BASE_PATH}/`)).toBe(true);
+		expect(shareTarget.action.endsWith('/')).toBe(true);
+		expect(shareTarget.method).toBe('POST');
+		expect(shareTarget.enctype).toBe('multipart/form-data');
+		expect(shareTarget.params.files[0]).toEqual({
+			name: 'file',
+			accept: expect.arrayContaining(['application/json', '.json'])
+		});
+	});
+
 	it('ships a maskable icon and a plain one, at the sizes installers require', async () => {
 		const manifest = await renderManifest();
 		const icons = manifest.icons as { src: string; sizes: string; purpose: string }[];

@@ -20,7 +20,9 @@ import { claimLeadership, type Leadership } from './leader';
 import * as Y from 'yjs';
 import type { IndexeddbPersistence } from 'y-indexeddb';
 import {
+	APP_NAME,
 	DOC_PERSISTENCE_NAME,
+	DOC_SCHEMA_VERSION,
 	applyRemoteUpdate,
 	attachPersistence,
 	createDocument,
@@ -70,6 +72,7 @@ import {
 import { diffProjections, mergeCardListSets, mergeCollections } from './merge';
 import type { CardsDelta, ListMergeDetail } from './merge';
 import { parseImportFile, assertRestorable, type ImportPayload } from './import-guard';
+import { buildShareEnvelope } from './share-envelope';
 import {
 	formatCollectionAsCSV,
 	formatCollectionAsText,
@@ -736,6 +739,60 @@ export async function downloadBackupCopy(): Promise<void> {
 	await recordCopySeen('export', 'export', filename);
 }
 
+// ==================== SHARE SHEET (#91, T2) ====================
+
+/** Mirrors `backupFilename()` — date-based, extension follows the T2b envelope instead. */
+function shareFilename(): string {
+	return `lm-decktools-share-${new Date().toISOString().slice(0, 10)}.json`;
+}
+
+/** The `.json` share envelope (T2b) for the whole document, ready for `navigator.share`. */
+export function shareEnvelopeFile(): File {
+	const json = buildShareEnvelope(new Uint8Array(exportDB()), {
+		app: APP_NAME,
+		guid: documentGuid() ?? '',
+		schemaVersion: String(DOC_SCHEMA_VERSION)
+	});
+	return new File([json], shareFilename(), { type: 'application/json' });
+}
+
+/**
+ * Feature-detect the Web Share API's file support (T2). `canShare()` runs
+ * synchronously with no permission prompt and no transient-activation
+ * requirement, which is what lets the button decide whether to render at all
+ * rather than rendering and failing on click.
+ */
+export function canShareFiles(): boolean {
+	if (typeof navigator === 'undefined' || !('canShare' in navigator)) return false;
+	try {
+		return navigator.canShare({
+			files: [new File([''], 'probe.json', { type: 'application/json' })]
+		});
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * Hand the document to the OS share sheet — AirDrop, Messages, Mail, a cloud
+ * client, whatever the user picks. This is the project's first deliberate
+ * egress of collection data (`docs/project-vision.md` §5.5): no host is
+ * contacted, but the user is choosing a destination, so it is worth naming
+ * rather than folding into the silent "nothing leaves the device" claim.
+ *
+ * Not recorded in the copy registry: unlike a sibling's `.ydelta`, a shared
+ * file is not a location this device can point back to and re-read later.
+ */
+export async function shareBackupCopy(): Promise<void> {
+	try {
+		await navigator.share({ files: [shareEnvelopeFile()] });
+	} catch (e) {
+		// The user closing the share sheet without picking anything, not a failure.
+		if (e instanceof DOMException && e.name === 'AbortError') return;
+		throw e;
+	}
+}
+
 // ==================== ERROR JOURNAL ====================
 
 /**
@@ -1101,17 +1158,25 @@ export async function previewMergeFromFile(): Promise<MergePreview | null> {
 	return previewPayload(fileData);
 }
 
-/** The preview for a payload from any transport — the linked file, an upload, a peer. */
+/**
+ * The preview for a payload from any transport — the linked file, an upload, a
+ * sibling's file, a share envelope, a peer. Routed through `parseImportFile()`
+ * rather than `peekPayload()`/`readPayload()` directly (#91, T2b): those two
+ * assume the bytes are already a raw Yjs update, which stopped being true the
+ * moment a `.json` share envelope could reach this function through the same
+ * file inputs a `.ydelta` does. Format detection, validation and the T2b
+ * envelope's own decode step all happen once, here, for every caller.
+ */
 export function previewPayload(data: Uint8Array): MergePreview {
 	const current = requireDoc();
 	const before = { collection: liveCollection(), cardLists: liveLists() };
 
-	const incoming = peekPayload(data);
+	const payload = parseImportFile(data);
 
-	if (incoming.guid && incoming.guid === documentGuid()) {
+	if (payload.format === 'document' && payload.guid && payload.guid === documentGuid()) {
 		const clone = createDocument(current.guid);
 		applyRemoteUpdate(clone, updateFor(current), 'file');
-		applyRemoteUpdate(clone, data, 'file');
+		applyRemoteUpdate(clone, payload.rawUpdate!, 'file');
 
 		const after = {
 			collection: docReadCollection(clone),
@@ -1129,7 +1194,6 @@ export function previewPayload(data: Uint8Array): MergePreview {
 		};
 	}
 
-	const payload = readPayload(data);
 	const lists = mergeCardListSets(before.cardLists, payload.cardLists);
 	const collection = mergeCollections(before.collection, payload.collection);
 
@@ -1187,7 +1251,7 @@ export async function loadFromFile(
 	const payload = parseImportFile(data);
 	assertRestorable(payload);
 
-	const result = await adoptPayload(_db, payload, data, onProgress);
+	const result = await adoptPayload(_db, payload, onProgress);
 
 	store.dbMode = 'active';
 	await putMetadata(_db, 'autoLoadDB', true);
@@ -1207,7 +1271,6 @@ export async function loadFromFile(
 async function adoptPayload(
 	_db: IDBDatabase,
 	payload: ImportPayload,
-	data: Uint8Array,
 	onProgress?: (current: number, total: number) => void
 ): Promise<{ imported: number; merged: number; errors: number }> {
 	// The facts, before the whitelist drops them on the way into the document.
@@ -1226,7 +1289,7 @@ async function adoptPayload(
 	const adopted = await openDocument({ persist: true });
 
 	if (payload.format === 'document') {
-		applyRemoteUpdate(adopted, data, 'file');
+		applyRemoteUpdate(adopted, payload.rawUpdate!, 'file');
 	} else {
 		seedDocument(adopted, { collection: payload.collection, cardLists: payload.cardLists });
 	}
@@ -1248,12 +1311,12 @@ export async function importDatabase(
 	const payload = parseImportFile(data);
 	if (!merge) assertRestorable(payload);
 
-	if (!merge) return adoptPayload(_db, payload, data, onProgress);
+	if (!merge) return adoptPayload(_db, payload, onProgress);
 
 	const before = liveLists().length;
 
 	if (payload.format === 'document') {
-		await applyPayloadToDocument(data);
+		await applyPayloadToDocument(payload.rawUpdate!);
 	} else {
 		await cacheCardFacts(
 			[...payload.collection, ...payload.cardLists.flatMap((list) => list.cards)],

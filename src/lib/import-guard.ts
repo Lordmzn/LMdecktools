@@ -11,6 +11,7 @@
 import type { CardList, CollectionCard } from './db';
 import * as m from './paraglide/messages';
 import { DOC_SCHEMA_VERSION, readPayload } from './ydoc';
+import { isShareEnvelope, decodeUpdate } from './share-envelope';
 
 export const APP_NAME = 'LM Deck Tools';
 
@@ -43,6 +44,16 @@ export interface ImportPayload {
 	/** Counts the file claims for itself, used as a truncation check. Absent in pre-#52 exports. */
 	declaredLists: number | null;
 	declaredCards: number | null;
+	/**
+	 * The raw Yjs update bytes for a `document` payload (#91, T2b) — the file's
+	 * own bytes when it arrived as a `.ydelta`, or the base64 field decoded when
+	 * it arrived inside a `.json` share envelope. Every caller that applies a
+	 * `document` payload to the live document must use this, never the file's
+	 * outer bytes: those are the envelope's JSON when the payload came from one,
+	 * and `Y.applyUpdate` on JSON text throws. Null for `format: 'json'`, which
+	 * has no update to apply.
+	 */
+	rawUpdate: Uint8Array | null;
 }
 
 /** Thrown for any file we refuse to import. The message is shown to the user verbatim. */
@@ -134,7 +145,8 @@ function parseJSONPayload(raw: unknown): ImportPayload {
 		exportedAt: asNumber(source.exported_at),
 		guid: null,
 		declaredLists: asNumber(source.total_lists),
-		declaredCards: asNumber(source.total_cards)
+		declaredCards: asNumber(source.total_cards),
+		rawUpdate: null
 	};
 }
 
@@ -181,8 +193,31 @@ function parseDocumentPayload(data: Uint8Array): ImportPayload {
 		exportedAt: asNumber(meta.created_at),
 		guid: asString(meta.guid),
 		declaredLists: null,
-		declaredCards: null
+		declaredCards: null,
+		rawUpdate: data
 	};
+}
+
+/**
+ * Decode the `.json` share envelope (#91, T2b): check the outer app/version
+ * before the base64 bytes inside are ever touched — that is the whole reason
+ * the envelope carries its own `schema_version` rather than relying solely on
+ * the inner document's — then delegate to `parseDocumentPayload()` for the
+ * rest, same as a raw `.ydelta` file.
+ */
+function parseShareEnvelopePayload(raw: Record<string, unknown>): ImportPayload {
+	const app = asString(raw.app);
+	const version = asString(raw.schema_version);
+	checkIdentity(app, version, true);
+
+	let bytes: Uint8Array;
+	try {
+		bytes = decodeUpdate(raw.update as string);
+	} catch {
+		throw new ImportValidationError(m.import_error_unrecognised_format());
+	}
+
+	return parseDocumentPayload(bytes);
 }
 
 /**
@@ -195,6 +230,10 @@ export function parseImportFile(data: Uint8Array): ImportPayload {
 		json = JSON.parse(new TextDecoder().decode(data));
 	} catch {
 		return checkedPayload(parseDocumentPayload(data));
+	}
+
+	if (isShareEnvelope(json)) {
+		return checkedPayload(parseShareEnvelopePayload(json));
 	}
 
 	return checkedPayload(parseJSONPayload(json));

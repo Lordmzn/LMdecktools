@@ -19,7 +19,12 @@ const ROUTES: { path: string; priority: string }[] = [
 	{ path: '/card-lists/', priority: '0.8' },
 	{ path: '/collection/', priority: '0.8' },
 	{ path: '/card-lists/compare/', priority: '0.6' },
-	{ path: '/diagnostics/', priority: '0.3' }
+	{ path: '/diagnostics/', priority: '0.3' },
+	// Reachable only as the Android share-sheet redirect target (#91, T2) —
+	// there is no content here for a crawler and no incoming link to it, but
+	// `sitemap.test.ts` requires every `+page.svelte` listed, so it gets the
+	// lowest priority rather than an exception to that rule.
+	{ path: '/share-target/', priority: '0.1' }
 ];
 
 /** Locale → URL prefix. English is served at the root, Italian under /it-it. */

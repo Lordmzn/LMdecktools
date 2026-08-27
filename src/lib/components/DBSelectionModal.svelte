@@ -32,6 +32,8 @@
 		logAppError,
 		previewPayload,
 		importSiblingFile,
+		canShareFiles,
+		shareBackupCopy,
 		type MergePreview
 	} from '$lib/store.svelte';
 	import type { ExportFormat } from '$lib/export-format';
@@ -43,6 +45,10 @@
 	import * as m from '$lib/paraglide/messages';
 
 	const fsAccessSupported = isFileSystemAccessSupported();
+	// canShare({files}) runs synchronously with no prompt (#91, T2) — it's what
+	// decides whether the Share button renders at all rather than rendering and
+	// failing on click everywhere the API is absent (Firefox, most desktops).
+	const shareSupported = canShareFiles();
 
 	let activeSection = $state<Section | null>(null);
 
@@ -479,6 +485,23 @@
 			logAppError('indexeddb', e, { operation: 'exportBackup' });
 		} finally {
 			isExportingBackup = false;
+		}
+	}
+
+	// Share sheet (#91, T2)
+	let isSharing = $state(false);
+	let shareError = $state<string | null>(null);
+
+	async function handleShare() {
+		isSharing = true;
+		shareError = null;
+		try {
+			await shareBackupCopy();
+		} catch (e) {
+			logAppError('indexeddb', e, { operation: 'shareBackupCopy' });
+			shareError = m.db_share_error();
+		} finally {
+			isSharing = false;
 		}
 	}
 
@@ -1197,6 +1220,14 @@
 							</div>
 						{/if}
 
+						{#if shareError}
+							<div
+								class="border-danger-edge bg-danger-surface text-danger rounded-lg border p-3 text-sm"
+							>
+								{shareError}
+							</div>
+						{/if}
+
 						<div class="flex gap-2">
 							<button
 								onclick={handleExportBackup}
@@ -1205,6 +1236,16 @@
 							>
 								{isExportingBackup ? m.db_download_preparing() : m.db_copies_save_button()}
 							</button>
+							{#if shareSupported}
+								<button
+									onclick={handleShare}
+									disabled={isSharing || store.dbMode !== 'active'}
+									data-testid="share-button"
+									class="btn btn-subtle flex-1 disabled:cursor-not-allowed disabled:opacity-50"
+								>
+									{m.db_copies_share_button()}
+								</button>
+							{/if}
 							<button
 								disabled
 								title={m.db_copies_pair_caption()}

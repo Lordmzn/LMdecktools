@@ -552,14 +552,22 @@ working.
       sits outside the File DB tab that's hidden without it), one
       `MergePreviewModal` confirmation per file, recorded in the copy registry
       as `sibling:<filename>` (#91)
-- [ ] T2b `.json` envelope; T2a remove `accept`; two-way classification (C4) —
-      `accept` removed from the restore and sibling-import inputs; the `.json`
-      envelope itself is still open
-- [ ] `navigator.share({files})` behind `canShare`; Android `share_target`
+- [x] T2b `.json` envelope; T2a remove `accept`; two-way classification (C4) —
+      `src/lib/share-envelope.ts` builds/decodes it; `ImportPayload.rawUpdate`
+      is what lets `previewPayload()`/`importDatabase()` accept an envelope
+      through the same file inputs a raw `.ydelta` uses, not a parallel path
+      (#91)
+- [x] `navigator.share({files})` behind `canShare`; Android `share_target` —
+      outbound Share button in the Copies tab; `share_target` in the manifest,
+      a POST intercept + Cache-API stash in the service worker, and
+      `src/routes/share-target/+page.svelte` as the receiving route, reusing
+      the same `MergePreviewModal` pipeline as every other import (#91)
 - [x] Merge-vs-union stated in the import UI — `merge_preview_op_merge` /
-      `merge_preview_op_union`, shared by the linked-file, restore and
-      sibling-import paths
-- **Exit:** a file round-trips with lineage intact and deletions propagate
+      `merge_preview_op_union`, shared by the linked-file, restore, sibling-
+      import and share-target paths
+- **Exit:** a file round-trips with lineage intact and deletions propagate.
+  **Met** — `tests/e2e/pwa.spec.ts` "share target" exercises the real service
+  worker's intercept/stash/redirect against a production build
 
 ### M4 — Peer transport
 - [ ] QWBP, LAN-only, no STUN configured (T1)
@@ -575,12 +583,12 @@ working.
 - [ ] Direct download + signing/notarisation for macOS and Windows
 - **Exit:** the anchor holds a real file that the user's own backup covers
 
-**M0 and M1 are done.** M2 is next, and it is the gate on inviting users.
+**M0 through M3 are done.** M4 (peer transport) and M5 (anchor) remain.
 
 **Constraints:** M0 is independent and ships immediately. M1 blocks M2–M5. M3 and
-M4 are parallel. M5 depends on M1 only. **M2 is the gate on inviting users** —
-the copy-count invariant is what makes the app safe to recommend, and until it
-ships the alpha stays private.
+M4 are parallel. M5 depends on M1 only. **M2 was the gate on inviting users** —
+the copy-count invariant is what makes the app safe to recommend, and it has
+shipped, so that gate is open. M4 closes #11.
 
 ---
 

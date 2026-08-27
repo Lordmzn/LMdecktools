@@ -1961,6 +1961,86 @@ export const diagnostics_open_issue = () => `Apri la segnalazione su GitHub`
  * @returns {string}
  */
 /* @__NO_SIDE_EFFECTS__ */
+export const share_target_meta_title = () => `File condiviso · LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_meta_description = () => `Importa un file condiviso con LM Deck Tools da un'altra app.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_eyebrow = () => `Condivisione`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_title = () => `File condiviso`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_loading = () => `Lettura del file condiviso…`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_empty = () => `Non è stato condiviso nulla. Condividi un file .json con LM Deck Tools da un'altra app per importarlo qui.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_no_database = () => `Su questo dispositivo non è ancora aperto nessun database. Aprine o creane uno, poi condividi di nuovo il file con LM Deck Tools.`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_done_one = (params) => `${params.count} lista importata.`
+
+
+/**
+ * @param {{ count: NonNullable<unknown> }} params
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_done_other = (params) => `${params.count} liste importate.`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const share_target_home_link = () => `Vai a LM Deck Tools`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
 export const db_stat_lists = () => `Liste di carte:`
 
 
@@ -2090,6 +2170,22 @@ export const db_copies_warning_body = () => `La tua collezione esiste in un solo
  */
 /* @__NO_SIDE_EFFECTS__ */
 export const db_copies_save_button = () => `Salva una copia`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_copies_share_button = () => `Condividi…`
+
+
+/**
+ * 
+ * @returns {string}
+ */
+/* @__NO_SIDE_EFFECTS__ */
+export const db_share_error = () => `Impossibile aprire il foglio di condivisione.`
 
 
 /**

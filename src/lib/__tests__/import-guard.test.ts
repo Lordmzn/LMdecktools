@@ -8,6 +8,7 @@ import {
 } from '../import-guard';
 import * as Y from 'yjs';
 import { DOC_SCHEMA_VERSION, createDocument, seedDocument, updateFor } from '../ydoc';
+import { buildShareEnvelope } from '../share-envelope';
 
 const CURRENT_VERSION = String(DOC_SCHEMA_VERSION);
 
@@ -281,5 +282,64 @@ describe('describeImport', () => {
 
 		expect(describeImport(payload)).toContain('Legacy export');
 		expect(describeImport(payload)).toContain('1 list, 0 collection cards');
+	});
+});
+
+describe('the .json share envelope (#91, T2b)', () => {
+	function envelope(options: {
+		app?: string;
+		version?: string;
+		guid?: string;
+		lists?: { name: string }[];
+	}): Uint8Array {
+		const rawUpdate = documentExport({
+			app: APP_NAME,
+			version: CURRENT_VERSION,
+			guid: options.guid,
+			lists: options.lists
+		});
+		const json = buildShareEnvelope(rawUpdate, {
+			app: options.app ?? APP_NAME,
+			guid: options.guid ?? 'envelope-guid',
+			schemaVersion: options.version ?? CURRENT_VERSION
+		});
+		return new TextEncoder().encode(json);
+	}
+
+	it('decodes to the same document payload a raw .ydelta would', () => {
+		const payload = parseImportFile(
+			envelope({ guid: 'shared-guid', lists: [{ name: 'Shared Deck' }] })
+		);
+
+		expect(payload.format).toBe('document');
+		expect(payload.guid).toBe('shared-guid');
+		expect(payload.cardLists.map((l) => l.name)).toEqual(['Shared Deck']);
+		expect(payload.rawUpdate).not.toBeNull();
+	});
+
+	it('rejects the envelope by its own app field, before the update is ever decoded', () => {
+		expect(() => parseImportFile(envelope({ app: 'Some Other App' }))).toThrow(
+			ImportValidationError
+		);
+	});
+
+	it('rejects the envelope by its own schema_version', () => {
+		expect(() => parseImportFile(envelope({ version: '999' }))).toThrow(ImportValidationError);
+	});
+
+	it('rejects a corrupt base64 update', () => {
+		const json = JSON.stringify({
+			app: APP_NAME,
+			schema_version: CURRENT_VERSION,
+			guid: 'x',
+			update: '***not base64***'
+		});
+		expect(() => parseImportFile(new TextEncoder().encode(json))).toThrow(ImportValidationError);
+	});
+
+	it('still reads the legacy plain-JSON shape, which carries no update field', () => {
+		const payload = parseImportFile(encode({ app: APP_NAME, cardLists: [{ name: 'Plain' }] }));
+		expect(payload.format).toBe('json');
+		expect(payload.rawUpdate).toBeNull();
 	});
 });
