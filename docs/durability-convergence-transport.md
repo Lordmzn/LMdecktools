@@ -528,19 +528,37 @@ working.
 - [x] Re-cache critical assets on launch — the worker's registration survives
       WebKit's 7-day sweep while its cache does not, so nothing would refill it
       until a deploy changed `version`. The launch asks, every time
-- [ ] `deviceId` in `metadata`; copy registry (kind, label, last-seen)
-- [ ] Header widget: count + age per copy; one-copy warning state (D1)
-- [ ] First-run gate after first meaningful import
-- [ ] `<a download>` export path on every platform
+- [x] `deviceId` in `metadata`; copy registry (kind, label, last-seen) — lineage-
+      scoped by `guid`, so a foreign-lineage restore never inherits a stale
+      registry: `src/lib/copy-registry.ts` (#90)
+- [x] Header widget: count + age per copy; one-copy warning state (D1) —
+      header chip escalates to the warning lane at one copy and opens the DB
+      modal straight to a new Copies tab
+- [x] First-run gate after first meaningful import — shipped as a
+      dismissible-per-session nudge at 50 cards while only one copy is on
+      record, not a hard block; scope call recorded on #90
+- [x] `<a download>` export path on every platform — the three duplicated
+      download sequences (backup, CSV export, diagnostics journal) consolidated
+      into `src/lib/download.ts`; the backup download records itself as a copy
 - **Exit:** an installed iOS replica survives 14 days idle with data intact (Q1);
   no user can reach a one-copy state without being told
 
 ### M3 — File and share transports
-- [ ] T3 one-file-per-device layout on the `showSaveFilePicker` path
-- [ ] `<input type="file" multiple>` sibling import
-- [ ] T2b `.json` envelope; T2a remove `accept`; two-way classification (C4)
+- [x] T3 one-file-per-device layout on the `showSaveFilePicker` path — linked
+      file suggests `<deviceId>.ydelta`; `.yjs` retired everywhere, including
+      the backup download (#91)
+- [x] `<input type="file" multiple>` sibling import — "Read other devices'
+      files" in the In-browser DB tab (no File System Access API needed, so it
+      sits outside the File DB tab that's hidden without it), one
+      `MergePreviewModal` confirmation per file, recorded in the copy registry
+      as `sibling:<filename>` (#91)
+- [ ] T2b `.json` envelope; T2a remove `accept`; two-way classification (C4) —
+      `accept` removed from the restore and sibling-import inputs; the `.json`
+      envelope itself is still open
 - [ ] `navigator.share({files})` behind `canShare`; Android `share_target`
-- [ ] Merge-vs-union stated in the import UI
+- [x] Merge-vs-union stated in the import UI — `merge_preview_op_merge` /
+      `merge_preview_op_union`, shared by the linked-file, restore and
+      sibling-import paths
 - **Exit:** a file round-trips with lineage intact and deletions propagate
 
 ### M4 — Peer transport
